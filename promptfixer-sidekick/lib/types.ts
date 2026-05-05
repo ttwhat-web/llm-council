@@ -2,6 +2,16 @@ export type Engine = "auto" | "cloud" | "ollama" | "deterministic";
 
 export type Tier = "free" | "pro";
 
+/**
+ * Where the request originated from. Drives the *Auto* routing order:
+ *   web    → cloud → deterministic              (no Ollama on the server)
+ *   mobile → cloud → deterministic              (iPhone can't run Ollama)
+ *   desktop → ollama → cloud → deterministic    (Mac shell, prefers local)
+ *
+ * Default is "web". Detection lives in lib/clientContext.ts on the browser.
+ */
+export type ClientContext = "web" | "desktop" | "mobile";
+
 export type Mode =
   | "claude"
   | "chatgpt"
@@ -49,6 +59,7 @@ export interface FixRequest {
   mode?: Mode;
   engine?: Engine;
   autoMode?: boolean;
+  clientContext?: ClientContext;
 }
 
 export interface UsageSnapshot {
@@ -79,6 +90,7 @@ export interface SupervisorReview {
   engine: Engine;
   resolved: ProviderId;
   requestedEngine: Engine;
+  clientContext: ClientContext;
   fallbackUsed: boolean;
   model?: string;
   latencyMs?: number;
@@ -118,6 +130,29 @@ export interface ProviderHealth {
   error?: string;
 }
 
+/**
+ * The ordered list of provider ids that `route(engine, clientContext)` will
+ * try, in order. The first configured + reachable provider wins.
+ *
+ * Example payload:
+ *   {
+ *     auto: {
+ *       web:     ["cloud", "deterministic"],
+ *       mobile:  ["cloud", "deterministic"],
+ *       desktop: ["ollama", "cloud", "deterministic"]
+ *     },
+ *     cloud:         ["cloud", "deterministic"],
+ *     ollama:        ["ollama", "cloud", "deterministic"],
+ *     deterministic: ["deterministic"]
+ *   }
+ */
+export interface RoutingOrder {
+  auto: Record<ClientContext, Array<"cloud" | "ollama" | "deterministic">>;
+  cloud: Array<"cloud" | "deterministic">;
+  ollama: Array<"ollama" | "cloud" | "deterministic">;
+  deterministic: Array<"deterministic">;
+}
+
 export interface HealthResponse {
   ok: true;
   version: string;
@@ -125,6 +160,7 @@ export interface HealthResponse {
   cloud: ProviderHealth;
   ollama: ProviderHealth;
   deterministicAvailable: true;
+  routing: RoutingOrder;
   limits: {
     free: number;
     pro: number;

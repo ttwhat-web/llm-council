@@ -10,7 +10,14 @@ import { EngineStatus } from "./EngineStatus";
 import { Toggle } from "./Toggle";
 import { CopyButton } from "./CopyButton";
 import { SafetyBadge } from "./SafetyBadge";
-import type { CleanResponse, Engine, FixResponse, Mode } from "@/lib/types";
+import { useClientContext } from "@/lib/clientContext";
+import type {
+  CleanResponse,
+  ClientContext,
+  Engine,
+  FixResponse,
+  Mode
+} from "@/lib/types";
 
 interface Props {
   variant?: "web" | "floating";
@@ -32,6 +39,9 @@ const DEFAULTS: Settings = {
 
 export function PromptFixer({ variant = "web" }: Props) {
   const compact = variant === "floating";
+  // Tauri shells default to "desktop"; everything else hydrates from UA on mount.
+  const detectedContext: ClientContext = variant === "floating" ? "desktop" : "web";
+  const clientContext = useClientContext(detectedContext);
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const [input, setInput] = useState("");
   const [result, setResult] = useState<FixResponse | null>(null);
@@ -67,7 +77,8 @@ export function PromptFixer({ variant = "web" }: Props) {
           input,
           mode: settings.autoMode ? undefined : settings.mode,
           engine: settings.engine,
-          autoMode: settings.autoMode
+          autoMode: settings.autoMode,
+          clientContext
         })
       });
       const data = (await res.json()) as FixResponse & { error?: string };
@@ -85,7 +96,7 @@ export function PromptFixer({ variant = "web" }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [input, busy, settings]);
+  }, [input, busy, settings, clientContext]);
 
   const clean = useCallback(async () => {
     if (!input.trim() || busy) return;
@@ -195,6 +206,7 @@ export function PromptFixer({ variant = "web" }: Props) {
 
       <EngineStatus
         selectedEngine={settings.engine}
+        clientContext={clientContext}
         lastSupervisor={result?.supervisor}
         lastUsage={result?.usage}
         compact={compact}

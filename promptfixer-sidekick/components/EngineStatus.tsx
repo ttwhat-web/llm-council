@@ -3,10 +3,17 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Cloud, Cpu, RefreshCw, Settings2 } from "lucide-react";
-import type { Engine, HealthResponse, SupervisorReview, UsageSnapshot } from "@/lib/types";
+import type {
+  ClientContext,
+  Engine,
+  HealthResponse,
+  SupervisorReview,
+  UsageSnapshot
+} from "@/lib/types";
 
 interface Props {
   selectedEngine: Engine;
+  clientContext: ClientContext;
   lastSupervisor?: SupervisorReview;
   lastUsage?: UsageSnapshot;
   compact?: boolean;
@@ -14,6 +21,7 @@ interface Props {
 
 export function EngineStatus({
   selectedEngine,
+  clientContext,
   lastSupervisor,
   lastUsage,
   compact
@@ -112,6 +120,8 @@ export function EngineStatus({
         <div>
           <span className="text-white/45">Selected: </span>
           <span className="text-white/85">{selectedEngine}</span>
+          <span className="text-white/45"> · context: </span>
+          <span className="text-white/85">{clientContext}</span>
           {health && (
             <>
               <span className="text-white/45"> · default: </span>
@@ -119,6 +129,14 @@ export function EngineStatus({
             </>
           )}
         </div>
+        {health && (
+          <div className="mt-1">
+            <span className="text-white/45">Routing ({selectedEngine}): </span>
+            <span className="font-mono text-white/85">
+              {routingFor(health, selectedEngine, clientContext).join(" → ")}
+            </span>
+          </div>
+        )}
         {lastSupervisor && (
           <div className="mt-1">
             <span className="text-white/45">Last call: </span>
@@ -185,4 +203,15 @@ function formatReset(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function routingFor(
+  health: HealthResponse,
+  engine: Engine,
+  ctx: ClientContext
+): readonly string[] {
+  if (engine === "auto") return health.routing.auto[ctx];
+  if (engine === "cloud") return health.routing.cloud;
+  if (engine === "ollama") return health.routing.ollama;
+  return health.routing.deterministic;
 }

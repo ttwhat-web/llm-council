@@ -17,7 +17,7 @@ const OPTIONS: Option[] = [
   {
     id: "auto",
     label: "Auto",
-    blurb: "Use whatever is configured (cloud preferred).",
+    blurb: "Web/iPhone → cloud. Desktop → Ollama if configured, else cloud.",
     Icon: Layers
   },
   {

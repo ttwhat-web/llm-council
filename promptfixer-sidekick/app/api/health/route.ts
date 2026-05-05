@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import {
   cloudProvider,
   defaultEngine,
-  ollamaProvider
+  ollamaProvider,
+  routingOrder
 } from "@/lib/providers";
 import { FREE_DAILY_LIMIT, PRO_DAILY_LIMIT } from "@/lib/usage";
 import type { HealthResponse } from "@/lib/types";
@@ -15,11 +16,12 @@ export async function GET() {
 
   const payload: HealthResponse = {
     ok: true,
-    version: "1.1.0",
+    version: "1.2.0",
     defaultEngine: defaultEngine(),
     cloud,
     ollama,
     deterministicAvailable: true,
+    routing: routingOrder(),
     limits: {
       free: FREE_DAILY_LIMIT,
       pro: PRO_DAILY_LIMIT

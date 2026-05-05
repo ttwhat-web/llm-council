@@ -1,6 +1,6 @@
 import { renderPrompt } from "./engine";
 import type { Provider } from "./providers";
-import type { Mode, PromptSections, SupervisorReview, Tier } from "./types";
+import type { ClientContext, Mode, PromptSections, SupervisorReview, Tier } from "./types";
 
 const SUPERVISOR_SYSTEM = `You are PromptFixer's supervisor.
 You DO NOT write the final answer for the user.
@@ -13,6 +13,7 @@ interface ReviewArgs {
   provider: Provider;
   requestedEngine: SupervisorReview["requestedEngine"];
   resolvedEngine: SupervisorReview["engine"];
+  clientContext: ClientContext;
   fallbackUsed: boolean;
   sections: PromptSections;
   mode: Mode;
@@ -33,6 +34,7 @@ export async function runSupervisor({
   provider,
   requestedEngine,
   resolvedEngine,
+  clientContext,
   fallbackUsed,
   sections,
   mode,
@@ -46,6 +48,7 @@ export async function runSupervisor({
       engine: "deterministic",
       requestedEngine,
       resolved: "deterministic",
+      clientContext,
       fallbackUsed
     };
   }
@@ -88,6 +91,7 @@ export async function runSupervisor({
       engine: resolvedEngine,
       resolved: result.providerId,
       requestedEngine,
+      clientContext,
       fallbackUsed,
       error: result.error
     };
@@ -100,6 +104,7 @@ export async function runSupervisor({
       engine: resolvedEngine,
       resolved: result.providerId,
       requestedEngine,
+      clientContext,
       fallbackUsed,
       model: result.model,
       latencyMs: result.latencyMs,
@@ -124,6 +129,7 @@ export async function runSupervisor({
     engine: resolvedEngine,
     resolved: result.providerId,
     requestedEngine,
+    clientContext,
     fallbackUsed,
     model: result.model,
     latencyMs: result.latencyMs,

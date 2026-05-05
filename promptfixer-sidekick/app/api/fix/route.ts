@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fixPrompt } from "@/lib/ai";
 import { isMode } from "@/lib/modes";
-import { isEngine, route } from "@/lib/providers";
+import { isClientContext, isEngine, route } from "@/lib/providers";
 import {
   clientKeyFromHeaders,
   consume,
   FREE_DAILY_LIMIT,
   peek
 } from "@/lib/usage";
-import type { Engine, FixRequest, Tier } from "@/lib/types";
+import type { ClientContext, Engine, FixRequest, Tier } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,12 +27,17 @@ export async function POST(req: NextRequest) {
   }
 
   const requestedEngine: Engine | undefined = isEngine(body.engine) ? body.engine : undefined;
+  const clientContext: ClientContext = isClientContext(body.clientContext)
+    ? body.clientContext
+    : "web";
+
   // Tier is server-decided in v1 (no auth yet). Wired so the billing layer can
   // populate it from a session/JWT later without changing the route shape.
   const tier: Tier = "free";
 
   // Resolve which provider we'd actually use, so we only meter cloud calls.
-  const routed = route(requestedEngine);
+  // Ollama and deterministic runs never count against the daily quota.
+  const routed = route(requestedEngine, clientContext);
   const willHitCloud = routed.resolved === "cloud";
 
   let usage = peek(clientKeyFromHeaders(req.headers), tier);
@@ -57,12 +62,12 @@ export async function POST(req: NextRequest) {
       input,
       mode: isMode(body.mode) ? body.mode : undefined,
       engine: requestedEngine,
-      autoMode: Boolean(body.autoMode)
+      autoMode: Boolean(body.autoMode),
+      clientContext
     },
     { tier, usage }
   );
 
-  // Soft hint header that lets the UI surface remaining quota.
   const headers = new Headers();
   headers.set("X-RateLimit-Limit", String(usage.limit));
   headers.set("X-RateLimit-Remaining", String(usage.remaining));

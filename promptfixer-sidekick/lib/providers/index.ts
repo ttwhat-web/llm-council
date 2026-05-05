@@ -1,20 +1,23 @@
 /**
  * Provider router.
  *
- * Routing rules (in order):
- *   - engine = "deterministic"      → deterministic (never call out)
- *   - engine = "ollama"              → ollama if configured, else cloud, else deterministic
- *   - engine = "cloud"               → cloud   if configured, else deterministic
- *   - engine = "auto" (or default)   → cloud   if configured, else ollama, else deterministic
+ * Routing rules — context-aware in Auto mode:
  *
- * The env variable AI_ENGINE pins the default when no engine is supplied
- * by the request (overriding "auto").
+ *   engine = "deterministic"           → deterministic                        (never call out)
+ *   engine = "ollama"                  → ollama → cloud → deterministic       (regardless of context)
+ *   engine = "cloud"                   → cloud → deterministic                (regardless of context)
+ *   engine = "auto" + web              → cloud → deterministic                (no Ollama on server)
+ *   engine = "auto" + mobile           → cloud → deterministic                (iPhone can't run Ollama)
+ *   engine = "auto" + desktop          → ollama → cloud → deterministic       (Mac shell prefers local)
  *
- * Cloud calls run server-side only; Ollama is opt-in and only hit when
- * OLLAMA_BASE_URL is configured. The VPS does NOT host heavy local models.
+ * AI_ENGINE pins the default engine when the request doesn't specify.
+ * clientContext defaults to "web".
+ *
+ * Cloud calls run server-side only; Ollama is opt-in (OLLAMA_BASE_URL must be set).
+ * The VPS does NOT host heavy local models.
  */
 
-import type { Engine } from "../types";
+import type { ClientContext, Engine, RoutingOrder } from "../types";
 import { cloudProvider } from "./cloud";
 import { deterministicProvider } from "./deterministic";
 import { ollamaProvider } from "./ollama";
@@ -33,43 +36,93 @@ export function isEngine(value: unknown): value is Engine {
   return value === "auto" || value === "cloud" || value === "ollama" || value === "deterministic";
 }
 
+export function isClientContext(value: unknown): value is ClientContext {
+  return value === "web" || value === "desktop" || value === "mobile";
+}
+
 export interface RouteResult {
   provider: Provider;
   requested: Engine;
   resolved: Engine;
+  clientContext: ClientContext;
   fallbackUsed: boolean;
+  order: Array<"cloud" | "ollama" | "deterministic">;
 }
 
-export function route(requested?: Engine): RouteResult {
+/**
+ * The static preference list for a given (engine, clientContext) pair.
+ * Used by /api/health to expose routing intent without actually probing.
+ */
+export function preferenceList(
+  engine: Engine,
+  clientContext: ClientContext
+): Array<"cloud" | "ollama" | "deterministic"> {
+  if (engine === "deterministic") return ["deterministic"];
+  if (engine === "ollama") return ["ollama", "cloud", "deterministic"];
+  if (engine === "cloud") return ["cloud", "deterministic"];
+  // auto — context-aware
+  if (clientContext === "desktop") return ["ollama", "cloud", "deterministic"];
+  return ["cloud", "deterministic"];
+}
+
+export function routingOrder(): RoutingOrder {
+  return {
+    auto: {
+      web: preferenceList("auto", "web"),
+      mobile: preferenceList("auto", "mobile"),
+      desktop: preferenceList("auto", "desktop")
+    } as RoutingOrder["auto"],
+    cloud: preferenceList("cloud", "web") as RoutingOrder["cloud"],
+    ollama: preferenceList("ollama", "web") as RoutingOrder["ollama"],
+    deterministic: preferenceList("deterministic", "web") as RoutingOrder["deterministic"]
+  };
+}
+
+export function route(requested?: Engine, clientContext: ClientContext = "web"): RouteResult {
   const ask: Engine = isEngine(requested) ? requested : defaultEngine();
+  const ctx: ClientContext = isClientContext(clientContext) ? clientContext : "web";
+  const order = preferenceList(ask, ctx);
 
-  if (ask === "deterministic") {
-    return { provider: deterministicProvider, requested: ask, resolved: "deterministic", fallbackUsed: false };
-  }
-
-  if (ask === "ollama") {
-    if (ollamaProvider.isConfigured()) {
-      return { provider: ollamaProvider, requested: ask, resolved: "ollama", fallbackUsed: false };
+  for (const id of order) {
+    if (id === "deterministic") {
+      return {
+        provider: deterministicProvider,
+        requested: ask,
+        resolved: "deterministic",
+        clientContext: ctx,
+        fallbackUsed: order[0] !== "deterministic",
+        order
+      };
     }
-    if (cloudProvider.isConfigured()) {
-      return { provider: cloudProvider, requested: ask, resolved: "cloud", fallbackUsed: true };
+    if (id === "cloud" && cloudProvider.isConfigured()) {
+      return {
+        provider: cloudProvider,
+        requested: ask,
+        resolved: "cloud",
+        clientContext: ctx,
+        fallbackUsed: order[0] !== "cloud",
+        order
+      };
     }
-    return { provider: deterministicProvider, requested: ask, resolved: "deterministic", fallbackUsed: true };
+    if (id === "ollama" && ollamaProvider.isConfigured()) {
+      return {
+        provider: ollamaProvider,
+        requested: ask,
+        resolved: "ollama",
+        clientContext: ctx,
+        fallbackUsed: order[0] !== "ollama",
+        order
+      };
+    }
   }
 
-  if (ask === "cloud") {
-    if (cloudProvider.isConfigured()) {
-      return { provider: cloudProvider, requested: ask, resolved: "cloud", fallbackUsed: false };
-    }
-    return { provider: deterministicProvider, requested: ask, resolved: "deterministic", fallbackUsed: true };
-  }
-
-  // auto
-  if (cloudProvider.isConfigured()) {
-    return { provider: cloudProvider, requested: ask, resolved: "cloud", fallbackUsed: false };
-  }
-  if (ollamaProvider.isConfigured()) {
-    return { provider: ollamaProvider, requested: ask, resolved: "ollama", fallbackUsed: false };
-  }
-  return { provider: deterministicProvider, requested: ask, resolved: "deterministic", fallbackUsed: false };
+  // Unreachable: deterministic is always last and always available.
+  return {
+    provider: deterministicProvider,
+    requested: ask,
+    resolved: "deterministic",
+    clientContext: ctx,
+    fallbackUsed: true,
+    order
+  };
 }
