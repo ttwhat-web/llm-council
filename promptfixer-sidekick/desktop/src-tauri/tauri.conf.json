@@ -1,0 +1,72 @@
+{
+  "$schema": "https://schema.tauri.app/config/1",
+  "build": {
+    "beforeDevCommand": "npm --prefix .. run dev",
+    "beforeBuildCommand": "npm --prefix .. run build",
+    "devPath": "http://localhost:3030/floating",
+    "distDir": "../../.next",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "PromptFixer Sidekick",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "window": {
+        "all": true
+      },
+      "globalShortcut": {
+        "all": true
+      },
+      "clipboard": {
+        "all": true,
+        "readText": true,
+        "writeText": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "category": "DeveloperTool",
+      "identifier": "com.promptfixer.sidekick",
+      "shortDescription": "Floating prompt optimiser",
+      "longDescription": "Floating, always-on-top assistant that cleans, structures, and supervises prompts using a local Gemma model via Ollama.",
+      "targets": "all",
+      "copyright": "© PromptFixer",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ]
+    },
+    "security": {
+      "csp": null
+    },
+    "systemTray": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": true
+    },
+    "windows": [
+      {
+        "label": "floating",
+        "title": "PromptFixer",
+        "url": "/floating",
+        "width": 420,
+        "height": 600,
+        "minWidth": 360,
+        "minHeight": 480,
+        "resizable": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "fullscreen": false,
+        "focus": true,
+        "visible": true
+      }
+    ]
+  }
+}
