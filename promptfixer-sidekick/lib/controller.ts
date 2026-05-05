@@ -1,6 +1,6 @@
-import { callOllama } from "./ollama";
-import type { Mode, PromptSections, SupervisorReview } from "./types";
 import { renderPrompt } from "./engine";
+import type { Provider } from "./providers";
+import type { Mode, PromptSections, SupervisorReview, Tier } from "./types";
 
 const SUPERVISOR_SYSTEM = `You are PromptFixer's supervisor.
 You DO NOT write the final answer for the user.
@@ -10,9 +10,14 @@ Never invent facts. Never add unsafe instructions. Never lengthen the prompt for
 Return STRICT JSON, no prose, matching the schema you are given.`;
 
 interface ReviewArgs {
+  provider: Provider;
+  requestedEngine: SupervisorReview["requestedEngine"];
+  resolvedEngine: SupervisorReview["engine"];
+  fallbackUsed: boolean;
   sections: PromptSections;
   mode: Mode;
   rawInput: string;
+  tier: Tier;
 }
 
 interface SupervisorJSON {
@@ -25,10 +30,26 @@ interface SupervisorJSON {
 }
 
 export async function runSupervisor({
+  provider,
+  requestedEngine,
+  resolvedEngine,
+  fallbackUsed,
   sections,
   mode,
-  rawInput
+  rawInput,
+  tier
 }: ReviewArgs): Promise<SupervisorReview> {
+  // Deterministic provider is a no-op sentinel.
+  if (provider.id === "deterministic") {
+    return {
+      used: false,
+      engine: "deterministic",
+      requestedEngine,
+      resolved: "deterministic",
+      fallbackUsed
+    };
+  }
+
   const draft = renderPrompt(sections, mode);
 
   const prompt = [
@@ -54,20 +75,32 @@ export async function runSupervisor({
     )
   ].join("\n");
 
-  const result = await callOllama(prompt, {
+  const result = await provider.generate(prompt, {
     system: SUPERVISOR_SYSTEM,
     temperature: 0.1,
-    format: "json"
+    json: true,
+    tier
   });
 
   if (!result.ok) {
-    return { used: false, error: result.error };
+    return {
+      used: false,
+      engine: resolvedEngine,
+      resolved: result.providerId,
+      requestedEngine,
+      fallbackUsed,
+      error: result.error
+    };
   }
 
   const parsed = safeParse(result.content);
   if (!parsed) {
     return {
       used: true,
+      engine: resolvedEngine,
+      resolved: result.providerId,
+      requestedEngine,
+      fallbackUsed,
       model: result.model,
       latencyMs: result.latencyMs,
       error: "supervisor returned non-JSON; keeping deterministic draft",
@@ -88,6 +121,10 @@ export async function runSupervisor({
 
   return {
     used: true,
+    engine: resolvedEngine,
+    resolved: result.providerId,
+    requestedEngine,
+    fallbackUsed,
     model: result.model,
     latencyMs: result.latencyMs,
     notes: parsed.notes,
@@ -109,7 +146,6 @@ function safeParse(raw: string): SupervisorJSON | null {
   if (!raw) return null;
   const direct = tryJSON(raw);
   if (direct) return direct;
-  // Models sometimes wrap JSON in fences or stray prose. Pull the first {...} block.
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) return null;
   return tryJSON(match[0]);

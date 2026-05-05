@@ -1,17 +1,30 @@
 import { NextResponse } from "next/server";
-import { health } from "@/lib/ollama";
+import {
+  cloudProvider,
+  defaultEngine,
+  ollamaProvider
+} from "@/lib/providers";
+import { FREE_DAILY_LIMIT, PRO_DAILY_LIMIT } from "@/lib/usage";
+import type { HealthResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const status = await health();
-  return NextResponse.json(
-    {
-      ok: true,
-      ollama: status,
-      version: "1.0.0"
-    },
-    { status: 200 }
-  );
+  const [cloud, ollama] = await Promise.all([cloudProvider.health(), ollamaProvider.health()]);
+
+  const payload: HealthResponse = {
+    ok: true,
+    version: "1.1.0",
+    defaultEngine: defaultEngine(),
+    cloud,
+    ollama,
+    deterministicAvailable: true,
+    limits: {
+      free: FREE_DAILY_LIMIT,
+      pro: PRO_DAILY_LIMIT
+    }
+  };
+
+  return NextResponse.json(payload, { status: 200 });
 }

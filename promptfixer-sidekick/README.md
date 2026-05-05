@@ -1,190 +1,262 @@
 # PromptFixer Sidekick
 
-A floating, always-on-top prompt optimiser with a matching Next.js web UI.
-Local-first: a deterministic engine builds your prompt; a local Gemma model
-(via Ollama) acts as a **supervisor** — auditing, tightening, and validating —
-not as the writer.
+Floating prompt optimiser with a Next.js web UI and an optional Tauri desktop
+shell. Three ways to run the AI engine — pick the one that fits how you ship.
 
 ```
 INPUT
   → cleaner.ts          (strip noise / smart-quotes / filler)
   → mode detection      (auto, or explicit)
-  → engine.ts           (Role / Task / Context / Constraints / Output Format)
+  → engine.ts           (Role · Task · Context · Constraints · Output Format)
+  → providers/index.ts  (route to cloud / ollama / deterministic)
+  → controller.ts       (supervisor pass — JSON contract; deterministic skips it)
   → safety.ts           (terminal-mode danger screen)
-  → controller.ts       (Gemma supervisor pass — optional)
 OUTPUT
 ```
 
-## Modes
+## AI execution modes
 
-| Mode        | Use when…                                                  |
-| ----------- | ---------------------------------------------------------- |
-| Claude      | Targeting Anthropic Claude (XML-tagged sections)           |
-| ChatGPT     | Targeting OpenAI ChatGPT (markdown, action-first)          |
-| Dev         | Engineering: code review, refactor, debugging              |
-| Terminal    | Shell automation — runs a destructive-command safety pass  |
-| Business    | Memos, briefs, executive comms                             |
-| General     | Balanced default                                           |
-| AS400       | IBM i / RPG / COBOL / DB2 for i — audit-friendly tone      |
+| Mode                | Who it's for                                  | Where the AI runs                       | Cost owner       |
+| ------------------- | --------------------------------------------- | --------------------------------------- | ---------------- |
+| **Free / Web**      | Default for web + iPhone users                | Cloud provider via server-side proxy    | App owner (you)  |
+| **Pro / Cloud**     | Paying users — higher limits, flagship models | Cloud provider via server-side proxy    | App owner (you)  |
+| **Local Ollama**    | Mac power users — *unlimited & private*       | The user's own Mac (`ollama serve`)     | The user         |
 
-## Quick start
+> The VPS hosts the Next.js app, API routes, auth/billing, and the cloud
+> provider proxy. **It does not host heavy local models.** That keeps the
+> server cheap and lets Mac users opt in to unlimited local inference on
+> their own hardware.
 
-### 1. Install Ollama
+### Routing rules
 
-```bash
-# macOS
-brew install ollama
-# Linux
-curl -fsSL https://ollama.com/install.sh | sh
-# Windows
-winget install Ollama.Ollama
+The engine selector in the UI (and `engine` field on `/api/fix`) drives this:
+
+```
+engine = "deterministic" → deterministic   (never calls out)
+engine = "ollama"        → ollama → cloud → deterministic    (if ollama unconfigured)
+engine = "cloud"         → cloud  → deterministic            (if cloud  unconfigured)
+engine = "auto"          → cloud  → ollama → deterministic   (cloud preferred for web)
 ```
 
-Start the daemon:
+`AI_ENGINE` in `.env.local` pins the default when the request doesn't specify.
 
-```bash
-ollama serve
-```
+---
 
-### 2. Pull the supervisor model
+## 1. Default web setup
 
-```bash
-ollama pull gemma2:2b
-# fallbacks
-ollama pull llama3:8b
-ollama pull mistral:7b
-```
-
-> The brief calls for `gemma4:e4b`. Until that public alias exists in the
-> Ollama registry, the closest small Gemma in the same family is `gemma2:2b`
-> (~1.6 GB, runs on CPU). Override with `OLLAMA_MODEL` in `.env.local`.
-
-### 3. Run the web app
+The fastest path: a free user on the web hits your VPS, the server calls a
+cloud provider, the user gets an answer. Nothing installed locally.
 
 ```bash
 cp .env.example .env.local
+# Set at least one of:
+#   ANTHROPIC_API_KEY=sk-ant-...
+#   OPENAI_API_KEY=sk-...
+
 npm install
-npm run dev
+npm run dev    # http://localhost:3030
 ```
 
-Open http://localhost:3030.
+That's it. Engine selector defaults to **Auto** → resolves to **Cloud AI**.
 
-### 4. Run the floating desktop window (Tauri)
+## 2. Cloud AI setup
 
-You need the Rust toolchain (`rustup`) and the system webview deps. See
-[Tauri prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites).
+Same path as above. Detail:
+
+- Keys live **only** in `.env.local` / your VPS env. They are **never** sent
+  to the browser. All cloud calls happen inside `app/api/fix/route.ts`.
+- Anthropic is preferred when both keys are set. Override defaults:
+  ```env
+  CLOUD_MODEL_FREE=claude-haiku-4-5-20251001
+  CLOUD_MODEL_PRO=claude-sonnet-4-6
+  ```
+- Free tier maps to the cheap/fast model; Pro tier maps to the flagship.
+  Tier is currently `free` for everyone (no auth yet) — wire your billing
+  layer into `app/api/fix/route.ts` to flip it.
+
+## 3. Optional Ollama local setup (Mac)
+
+Marketed as: **"Unlimited local mode — runs on your own Mac."**
 
 ```bash
-npm run tauri:dev
+# 1. Install Ollama
+brew install ollama   # or curl -fsSL https://ollama.com/install.sh | sh
+ollama serve          # leave running
+
+# 2. Pull a small supervisor model (~1.6 GB)
+ollama pull gemma2:2b
+# or larger: ollama pull llama3:8b
+
+# 3. Point the app at it (Mac-only — do NOT do this on the VPS)
+echo 'OLLAMA_BASE_URL=http://127.0.0.1:11434' >> .env.local
+echo 'OLLAMA_MODEL=gemma2:2b'                >> .env.local
+
+# 4. Restart `npm run dev` and pick "Local Ollama" from the engine selector.
 ```
 
-Toggle with **`Cmd/Ctrl + Shift + P`** or the system tray icon.
+The bundled Tauri desktop app (`npm run tauri:dev`) is the canonical way to
+ship this to Mac users — same UI, runs locally, talks to the user's own
+Ollama daemon.
 
-To build a signed release binary:
+> **Brief said `gemma4:e4b`.** That alias isn't in the public Ollama registry
+> at time of writing, so the default is the closest small Gemma in the same
+> family (`gemma2:2b`). Override with `OLLAMA_MODEL` whenever the alias ships.
 
-```bash
-npm run tauri:build
+## 4. Why the VPS does not run heavy models
+
+- **Cost.** A Mistral-7B / Gemma-7B / Llama-3-8B on a CPU VPS is unusable;
+  on a GPU VPS it costs $200–800 / month idling.
+- **Latency.** A small VPS hitting a 7B model gives ~10–30 s/response. Cloud
+  APIs return in 1–3 s with no infra to babysit.
+- **Concurrency.** A single Ollama process blocks per request. Two users at
+  once degrade to serial. Cloud providers parallelise across their fleet.
+- **Footprint.** The Next.js app + API routes fits comfortably on a $5
+  VPS. Adding a model server requires a different machine class.
+- **Privacy story.** Mac users who genuinely want privacy run the model
+  *on their own machine* — not on yours. That is a stronger guarantee than
+  "we promise we won't log it."
+
+If you ever do want a server-hosted model, set up a separate GPU box and
+point a *non-localhost* `OLLAMA_BASE_URL` at it; production refuses
+non-localhost Ollama unless you explicitly set `OLLAMA_ALLOW_REMOTE=1`.
+
+## 5. Usage limit model
+
+In-process, daily, per-IP — replace with Redis/KV when you go multi-instance.
+
+| Tier | Default     | Env var              | Counts what?              |
+| ---- | ----------- | -------------------- | ------------------------- |
+| free | 10 / day    | `FREE_DAILY_LIMIT`   | Cloud calls only          |
+| pro  | 1000 / day  | `PRO_DAILY_LIMIT`    | Cloud calls only          |
+
+Local Ollama and deterministic runs are **never** metered (they cost you
+nothing). Limits live in `lib/usage.ts`. The route returns a `429` with a
+`usage` snapshot when the bucket is exhausted, plus standard
+`X-RateLimit-*` headers.
+
+## 6. Future billing plan
+
+The seams are already cut so you can drop billing in without touching the UI:
+
+1. **Auth** — add NextAuth (or Clerk) at `/api/auth/*`.
+2. **Tier resolver** — replace the hard-coded `tier = "free"` in
+   `app/api/fix/route.ts` with a lookup against the session/JWT.
+3. **Stripe** — checkout → webhook → flip the user's tier in your DB.
+4. **Storage** — swap the in-memory `Map` in `lib/usage.ts` for Redis or
+   Vercel KV. Keys are already namespaced as `tier:client:day`.
+5. **Pricing page** — surface what each tier gets (limit, model, support).
+
+No changes required to providers, controller, or engine logic.
+
+---
+
+## API surface
+
+### `POST /api/fix`
+
+Request:
+```json
+{
+  "input": "fix this code its broken node express error",
+  "mode": "dev",            // optional; auto-detected when autoMode = true
+  "engine": "auto",         // auto | cloud | ollama | deterministic
+  "autoMode": true
+}
 ```
 
-## Configuration
+Response (`200`):
+```json
+{
+  "ok": true,
+  "mode": "dev",
+  "detectedMode": "dev",
+  "cleaned": "...",
+  "prompt": "# Role ...",
+  "sections": { "role": "...", "task": "...", "context": "...", "constraints": [...], "outputFormat": "..." },
+  "safety":   { "blocked": false, "requiresConfirmation": false, "findings": [] },
+  "supervisor": {
+    "used": true,
+    "engine": "cloud",
+    "requestedEngine": "auto",
+    "resolved": "cloud-anthropic",
+    "fallbackUsed": false,
+    "model": "claude-haiku-4-5-20251001",
+    "latencyMs": 612,
+    "notes": "tightened output_format; removed redundant tone constraint"
+  },
+  "usage": { "tier": "free", "used": 3, "limit": 10, "remaining": 7, "resetAt": "..." },
+  "elapsedMs": 743
+}
+```
 
-`.env.local` (copy from `.env.example`):
+Returns `429` with the same `usage` snapshot when the daily cap is hit.
 
-| Variable            | Default                       | Purpose                                |
-| ------------------- | ----------------------------- | -------------------------------------- |
-| `OLLAMA_HOST`       | `http://127.0.0.1:11434`      | Ollama HTTP endpoint                   |
-| `OLLAMA_MODEL`      | `gemma2:2b`                   | Supervisor model                       |
-| `OLLAMA_FALLBACKS`  | `llama3:8b,mistral:7b`        | Comma-separated fallback chain         |
-| `OLLAMA_TIMEOUT_MS` | `12000`                       | Hard cap on a supervisor call          |
+### `POST /api/clean`
 
-In the UI:
+Pure deterministic cleaner. No AI call. No quota.
 
-- **Auto** — detect mode from the input.
-- **Use Local AI (Ollama)** — when off, ships the deterministic prompt
-  immediately. When on, runs the Gemma supervisor pass and falls back to the
-  deterministic prompt if Ollama is unreachable.
+### `GET /api/health`
 
-## Architecture
+```json
+{
+  "ok": true,
+  "version": "1.1.0",
+  "defaultEngine": "auto",
+  "cloud":  { "id": "cloud",  "configured": true,  "reachable": true,  "vendor": "anthropic", "model": "claude-haiku-4-5-20251001" },
+  "ollama": { "id": "ollama", "configured": false, "reachable": false, "error": "OLLAMA_BASE_URL not set." },
+  "deterministicAvailable": true,
+  "limits": { "free": 10, "pro": 1000 }
+}
+```
+
+The UI status panel polls this on mount and on the **Refresh** button.
+
+---
+
+## File map
 
 ```
 promptfixer-sidekick/
 ├── app/
 │   ├── api/
-│   │   ├── clean/route.ts    POST  - deterministic cleaner only
-│   │   ├── fix/route.ts      POST  - full pipeline
-│   │   └── health/route.ts   GET   - reports Ollama reachability + model list
-│   ├── floating/page.tsx           - borderless overlay (loaded by Tauri)
-│   ├── layout.tsx                  - dark-mode root layout
-│   └── page.tsx                    - web companion
+│   │   ├── clean/route.ts        deterministic cleaner only
+│   │   ├── fix/route.ts          full pipeline + tier limits
+│   │   └── health/route.ts       cloud + ollama + default engine
+│   ├── floating/page.tsx         borderless overlay (Tauri target)
+│   ├── layout.tsx
+│   └── page.tsx                  web companion
 ├── components/
-│   ├── PromptFixer.tsx             - main interactive surface (web + floating)
-│   ├── ModeSelect.tsx              - mode dropdown
-│   ├── SafetyBadge.tsx             - terminal-mode safety findings
+│   ├── PromptFixer.tsx           main interactive surface (web + floating)
+│   ├── ModeSelect.tsx            prompt mode dropdown
+│   ├── EngineSelect.tsx          engine dropdown (Auto / Cloud / Ollama / Rules)
+│   ├── EngineStatus.tsx          live status panel (cloud + ollama + active)
+│   ├── SafetyBadge.tsx           terminal-mode safety findings
 │   ├── Toggle.tsx
 │   └── CopyButton.tsx
 ├── lib/
-│   ├── ai.ts                       - pipeline orchestrator
-│   ├── cleaner.ts                  - deterministic noise stripper
-│   ├── controller.ts               - Gemma supervisor (JSON contract)
-│   ├── engine.ts                   - mode detection + prompt builder
-│   ├── modes.ts                    - mode profiles
-│   ├── ollama.ts                   - HTTP client w/ fallback chain + timeout
-│   ├── safety.ts                   - destructive-command rules
+│   ├── ai.ts                     orchestrator
+│   ├── cleaner.ts                noise stripper
+│   ├── controller.ts             supervisor JSON contract
+│   ├── engine.ts                 mode detection + prompt builder
+│   ├── modes.ts                  7 mode profiles incl. AS400
+│   ├── safety.ts                 destructive-command rules
+│   ├── usage.ts                  daily per-IP limiter
+│   ├── providers/
+│   │   ├── index.ts              router (auto/cloud/ollama/deterministic)
+│   │   ├── cloud.ts              Anthropic + OpenAI (server-side only)
+│   │   ├── ollama.ts             local-only by default
+│   │   ├── deterministic.ts      no-op sentinel
+│   │   └── types.ts              Provider interface
 │   └── types.ts
 └── desktop/
-    └── src-tauri/                  - Rust shell: tray, global shortcut, transparent window
+    └── src-tauri/                Tauri shell: tray, Cmd+Shift+P, transparent window
 ```
 
-### Pipeline contract
+## Run the floating desktop window
 
-`lib/ai.ts → fixPrompt(req)` returns:
-
-```ts
-{
-  ok: true,
-  mode: "as400",
-  detectedMode?: "as400",
-  cleaned: "...",
-  prompt: "...",                     // ready-to-paste optimised prompt
-  sections: { role, task, context, constraints[], outputFormat },
-  safety: { blocked, requiresConfirmation, findings[], rewritten? },
-  supervisor: {
-    used: true,
-    model: "gemma2:2b",
-    latencyMs: 612,
-    notes: "tightened output_format; removed redundant tone constraint",
-    improved?: { ... }
-  },
-  elapsedMs: 743
-}
+```bash
+npm run tauri:dev   # Cmd/Ctrl + Shift + P toggles
+npm run tauri:build # release binary
 ```
 
-Every output prompt is guaranteed to contain **Role · Task · Context ·
-Constraints · Output Format**. The supervisor can edit each section but cannot
-remove any.
-
-### Safety screen (Terminal Mode)
-
-`lib/safety.ts` matches against an explicit ruleset (`rm -rf`, `dd`, `mkfs`,
-`DROP TABLE`, force-push, fork bombs, `chmod 777`, `curl | sh`, …) before the
-prompt is returned. Findings are surfaced in the UI; `critical` findings flip
-`safety.blocked = true` so the consumer can refuse to ship the prompt.
-
-## Why "supervisor", not "writer"
-
-Small local models hallucinate when asked to author from scratch. They are
-genuinely good at:
-
-- spotting redundant or vague constraints,
-- normalising structure,
-- failing fast when the input is incoherent.
-
-So PromptFixer pins Gemma to that role with a strict JSON contract. If the
-model returns garbage, the deterministic prompt ships unchanged. This keeps
-the pipeline reliable on a $0 stack.
-
-## Roadmap
-
-- **v1.5** — clipboard auto-detect, selection capture (Tauri + accessibility APIs)
-- **v2** — multi-model routing (route Dev → Claude, Business → GPT), JSON-file
-  prompt history, cloud sync (opt-in).
+See `desktop/README.md` for prerequisites.

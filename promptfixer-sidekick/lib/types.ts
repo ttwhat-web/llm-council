@@ -1,3 +1,7 @@
+export type Engine = "auto" | "cloud" | "ollama" | "deterministic";
+
+export type Tier = "free" | "pro";
+
 export type Mode =
   | "claude"
   | "chatgpt"
@@ -43,12 +47,39 @@ export interface SafetyReport {
 export interface FixRequest {
   input: string;
   mode?: Mode;
-  useLocalAI?: boolean;
+  engine?: Engine;
   autoMode?: boolean;
 }
 
+export interface UsageSnapshot {
+  tier: Tier;
+  used: number;
+  limit: number;
+  remaining: number;
+  resetAt: string;
+}
+
+export interface ProviderResult {
+  ok: boolean;
+  providerId: ProviderId;
+  model: string;
+  content: string;
+  latencyMs: number;
+  error?: string;
+}
+
+export type ProviderId =
+  | "cloud-anthropic"
+  | "cloud-openai"
+  | "ollama"
+  | "deterministic";
+
 export interface SupervisorReview {
   used: boolean;
+  engine: Engine;
+  resolved: ProviderId;
+  requestedEngine: Engine;
+  fallbackUsed: boolean;
   model?: string;
   latencyMs?: number;
   notes?: string;
@@ -65,6 +96,7 @@ export interface FixResponse {
   sections: PromptSections;
   safety: SafetyReport;
   supervisor: SupervisorReview;
+  usage?: UsageSnapshot;
   elapsedMs: number;
 }
 
@@ -73,4 +105,28 @@ export interface CleanResponse {
   cleaned: string;
   removed: string[];
   elapsedMs: number;
+}
+
+export interface ProviderHealth {
+  id: "cloud" | "ollama";
+  configured: boolean;
+  reachable: boolean;
+  vendor?: "anthropic" | "openai";
+  model?: string;
+  models?: string[];
+  endpoint?: string;
+  error?: string;
+}
+
+export interface HealthResponse {
+  ok: true;
+  version: string;
+  defaultEngine: Engine;
+  cloud: ProviderHealth;
+  ollama: ProviderHealth;
+  deterministicAvailable: true;
+  limits: {
+    free: number;
+    pro: number;
+  };
 }

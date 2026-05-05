@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Wand2, Eraser, Cpu, Loader2 } from "lucide-react";
+import { Sparkles, Wand2, Eraser, Loader2 } from "lucide-react";
 import clsx from "clsx";
 import { ModeSelect } from "./ModeSelect";
+import { EngineSelect } from "./EngineSelect";
+import { EngineStatus } from "./EngineStatus";
 import { Toggle } from "./Toggle";
 import { CopyButton } from "./CopyButton";
 import { SafetyBadge } from "./SafetyBadge";
-import type { CleanResponse, FixResponse, Mode } from "@/lib/types";
+import type { CleanResponse, Engine, FixResponse, Mode } from "@/lib/types";
 
 interface Props {
   variant?: "web" | "floating";
@@ -16,15 +18,15 @@ interface Props {
 
 interface Settings {
   mode: Mode;
-  useLocalAI: boolean;
+  engine: Engine;
   autoMode: boolean;
 }
 
-const STORAGE_KEY = "promptfixer.settings.v1";
+const STORAGE_KEY = "promptfixer.settings.v2";
 
 const DEFAULTS: Settings = {
   mode: "general",
-  useLocalAI: true,
+  engine: "auto",
   autoMode: true
 };
 
@@ -36,7 +38,6 @@ export function PromptFixer({ variant = "web" }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Hydrate persisted settings.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -65,13 +66,17 @@ export function PromptFixer({ variant = "web" }: Props) {
         body: JSON.stringify({
           input,
           mode: settings.autoMode ? undefined : settings.mode,
-          useLocalAI: settings.useLocalAI,
+          engine: settings.engine,
           autoMode: settings.autoMode
         })
       });
       const data = (await res.json()) as FixResponse & { error?: string };
       if (!res.ok || !data.ok) {
         setError(data.error || "Fix failed");
+        if ((data as FixResponse).usage) {
+          // Surface usage even on a 429 so the status panel updates.
+          setResult((prev) => (prev ? { ...prev, usage: (data as FixResponse).usage } : prev));
+        }
       } else {
         setResult(data);
       }
@@ -105,7 +110,6 @@ export function PromptFixer({ variant = "web" }: Props) {
     }
   }, [input, busy]);
 
-  // Cmd/Ctrl+Enter to fix.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -119,7 +123,7 @@ export function PromptFixer({ variant = "web" }: Props) {
 
   return (
     <div className={clsx("flex h-full w-full flex-col gap-4", compact ? "p-3" : "p-6")}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-accent/15 ring-1 ring-accent/30">
             <Sparkles className="h-4 w-4 text-accent" />
@@ -133,28 +137,27 @@ export function PromptFixer({ variant = "web" }: Props) {
             )}
           </div>
         </div>
-        <ModeSelect
-          value={settings.mode}
-          onChange={(mode) => setSettings((s) => ({ ...s, mode }))}
-          compact={compact}
-          disabled={settings.autoMode}
-        />
+        <div className="flex items-center gap-2">
+          <ModeSelect
+            value={settings.mode}
+            onChange={(mode) => setSettings((s) => ({ ...s, mode }))}
+            compact={compact}
+            disabled={settings.autoMode}
+          />
+          <EngineSelect
+            value={settings.engine}
+            onChange={(engine) => setSettings((s) => ({ ...s, engine }))}
+            compact={compact}
+          />
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Toggle
-          label="Auto"
-          hint="Detect mode from input"
-          checked={settings.autoMode}
-          onChange={(autoMode) => setSettings((s) => ({ ...s, autoMode }))}
-        />
-        <Toggle
-          label="Use Local AI"
-          hint="Gemma supervisor pass"
-          checked={settings.useLocalAI}
-          onChange={(useLocalAI) => setSettings((s) => ({ ...s, useLocalAI }))}
-        />
-      </div>
+      <Toggle
+        label="Auto mode detection"
+        hint="Pick the right prompt mode from the input"
+        checked={settings.autoMode}
+        onChange={(autoMode) => setSettings((s) => ({ ...s, autoMode }))}
+      />
 
       <div className="relative">
         <textarea
@@ -190,6 +193,13 @@ export function PromptFixer({ variant = "web" }: Props) {
         </button>
       </div>
 
+      <EngineStatus
+        selectedEngine={settings.engine}
+        lastSupervisor={result?.supervisor}
+        lastUsage={result?.usage}
+        compact={compact}
+      />
+
       <AnimatePresence mode="popLayout">
         {error && (
           <motion.div
@@ -220,15 +230,22 @@ export function PromptFixer({ variant = "web" }: Props) {
                   Detected: <span className="text-white/85">{result.detectedMode}</span>
                 </span>
               )}
-              <span className="rounded-md bg-white/5 px-2 py-0.5">
-                {result.elapsedMs}ms
+              <span className="rounded-md bg-white/5 px-2 py-0.5">{result.elapsedMs}ms</span>
+              <span
+                className={clsx(
+                  "rounded-md px-2 py-0.5",
+                  result.supervisor.used
+                    ? "border border-accent/30 bg-accent/10 text-accent"
+                    : "bg-white/5"
+                )}
+              >
+                {result.supervisor.used
+                  ? `${result.supervisor.resolved} · ${result.supervisor.model ?? "?"}`
+                  : `engine: ${result.supervisor.resolved}`}
               </span>
-              {result.supervisor.used && (
-                <span className="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-accent">
-                  <Cpu className="h-3 w-3" />
-                  {result.supervisor.error
-                    ? `${result.supervisor.model || "supervisor"} (fallback)`
-                    : `${result.supervisor.model} · ${result.supervisor.latencyMs}ms`}
+              {result.supervisor.fallbackUsed && (
+                <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-amber-200">
+                  fallback ({result.supervisor.requestedEngine} → {result.supervisor.resolved})
                 </span>
               )}
             </div>
@@ -251,6 +268,11 @@ export function PromptFixer({ variant = "web" }: Props) {
               <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] text-white/65">
                 <span className="text-white/45">Supervisor note: </span>
                 {result.supervisor.notes}
+              </div>
+            )}
+            {result.supervisor.error && (
+              <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                Supervisor: {result.supervisor.error}
               </div>
             )}
           </motion.div>
