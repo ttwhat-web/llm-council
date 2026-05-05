@@ -60,6 +60,19 @@ export interface FixRequest {
   engine?: Engine;
   autoMode?: boolean;
   clientContext?: ClientContext;
+  /**
+   * When `engine === "ollama"`, controls whether an unreachable Ollama daemon
+   * is allowed to fall through to the cloud provider.
+   *
+   * Default: **false** — Local Ollama is positioned as local / private /
+   * unlimited; silently falling back to a paid cloud API would be a privacy
+   * leak and an unexpected cost. Strict mode (the default) falls back to the
+   * deterministic engine instead.
+   *
+   * Set to `true` only when the user has explicitly opted in via the UI.
+   * Has no effect when `engine !== "ollama"`.
+   */
+  allowCloudFallback?: boolean;
 }
 
 export interface UsageSnapshot {
@@ -91,6 +104,8 @@ export interface SupervisorReview {
   resolved: ProviderId;
   requestedEngine: Engine;
   clientContext: ClientContext;
+  /** Echoes the request flag so the UI can render the warning banner. */
+  allowCloudFallback: boolean;
   fallbackUsed: boolean;
   model?: string;
   latencyMs?: number;
@@ -131,25 +146,20 @@ export interface ProviderHealth {
 }
 
 /**
- * The ordered list of provider ids that `route(engine, clientContext)` will
- * try, in order. The first configured + reachable provider wins.
+ * The ordered list of provider ids that `route(engine, clientContext, opts)`
+ * will try, in order. The first configured + reachable provider wins.
  *
- * Example payload:
- *   {
- *     auto: {
- *       web:     ["cloud", "deterministic"],
- *       mobile:  ["cloud", "deterministic"],
- *       desktop: ["ollama", "cloud", "deterministic"]
- *     },
- *     cloud:         ["cloud", "deterministic"],
- *     ollama:        ["ollama", "cloud", "deterministic"],
- *     deterministic: ["deterministic"]
- *   }
+ * Note: explicit `ollama` is **strict by default** — it falls back to the
+ * deterministic engine, never to cloud, unless the caller opts in via
+ * `allowCloudFallback`.
  */
 export interface RoutingOrder {
   auto: Record<ClientContext, Array<"cloud" | "ollama" | "deterministic">>;
   cloud: Array<"cloud" | "deterministic">;
-  ollama: Array<"ollama" | "cloud" | "deterministic">;
+  ollama: {
+    strict: Array<"ollama" | "deterministic">;
+    withCloudFallback: Array<"ollama" | "cloud" | "deterministic">;
+  };
   deterministic: Array<"deterministic">;
 }
 

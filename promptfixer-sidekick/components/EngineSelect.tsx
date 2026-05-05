@@ -29,7 +29,8 @@ const OPTIONS: Option[] = [
   {
     id: "ollama",
     label: "Local Ollama",
-    blurb: "Unlimited local mode — runs on your own Mac. Requires Ollama.",
+    blurb:
+      "Unlimited local mode — runs on your own Mac. Strict by default: never falls through to cloud.",
     Icon: Cpu
   },
   {

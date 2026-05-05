@@ -27,14 +27,20 @@ interface Settings {
   mode: Mode;
   engine: Engine;
   autoMode: boolean;
+  /**
+   * Only consulted when engine === "ollama". Strict (false) is the default —
+   * see lib/types.ts FixRequest for why.
+   */
+  allowCloudFallback: boolean;
 }
 
-const STORAGE_KEY = "promptfixer.settings.v2";
+const STORAGE_KEY = "promptfixer.settings.v3";
 
 const DEFAULTS: Settings = {
   mode: "general",
   engine: "auto",
-  autoMode: true
+  autoMode: true,
+  allowCloudFallback: false
 };
 
 export function PromptFixer({ variant = "web" }: Props) {
@@ -78,7 +84,10 @@ export function PromptFixer({ variant = "web" }: Props) {
           mode: settings.autoMode ? undefined : settings.mode,
           engine: settings.engine,
           autoMode: settings.autoMode,
-          clientContext
+          clientContext,
+          // Only forward the flag when it's meaningful — server enforces this too.
+          allowCloudFallback:
+            settings.engine === "ollama" ? settings.allowCloudFallback : false
         })
       });
       const data = (await res.json()) as FixResponse & { error?: string };
@@ -170,6 +179,17 @@ export function PromptFixer({ variant = "web" }: Props) {
         onChange={(autoMode) => setSettings((s) => ({ ...s, autoMode }))}
       />
 
+      {settings.engine === "ollama" && (
+        <Toggle
+          label="Allow cloud fallback"
+          hint="Off by default. When on, calls go to the cloud if Ollama is unavailable — your input leaves the machine and may count toward your quota."
+          checked={settings.allowCloudFallback}
+          onChange={(allowCloudFallback) =>
+            setSettings((s) => ({ ...s, allowCloudFallback }))
+          }
+        />
+      )}
+
       <div className="relative">
         <textarea
           value={input}
@@ -207,6 +227,9 @@ export function PromptFixer({ variant = "web" }: Props) {
       <EngineStatus
         selectedEngine={settings.engine}
         clientContext={clientContext}
+        allowCloudFallback={
+          settings.engine === "ollama" ? settings.allowCloudFallback : false
+        }
         lastSupervisor={result?.supervisor}
         lastUsage={result?.usage}
         compact={compact}

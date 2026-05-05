@@ -5,15 +5,16 @@
  *   → cleaner.ts          (strip noise)
  *   → mode detection      (auto if requested)
  *   → engine.ts           (build deterministic prompt sections)
- *   → providers/index.ts  (route(engine, clientContext))
+ *   → providers/index.ts  (route(engine, clientContext, { allowCloudFallback }))
  *   → controller.ts       (supervisor pass — skipped for deterministic)
  *   → safety.ts           (terminal-mode danger screen)
  * OUTPUT
  *
- * Routing summary (Auto is context-aware):
+ * Routing summary:
  *   web / mobile auto:  cloud → deterministic
  *   desktop      auto:  ollama → cloud → deterministic
- *   explicit ollama:    ollama → cloud → deterministic
+ *   explicit ollama:    ollama → deterministic                            (STRICT — never cloud)
+ *   explicit ollama + allowCloudFallback=true: ollama → cloud → deterministic
  *   explicit cloud:     cloud → deterministic
  *   explicit rules:     deterministic
  *
@@ -45,6 +46,7 @@ export async function fixPrompt(
   const t0 = Date.now();
   const tier = options.tier ?? "free";
   const clientContext: ClientContext = req.clientContext ?? "web";
+  const allowCloudFallback = Boolean(req.allowCloudFallback);
 
   const { cleaned } = cleanInput(req.input || "");
   const detected = req.autoMode ? detectMode(cleaned) : undefined;
@@ -52,12 +54,13 @@ export async function fixPrompt(
 
   const draft = buildSections({ cleanedInput: cleaned, mode });
 
-  const routed = route(req.engine, clientContext);
+  const routed = route(req.engine, clientContext, { allowCloudFallback });
   const supervisor = await runSupervisor({
     provider: routed.provider,
     requestedEngine: routed.requested,
     resolvedEngine: routed.resolved,
     clientContext,
+    allowCloudFallback: routed.allowCloudFallback,
     fallbackUsed: routed.fallbackUsed,
     sections: draft,
     mode,

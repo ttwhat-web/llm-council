@@ -14,6 +14,7 @@ interface ReviewArgs {
   requestedEngine: SupervisorReview["requestedEngine"];
   resolvedEngine: SupervisorReview["engine"];
   clientContext: ClientContext;
+  allowCloudFallback: boolean;
   fallbackUsed: boolean;
   sections: PromptSections;
   mode: Mode;
@@ -35,6 +36,7 @@ export async function runSupervisor({
   requestedEngine,
   resolvedEngine,
   clientContext,
+  allowCloudFallback,
   fallbackUsed,
   sections,
   mode,
@@ -49,6 +51,7 @@ export async function runSupervisor({
       requestedEngine,
       resolved: "deterministic",
       clientContext,
+      allowCloudFallback,
       fallbackUsed
     };
   }
@@ -92,6 +95,7 @@ export async function runSupervisor({
       resolved: result.providerId,
       requestedEngine,
       clientContext,
+      allowCloudFallback,
       fallbackUsed,
       error: result.error
     };
@@ -105,6 +109,7 @@ export async function runSupervisor({
       resolved: result.providerId,
       requestedEngine,
       clientContext,
+      allowCloudFallback,
       fallbackUsed,
       model: result.model,
       latencyMs: result.latencyMs,
@@ -130,6 +135,7 @@ export async function runSupervisor({
     resolved: result.providerId,
     requestedEngine,
     clientContext,
+    allowCloudFallback,
     fallbackUsed,
     model: result.model,
     latencyMs: result.latencyMs,

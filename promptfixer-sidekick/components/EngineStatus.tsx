@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Cloud, Cpu, RefreshCw, Settings2 } from "lucide-react";
+import { AlertTriangle, Cloud, Cpu, Info, RefreshCw, Settings2 } from "lucide-react";
 import type {
   ClientContext,
   Engine,
@@ -14,6 +14,7 @@ import type {
 interface Props {
   selectedEngine: Engine;
   clientContext: ClientContext;
+  allowCloudFallback: boolean;
   lastSupervisor?: SupervisorReview;
   lastUsage?: UsageSnapshot;
   compact?: boolean;
@@ -22,6 +23,7 @@ interface Props {
 export function EngineStatus({
   selectedEngine,
   clientContext,
+  allowCloudFallback,
   lastSupervisor,
   lastUsage,
   compact
@@ -68,6 +70,31 @@ export function EngineStatus({
       {error && (
         <div className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] text-red-200">
           {error}
+        </div>
+      )}
+
+      {selectedEngine === "ollama" && health && !ollamaUsable(health) && (
+        <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div>
+            <div className="font-medium">Ollama unavailable</div>
+            <div className="opacity-80">
+              {allowCloudFallback
+                ? "Cloud fallback is on — calls will go to the cloud and count toward your daily quota."
+                : "Using Rules Only fallback. Cloud is NOT called and usage is NOT metered."}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedEngine === "ollama" && allowCloudFallback && (
+        <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1.5 text-[11px] text-amber-200">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            <span className="font-medium">Cloud fallback enabled.</span> If Ollama is
+            unreachable, requests will be sent to the cloud provider — usage may count
+            toward your daily quota and your input will leave your machine.
+          </span>
         </div>
       )}
 
@@ -133,7 +160,7 @@ export function EngineStatus({
           <div className="mt-1">
             <span className="text-white/45">Routing ({selectedEngine}): </span>
             <span className="font-mono text-white/85">
-              {routingFor(health, selectedEngine, clientContext).join(" → ")}
+              {routingFor(health, selectedEngine, clientContext, allowCloudFallback).join(" → ")}
             </span>
           </div>
         )}
@@ -208,10 +235,19 @@ function formatReset(iso: string): string {
 function routingFor(
   health: HealthResponse,
   engine: Engine,
-  ctx: ClientContext
+  ctx: ClientContext,
+  allowCloudFallback: boolean
 ): readonly string[] {
   if (engine === "auto") return health.routing.auto[ctx];
   if (engine === "cloud") return health.routing.cloud;
-  if (engine === "ollama") return health.routing.ollama;
+  if (engine === "ollama") {
+    return allowCloudFallback
+      ? health.routing.ollama.withCloudFallback
+      : health.routing.ollama.strict;
+  }
   return health.routing.deterministic;
+}
+
+function ollamaUsable(health: HealthResponse): boolean {
+  return Boolean(health.ollama.configured && health.ollama.reachable);
 }

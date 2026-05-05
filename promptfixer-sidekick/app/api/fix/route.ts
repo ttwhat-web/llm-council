@@ -30,14 +30,17 @@ export async function POST(req: NextRequest) {
   const clientContext: ClientContext = isClientContext(body.clientContext)
     ? body.clientContext
     : "web";
+  // Strict by default. Only the user can flip this on, and only when
+  // engine === "ollama" — the router enforces the same.
+  const allowCloudFallback =
+    requestedEngine === "ollama" && body.allowCloudFallback === true;
 
-  // Tier is server-decided in v1 (no auth yet). Wired so the billing layer can
-  // populate it from a session/JWT later without changing the route shape.
   const tier: Tier = "free";
 
   // Resolve which provider we'd actually use, so we only meter cloud calls.
-  // Ollama and deterministic runs never count against the daily quota.
-  const routed = route(requestedEngine, clientContext);
+  // Ollama in strict mode (the default) NEVER resolves to cloud — guaranteed
+  // by the router — so cloud metering cannot fire by accident on a fallback.
+  const routed = route(requestedEngine, clientContext, { allowCloudFallback });
   const willHitCloud = routed.resolved === "cloud";
 
   let usage = peek(clientKeyFromHeaders(req.headers), tier);
@@ -63,7 +66,8 @@ export async function POST(req: NextRequest) {
       mode: isMode(body.mode) ? body.mode : undefined,
       engine: requestedEngine,
       autoMode: Boolean(body.autoMode),
-      clientContext
+      clientContext,
+      allowCloudFallback
     },
     { tier, usage }
   );
