@@ -87,7 +87,8 @@ async function callAnthropic(
   tier: "free" | "pro"
 ): Promise<ProviderResult> {
   const start = Date.now();
-  const model = modelFor("anthropic", tier);
+  // Explicit model override wins (used by the quality selector).
+  const model = (options.model && options.model.trim()) || modelFor("anthropic", tier);
   const system = options.json
     ? `${options.system || ""}\n\nRespond with a single valid JSON object. No code fences, no prose.`
     : options.system;
@@ -172,7 +173,7 @@ async function callOpenAI(
   tier: "free" | "pro"
 ): Promise<ProviderResult> {
   const start = Date.now();
-  const model = modelFor("openai", tier);
+  const model = (options.model && options.model.trim()) || modelFor("openai", tier);
   const messages: Array<{ role: string; content: string }> = [];
   if (options.system) messages.push({ role: "system", content: options.system });
   messages.push({ role: "user", content: prompt });

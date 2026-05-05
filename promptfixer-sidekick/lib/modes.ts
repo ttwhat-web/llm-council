@@ -33,6 +33,24 @@ export const MODES: Record<Mode, ModeProfile> = {
       "Tuned for GPT's preference for clear deliverables and bounded outputs."
     ]
   },
+  cursor: {
+    id: "cursor",
+    label: "Cursor",
+    blurb: "IDE assistant — file paths, minimal diffs, edit-ready.",
+    audience: "Cursor / Copilot / IDE-embedded code agent",
+    tone: "terse, surgical, no narration",
+    formatting:
+      "Lead with the target file path. Use unified diff blocks where possible. Group changes by file.",
+    guardrails: [
+      "Always state the file path before any code block.",
+      "Prefer minimal diffs over rewriting whole files.",
+      "Forbid prose preamble — lead with the change.",
+      "Reference symbols by their actual import path."
+    ],
+    systemHints: [
+      "Optimised for an editor that will apply the patch literally."
+    ]
+  },
   dev: {
     id: "dev",
     label: "Dev",

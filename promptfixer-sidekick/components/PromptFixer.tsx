@@ -5,18 +5,25 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Wand2, Eraser, Loader2 } from "lucide-react";
 import clsx from "clsx";
 import { ModeSelect } from "./ModeSelect";
-import { EngineSelect } from "./EngineSelect";
+import { QualitySelect } from "./QualitySelect";
 import { EngineStatus } from "./EngineStatus";
 import { Toggle } from "./Toggle";
 import { CopyButton } from "./CopyButton";
 import { SafetyBadge } from "./SafetyBadge";
+import { ScoreBadges } from "./ScoreBadges";
+import { OutputActions } from "./OutputActions";
+import { TemplatePicker } from "./TemplatePicker";
+import { HistoryDrawer } from "./HistoryDrawer";
 import { useClientContext } from "@/lib/clientContext";
+import { getQuality } from "@/lib/quality";
+import { newId, saveEntry, type HistoryEntry } from "@/lib/history";
 import type {
   CleanResponse,
   ClientContext,
-  Engine,
   FixResponse,
-  Mode
+  Mode,
+  ModelQuality,
+  OutputAction
 } from "@/lib/types";
 
 interface Props {
@@ -25,35 +32,40 @@ interface Props {
 
 interface Settings {
   mode: Mode;
-  engine: Engine;
+  modelQuality: ModelQuality;
   autoMode: boolean;
   /**
-   * Only consulted when engine === "ollama". Strict (false) is the default —
-   * see lib/types.ts FixRequest for why.
+   * Only consulted when modelQuality === "local". Strict (false) is the
+   * default — Local mode never silently falls through to cloud.
    */
   allowCloudFallback: boolean;
 }
 
-const STORAGE_KEY = "promptfixer.settings.v3";
+const STORAGE_KEY = "promptfixer.settings.v4";
 
 const DEFAULTS: Settings = {
   mode: "general",
-  engine: "auto",
+  modelQuality: "fast",
   autoMode: true,
   allowCloudFallback: false
 };
 
 export function PromptFixer({ variant = "web" }: Props) {
   const compact = variant === "floating";
-  // Tauri shells default to "desktop"; everything else hydrates from UA on mount.
   const detectedContext: ClientContext = variant === "floating" ? "desktop" : "web";
   const clientContext = useClientContext(detectedContext);
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const [input, setInput] = useState("");
   const [result, setResult] = useState<FixResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<OutputAction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [historyKey, setHistoryKey] = useState(0);
 
+  const isLocal = settings.modelQuality === "local";
+  const derivedEngine = getQuality(settings.modelQuality).engine;
+
+  // ---- persisted settings ----
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -62,7 +74,6 @@ export function PromptFixer({ variant = "web" }: Props) {
       /* ignore */
     }
   }, []);
-
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -71,44 +82,70 @@ export function PromptFixer({ variant = "web" }: Props) {
     }
   }, [settings]);
 
-  const fix = useCallback(async () => {
-    if (!input.trim() || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/fix", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input,
-          mode: settings.autoMode ? undefined : settings.mode,
-          engine: settings.engine,
-          autoMode: settings.autoMode,
-          clientContext,
-          // Only forward the flag when it's meaningful — server enforces this too.
-          allowCloudFallback:
-            settings.engine === "ollama" ? settings.allowCloudFallback : false
-        })
-      });
-      const data = (await res.json()) as FixResponse & { error?: string };
-      if (!res.ok || !data.ok) {
-        setError(data.error || "Fix failed");
-        if ((data as FixResponse).usage) {
-          // Surface usage even on a 429 so the status panel updates.
-          setResult((prev) => (prev ? { ...prev, usage: (data as FixResponse).usage } : prev));
+  // ---- API calls ----
+  const callFix = useCallback(
+    async (override?: { action: OutputAction; previousSections: FixResponse["sections"] }) => {
+      if (!override && !input.trim()) return;
+      if (busy || busyAction) return;
+      if (override) setBusyAction(override.action);
+      else setBusy(true);
+      setError(null);
+
+      try {
+        const res = await fetch("/api/fix", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            input: override ? "" : input,
+            mode: settings.autoMode && !override ? undefined : settings.mode,
+            engine: derivedEngine,
+            autoMode: !override && settings.autoMode,
+            clientContext,
+            allowCloudFallback: isLocal ? settings.allowCloudFallback : false,
+            modelQuality: settings.modelQuality,
+            action: override?.action,
+            previousSections: override?.previousSections
+          })
+        });
+        const data = (await res.json()) as FixResponse & { error?: string };
+        if (!res.ok || !data.ok) {
+          setError(data.error || "Fix failed");
+          if ((data as FixResponse).usage) {
+            setResult((prev) =>
+              prev ? { ...prev, usage: (data as FixResponse).usage } : prev
+            );
+          }
+          return;
         }
-      } else {
         setResult(data);
+
+        // Persist to local history (only on a fresh fix; transforms reuse).
+        if (!override) {
+          const entry: HistoryEntry = {
+            id: newId(),
+            timestamp: Date.now(),
+            input,
+            output: data.prompt,
+            mode: data.mode,
+            engine: derivedEngine,
+            modelQuality: settings.modelQuality,
+            score: data.score
+          };
+          saveEntry(entry);
+          setHistoryKey((k) => k + 1);
+        }
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        if (override) setBusyAction(null);
+        else setBusy(false);
       }
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }, [input, busy, settings, clientContext]);
+    },
+    [input, busy, busyAction, settings, derivedEngine, clientContext, isLocal]
+  );
 
   const clean = useCallback(async () => {
-    if (!input.trim() || busy) return;
+    if (!input.trim() || busy || busyAction) return;
     setBusy(true);
     setError(null);
     try {
@@ -118,31 +155,45 @@ export function PromptFixer({ variant = "web" }: Props) {
         body: JSON.stringify({ input })
       });
       const data = (await res.json()) as CleanResponse & { error?: string };
-      if (!res.ok || !data.ok) {
-        setError(data.error || "Clean failed");
-      } else {
-        setInput(data.cleaned);
-      }
+      if (!res.ok || !data.ok) setError(data.error || "Clean failed");
+      else setInput(data.cleaned);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
     }
-  }, [input, busy]);
+  }, [input, busy, busyAction]);
 
+  const onAction = useCallback(
+    (action: OutputAction) => {
+      if (!result?.sections) return;
+      void callFix({ action, previousSections: result.sections });
+    },
+    [callFix, result]
+  );
+
+  const reopenHistory = useCallback((entry: HistoryEntry) => {
+    setInput(entry.input);
+    setSettings((s) => ({ ...s, mode: entry.mode, modelQuality: entry.modelQuality }));
+    setResult(null);
+    setError(null);
+  }, []);
+
+  // ⌘/Ctrl + Enter to fix
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        void fix();
+        void callFix();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [fix]);
+  }, [callFix]);
 
   return (
     <div className={clsx("flex h-full w-full flex-col gap-4", compact ? "p-3" : "p-6")}>
+      {/* ---- header ---- */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-accent/15 ring-1 ring-accent/30">
@@ -164,22 +215,35 @@ export function PromptFixer({ variant = "web" }: Props) {
             compact={compact}
             disabled={settings.autoMode}
           />
-          <EngineSelect
-            value={settings.engine}
-            onChange={(engine) => setSettings((s) => ({ ...s, engine }))}
+          <QualitySelect
+            value={settings.modelQuality}
+            onChange={(modelQuality) => setSettings((s) => ({ ...s, modelQuality }))}
             compact={compact}
           />
         </div>
       </div>
 
-      <Toggle
-        label="Auto mode detection"
-        hint="Pick the right prompt mode from the input"
-        checked={settings.autoMode}
-        onChange={(autoMode) => setSettings((s) => ({ ...s, autoMode }))}
-      />
+      {/* ---- secondary chrome ---- */}
+      <div className="flex flex-wrap items-center gap-2">
+        <TemplatePicker
+          compact={compact}
+          onPick={(t) => {
+            setInput(t.body);
+            setSettings((s) => ({ ...s, mode: t.mode, autoMode: false }));
+          }}
+        />
+        <HistoryDrawer compact={compact} reloadKey={historyKey} onReopen={reopenHistory} />
+        <div className="ml-auto">
+          <Toggle
+            label="Auto mode"
+            hint="Detect best mode from input"
+            checked={settings.autoMode}
+            onChange={(autoMode) => setSettings((s) => ({ ...s, autoMode }))}
+          />
+        </div>
+      </div>
 
-      {settings.engine === "ollama" && (
+      {isLocal && (
         <Toggle
           label="Allow cloud fallback"
           hint="Off by default. When on, calls go to the cloud if Ollama is unavailable — your input leaves the machine and may count toward your quota."
@@ -190,6 +254,7 @@ export function PromptFixer({ variant = "web" }: Props) {
         />
       )}
 
+      {/* ---- input ---- */}
       <div className="relative">
         <textarea
           value={input}
@@ -207,7 +272,7 @@ export function PromptFixer({ variant = "web" }: Props) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={fix}
+          onClick={() => void callFix()}
           disabled={busy || !input.trim()}
           className="no-drag inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent/90 px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -225,11 +290,9 @@ export function PromptFixer({ variant = "web" }: Props) {
       </div>
 
       <EngineStatus
-        selectedEngine={settings.engine}
+        selectedEngine={derivedEngine}
         clientContext={clientContext}
-        allowCloudFallback={
-          settings.engine === "ollama" ? settings.allowCloudFallback : false
-        }
+        allowCloudFallback={isLocal ? settings.allowCloudFallback : false}
         lastSupervisor={result?.supervisor}
         lastUsage={result?.usage}
         compact={compact}
@@ -250,19 +313,26 @@ export function PromptFixer({ variant = "web" }: Props) {
 
         {result && (
           <motion.div
-            key={result.elapsedMs + "_" + result.mode}
+            key={result.elapsedMs + "_" + result.mode + "_" + (result.action ?? "fix")}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             className="flex min-h-0 flex-1 flex-col gap-3"
           >
+            {/* score row */}
+            <ScoreBadges score={result.score} compact={compact} />
+
+            {/* meta row */}
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/60">
               <span className="rounded-md bg-white/5 px-2 py-0.5">
                 Mode: <span className="text-white/85">{result.mode}</span>
               </span>
-              {result.detectedMode && (
-                <span className="rounded-md bg-white/5 px-2 py-0.5">
-                  Detected: <span className="text-white/85">{result.detectedMode}</span>
+              <span className="rounded-md bg-white/5 px-2 py-0.5">
+                Quality: <span className="text-white/85">{result.modelQuality}</span>
+              </span>
+              {result.action && (
+                <span className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-accent">
+                  {result.action}
                 </span>
               )}
               <span className="rounded-md bg-white/5 px-2 py-0.5">{result.elapsedMs}ms</span>
@@ -275,7 +345,7 @@ export function PromptFixer({ variant = "web" }: Props) {
                 )}
               >
                 {result.supervisor.used
-                  ? `${result.supervisor.resolved} · ${result.supervisor.model ?? "?"}`
+                  ? `${result.supervisor.resolved}`
                   : `engine: ${result.supervisor.resolved}`}
               </span>
               {result.supervisor.fallbackUsed && (
@@ -285,6 +355,7 @@ export function PromptFixer({ variant = "web" }: Props) {
               )}
             </div>
 
+            {/* prompt */}
             <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-white/8 bg-black/30">
               <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
                 <div className="text-[11px] font-medium uppercase tracking-wider text-white/55">
@@ -296,6 +367,14 @@ export function PromptFixer({ variant = "web" }: Props) {
                 {result.prompt}
               </pre>
             </div>
+
+            {/* output actions */}
+            <OutputActions
+              onAction={onAction}
+              busyAction={busyAction}
+              disabled={busy}
+              compact={compact}
+            />
 
             <SafetyBadge safety={result.safety} />
 

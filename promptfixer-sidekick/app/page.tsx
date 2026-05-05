@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PromptFixer } from "@/components/PromptFixer";
-import { MODE_LIST } from "@/lib/modes";
+import { Pricing } from "@/components/Pricing";
 
 export default function HomePage() {
   return (
@@ -16,7 +16,8 @@ export default function HomePage() {
                 PromptFixer Sidekick
               </h1>
               <p className="text-xs text-white/50">
-                Cloud AI by default. Optional local Ollama for unlimited Mac use.
+                Web-first prompt optimiser. Pick a quality, paste your mess, ship a
+                production-grade prompt.
               </p>
             </div>
           </div>
@@ -24,79 +25,35 @@ export default function HomePage() {
             href="/floating"
             className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/[0.08]"
           >
-            Open floating window →
+            Power user? Open floating →
           </Link>
         </div>
       </header>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="glass min-h-[680px] rounded-3xl">
+        <div className="glass min-h-[720px] rounded-3xl">
           <PromptFixer variant="web" />
         </div>
 
         <aside className="flex flex-col gap-4">
           <div className="glass rounded-3xl p-5">
+            <Pricing />
+          </div>
+
+          <div className="glass rounded-3xl p-5">
             <div className="text-[11px] font-medium uppercase tracking-wider text-white/45">
-              Three ways to run
+              How it works
             </div>
-            <ul className="mt-3 space-y-3 text-xs text-white/70">
-              <li>
-                <span className="text-white/90">Free / Web — </span>
-                Instant cloud AI. Nothing to install. Daily limit applies.
-              </li>
-              <li>
-                <span className="text-white/90">Pro / Cloud — </span>
-                Same path with higher limits and flagship models.
-              </li>
-              <li>
-                <span className="text-white/90">Local Ollama (Mac) — </span>
-                Unlimited local mode. Install Ollama once; data never leaves
-                your machine.
-              </li>
-            </ul>
+            <ol className="mt-3 space-y-2 text-xs text-white/70">
+              <li>1. Pick a quality (Fast / Smart / Expert / Code / Local).</li>
+              <li>2. Paste your input. We clean, structure, and supervise it.</li>
+              <li>3. Tweak with one click — Shorter, Stronger, Convert to Cursor, …</li>
+              <li>4. Copy. History is saved locally so you can come back to it.</li>
+            </ol>
             <p className="mt-3 text-[11px] text-white/45">
-              iPhone & web users → cloud. Mac power users → optional local.
-              Server never hosts heavy models.
-            </p>
-          </div>
-
-          <div className="glass rounded-3xl p-5">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-white/45">
-              Modes
-            </div>
-            <ul className="mt-3 space-y-2 text-xs text-white/70">
-              {MODE_LIST.map((m) => (
-                <li key={m.id}>
-                  <span className="text-white/90">{m.label}</span>
-                  <span className="text-white/45"> — {m.blurb}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="glass rounded-3xl p-5">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-white/45">
-              Optional: Local Ollama (Mac)
-            </div>
-            <p className="mt-3 text-xs text-white/70">
-              For unlimited / private use, install{" "}
-              <a
-                href="https://ollama.com"
-                target="_blank"
-                rel="noreferrer"
-                className="text-accent hover:underline"
-              >
-                Ollama
-              </a>{" "}
-              and pull a model:
-            </p>
-            <pre className="mt-2 overflow-x-auto rounded-xl bg-black/40 px-3 py-2 font-mono text-[11px] text-white/80">
-              ollama pull gemma2:2b
-            </pre>
-            <p className="mt-2 text-[11px] text-white/45">
-              Then set <code className="rounded bg-white/5 px-1 py-0.5 font-mono">OLLAMA_BASE_URL=http://127.0.0.1:11434</code>{" "}
-              in your local <code className="rounded bg-white/5 px-1 py-0.5 font-mono">.env.local</code> and pick{" "}
-              <span className="text-white/85">Local Ollama</span> from the engine selector.
+              Web & iPhone users run cloud-only. Mac power users can flip{" "}
+              <span className="text-white/80">Local</span> to run on Ollama —
+              unlimited and private. The server never hosts heavy models.
             </p>
           </div>
         </aside>

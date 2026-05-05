@@ -15,11 +15,33 @@ export type ClientContext = "web" | "desktop" | "mobile";
 export type Mode =
   | "claude"
   | "chatgpt"
+  | "cursor"
   | "dev"
   | "terminal"
   | "business"
   | "general"
   | "as400";
+
+/**
+ * User-facing model selector. Internal code maps these to specific provider
+ * + model identifiers in lib/quality.ts. Raw model names are NEVER exposed
+ * to normal users.
+ */
+export type ModelQuality = "fast" | "smart" | "expert" | "code" | "local";
+
+/**
+ * Output transformation actions. Triggered after a successful fix to mutate
+ * the rendered prompt without re-running the full clean→engine pipeline.
+ */
+export type OutputAction =
+  | "shorter"
+  | "stronger"
+  | "safer"
+  | "to-claude"
+  | "to-chatgpt"
+  | "to-cursor"
+  | "to-terminal"
+  | "split-steps";
 
 export interface ModeProfile {
   id: Mode;
@@ -73,6 +95,27 @@ export interface FixRequest {
    * Has no effect when `engine !== "ollama"`.
    */
   allowCloudFallback?: boolean;
+  /**
+   * User-facing quality knob. Drives both the engine choice (Local → Ollama,
+   * everything else → Cloud) and the model id within the cloud provider.
+   * Defaults to "fast".
+   */
+  modelQuality?: ModelQuality;
+  /**
+   * If set, this is a transform of a previous result rather than a fresh fix.
+   * The cleaner / engine pipeline is skipped — the supervisor (or its
+   * deterministic shim) rewrites `previousSections` according to the action.
+   */
+  action?: OutputAction;
+  previousSections?: PromptSections;
+}
+
+export interface ScoreCard {
+  /** 0-100. Lightweight, deterministic. */
+  clarity: number;
+  specificity: number;
+  safety: number;
+  modelFit: number;
 }
 
 export interface UsageSnapshot {
@@ -124,6 +167,9 @@ export interface FixResponse {
   safety: SafetyReport;
   supervisor: SupervisorReview;
   usage?: UsageSnapshot;
+  score: ScoreCard;
+  modelQuality: ModelQuality;
+  action?: OutputAction;
   elapsedMs: number;
 }
 

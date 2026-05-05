@@ -6,6 +6,8 @@ export interface GenerateOptions {
   timeoutMs?: number;
   json?: boolean;
   tier?: "free" | "pro";
+  /** Explicit model id override. Wins over tier-based defaults. */
+  model?: string;
 }
 
 export interface Provider {

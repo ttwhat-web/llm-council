@@ -113,6 +113,8 @@ function roleFor(mode: Mode): string {
       return "a senior technical writer collaborating with Claude";
     case "chatgpt":
       return "a senior product engineer briefing ChatGPT";
+    case "cursor":
+      return "a senior engineer briefing an IDE coding agent (Cursor) on a precise edit";
     case "dev":
       return "a staff software engineer pair-programming with the model";
     case "terminal":
@@ -187,6 +189,8 @@ function outputFormatFor(mode: Mode, deliverable?: string): string {
       return "Wrap the final answer in <answer>...</answer>. Precede it with <thinking>...</thinking> only if reasoning is non-trivial.";
     case "chatgpt":
       return "Markdown. Start with the deliverable. End with a single 'Next Steps' bullet list (max 3 items).";
+    case "cursor":
+      return "For each touched file: '### path/to/file' header followed by a fenced unified-diff block. End with a one-line 'Verify' command.";
     case "dev":
       return "Begin with the patched code in a fenced block. Follow with 'Why' (≤3 bullets) and 'Verify' (≤3 bullets).";
     case "terminal":
