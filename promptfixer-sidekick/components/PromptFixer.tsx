@@ -358,14 +358,23 @@ export function PromptFixer({ variant = "web" }: Props) {
             {/* prompt */}
             <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-white/8 bg-black/30">
               <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-white/55">
-                  Optimised Prompt
+                <div className="flex flex-col">
+                  <div className="text-[11px] font-medium uppercase tracking-wider text-white/55">
+                    Execution-ready prompt
+                  </div>
+                  <div className="text-[10px] text-white/40">
+                    Copy this into Claude, ChatGPT, Cursor or your AI tool.
+                  </div>
                 </div>
                 <CopyButton text={result.prompt} />
               </div>
               <pre className="scrollbar-thin min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-4 py-3 font-mono text-[12px] leading-relaxed text-white/85">
                 {result.prompt}
               </pre>
+              <div className="border-t border-white/5 px-3 py-2 text-[11px] text-white/45">
+                <span className="text-white/65">Next step:</span> paste this prompt into your
+                AI tool to get the final answer.
+              </div>
             </div>
 
             {/* output actions */}

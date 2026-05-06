@@ -49,7 +49,7 @@ const PLANS: Plan[] = [
   {
     id: "operator",
     name: "Operator",
-    price: "$39 / mo",
+    price: "$19 / mo",
     blurb: "Power users running real ops.",
     Icon: Wrench,
     features: [

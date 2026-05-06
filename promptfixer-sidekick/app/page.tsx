@@ -16,8 +16,7 @@ export default function HomePage() {
                 PromptFixer Sidekick
               </h1>
               <p className="text-xs text-white/50">
-                Web-first prompt optimiser. Pick a quality, paste your mess, ship a
-                production-grade prompt.
+                PromptFixer turns rough ideas into execution-ready prompts.
               </p>
             </div>
           </div>
