@@ -14,6 +14,7 @@
  * landing page calls it out and the badge is rendered accordingly.
  */
 
+import { ollamaProfileModel, type LocalProfile } from "./providers/ollama";
 import type { Engine, ModelQuality, Tier } from "./types";
 
 export interface QualityProfile {
@@ -108,4 +109,38 @@ export function resolveCloudModel(quality: ModelQuality): string | undefined {
   if (hasAnthropic) return modelIdFor(quality, "anthropic") || undefined;
   if (hasOpenAI) return modelIdFor(quality, "openai") || undefined;
   return undefined;
+}
+
+/**
+ * Map a user-facing quality to a local Ollama profile.
+ *
+ *   fast            → fast    (low-resource fallback, e.g. gemma2:2b)
+ *   smart / expert  → smart   (the daily driver, e.g. gemma4)
+ *   code            → coder   (qwen2.5-coder:7b — also used for terminal / AS400)
+ *   local           → smart   (sensible default when "Local" is the explicit choice)
+ *
+ * The "agent" profile (hermes3) is reserved for a future agent quality.
+ */
+export function localProfileFor(quality: ModelQuality): LocalProfile {
+  switch (quality) {
+    case "fast":
+      return "fast";
+    case "smart":
+    case "expert":
+      return "smart";
+    case "code":
+      return "coder";
+    case "local":
+    default:
+      return "smart";
+  }
+}
+
+/**
+ * Resolve the local model id for a given quality. Reads the live env, so
+ * this must run server-side. Used by /api/fix and /api/preview when the
+ * router resolves to the Ollama provider.
+ */
+export function resolveOllamaModel(quality: ModelQuality): string {
+  return ollamaProfileModel(localProfileFor(quality));
 }

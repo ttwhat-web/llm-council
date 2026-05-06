@@ -30,7 +30,7 @@ import { buildSections, detectMode, renderPrompt } from "./engine";
 import { runSupervisor, runTransform } from "./controller";
 import { buildInsights } from "./insights";
 import { route } from "./providers";
-import { getQuality, resolveCloudModel } from "./quality";
+import { getQuality, resolveCloudModel, resolveOllamaModel } from "./quality";
 import { screenForDanger } from "./safety";
 import { scorePrompt } from "./score";
 import type {
@@ -85,7 +85,12 @@ export async function fixPrompt(
 
   // ---- route to a provider ----
   const routed = route(engine, clientContext, { allowCloudFallback });
-  const modelOverride = routed.resolved === "cloud" ? resolveCloudModel(modelQuality) : undefined;
+  const modelOverride =
+    routed.resolved === "cloud"
+      ? resolveCloudModel(modelQuality)
+      : routed.resolved === "ollama"
+        ? resolveOllamaModel(modelQuality)
+        : undefined;
 
   // ---- supervisor / transform ----
   const supervisor = isTransform

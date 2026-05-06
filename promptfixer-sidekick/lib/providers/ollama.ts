@@ -4,19 +4,65 @@
  * IMPORTANT: this is opt-in. The VPS is NOT meant to host heavy models.
  * Configure OLLAMA_BASE_URL only on machines that actually run `ollama serve`
  * (developer laptops, the bundled Tauri desktop shell, or a dedicated GPU box).
+ *
+ * Local model strategy — four named profiles, each independently configurable:
+ *
+ *   OLLAMA_FAST_MODEL    fast fallback / low-resource     default: gemma2:2b
+ *   OLLAMA_SMART_MODEL   smart supervisor                 default: gemma4
+ *   OLLAMA_CODER_MODEL   code / terminal / AS400          default: qwen2.5-coder:7b
+ *   OLLAMA_AGENT_MODEL   agent experiments                default: hermes3
+ *
+ * `gemma2:2b` is positioned as a *fast fallback* only. The default smart
+ * model for local supervision is gemma4. Callers (lib/quality.ts) pick
+ * which profile to use based on the user's quality selection and pass the
+ * model id as `options.model`. When no override is given, the provider
+ * defaults to OLLAMA_FAST_MODEL.
+ *
+ * If the chosen model is not installed, the provider falls through to
+ * OLLAMA_FALLBACKS (comma-separated). If every candidate fails, the
+ * router falls through to deterministic — and never to cloud unless the
+ * caller explicitly opted in via allowCloudFallback.
  */
 
 import type { ProviderHealth, ProviderResult } from "../types";
 import { fetchWithTimeout, type GenerateOptions, type Provider } from "./types";
 
-// Accept both env names for back-compat with the v1 layout.
 const HOST = (process.env.OLLAMA_BASE_URL || process.env.OLLAMA_HOST || "").trim();
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL || "gemma2:2b";
+
+// Profile-based env. OLLAMA_MODEL kept as a back-compat alias for FAST.
+const FAST_MODEL =
+  process.env.OLLAMA_FAST_MODEL || process.env.OLLAMA_MODEL || "gemma2:2b";
+const SMART_MODEL = process.env.OLLAMA_SMART_MODEL || "gemma4";
+const CODER_MODEL = process.env.OLLAMA_CODER_MODEL || "qwen2.5-coder:7b";
+const AGENT_MODEL = process.env.OLLAMA_AGENT_MODEL || "hermes3";
+
 const FALLBACKS = (process.env.OLLAMA_FALLBACKS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 const TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 12000);
+
+export type LocalProfile = "fast" | "smart" | "coder" | "agent";
+
+export const OLLAMA_PROFILES: Record<LocalProfile, () => string> = {
+  fast: () => FAST_MODEL,
+  smart: () => SMART_MODEL,
+  coder: () => CODER_MODEL,
+  agent: () => AGENT_MODEL
+};
+
+export function ollamaProfileModel(profile: LocalProfile): string {
+  return OLLAMA_PROFILES[profile]();
+}
+
+export function ollamaProfilesSnapshot(): Record<LocalProfile, string> {
+  return {
+    fast: FAST_MODEL,
+    smart: SMART_MODEL,
+    coder: CODER_MODEL,
+    agent: AGENT_MODEL
+  };
+}
 
 function isLocalhost(url: string): boolean {
   return /^https?:\/\/(127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\])/i.test(url);
@@ -47,7 +93,8 @@ export const ollamaProvider: Provider = {
           configured: true,
           reachable: false,
           endpoint: HOST,
-          error: `HTTP ${res.status}`
+          error: `HTTP ${res.status}`,
+          profiles: ollamaProfilesSnapshot()
         };
       }
       const data = (await res.json()) as { models?: Array<{ name: string }> };
@@ -57,8 +104,10 @@ export const ollamaProvider: Provider = {
         configured: true,
         reachable: true,
         endpoint: HOST,
-        model: DEFAULT_MODEL,
-        models
+        // `model` kept as the legacy headline; profile-aware UIs should read `profiles`.
+        model: SMART_MODEL,
+        models,
+        profiles: ollamaProfilesSnapshot()
       };
     } catch (err) {
       return {
@@ -66,7 +115,8 @@ export const ollamaProvider: Provider = {
         configured: true,
         reachable: false,
         endpoint: HOST,
-        error: (err as Error).message
+        error: (err as Error).message,
+        profiles: ollamaProfilesSnapshot()
       };
     }
   },
@@ -100,7 +150,9 @@ export const ollamaProvider: Provider = {
       };
     }
 
-    const candidates = uniq([DEFAULT_MODEL, ...FALLBACKS]);
+    // Candidate chain: explicit override → fast profile → user fallbacks list.
+    const requested = options.model && options.model.trim() ? [options.model.trim()] : [];
+    const candidates = uniq([...requested, FAST_MODEL, ...FALLBACKS]);
     let lastErr: string | undefined;
 
     for (const model of candidates) {

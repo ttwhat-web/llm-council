@@ -123,7 +123,7 @@ export function EngineStatus({
           status={
             health?.ollama.configured
               ? health.ollama.reachable
-                ? `connected · ${health.ollama.model ?? ""}`.trim()
+                ? "connected"
                 : `not connected (${health.ollama.error || "?"})`
               : "not configured"
           }
@@ -135,6 +135,13 @@ export function EngineStatus({
                 : "muted"
           }
         />
+        {health?.ollama.profiles && (
+          <OllamaProfiles
+            profiles={health.ollama.profiles}
+            installed={health.ollama.models}
+            reachable={health.ollama.reachable}
+          />
+        )}
         <Row
           icon={<Settings2 className="h-3.5 w-3.5" />}
           label="Rules engine"
@@ -250,4 +257,67 @@ function routingFor(
 
 function ollamaUsable(health: HealthResponse): boolean {
   return Boolean(health.ollama.configured && health.ollama.reachable);
+}
+
+interface ProfileMap {
+  fast: string;
+  smart: string;
+  coder: string;
+  agent: string;
+}
+
+const PROFILE_LABELS: Array<{
+  key: keyof ProfileMap;
+  label: string;
+  hint: string;
+}> = [
+  { key: "fast", label: "Fast", hint: "low-resource fallback" },
+  { key: "smart", label: "Smart", hint: "default supervisor" },
+  { key: "coder", label: "Code", hint: "code / terminal / AS400" },
+  { key: "agent", label: "Agent", hint: "experimental" }
+];
+
+function OllamaProfiles({
+  profiles,
+  installed,
+  reachable
+}: {
+  profiles: ProfileMap;
+  installed?: string[];
+  reachable: boolean;
+}) {
+  const installedSet = new Set(
+    (installed ?? []).map((m) => m.toLowerCase().split(":")[0])
+  );
+  return (
+    <div className="ml-5 mt-1 grid grid-cols-2 gap-1.5">
+      {PROFILE_LABELS.map(({ key, label, hint }) => {
+        const id = profiles[key];
+        const isInstalled =
+          reachable && installedSet.has(id.toLowerCase().split(":")[0]);
+        return (
+          <div
+            key={key}
+            className={clsx(
+              "flex flex-col rounded-lg border px-2 py-1 text-[10px] leading-tight",
+              isInstalled
+                ? "border-emerald-500/25 bg-emerald-500/5"
+                : "border-white/8 bg-white/[0.02]"
+            )}
+            title={hint}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-white/85">{label}</span>
+              {!isInstalled && reachable && (
+                <span className="text-[9px] uppercase tracking-wider text-white/35">
+                  not installed
+                </span>
+              )}
+            </div>
+            <span className="truncate font-mono text-white/55">{id}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }

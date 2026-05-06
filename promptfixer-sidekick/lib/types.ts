@@ -212,6 +212,16 @@ export interface ProviderHealth {
   model?: string;
   models?: string[];
   endpoint?: string;
+  /**
+   * Local model profile snapshot. Only set for the Ollama provider.
+   * Resolved from OLLAMA_FAST_MODEL / SMART_MODEL / CODER_MODEL / AGENT_MODEL.
+   */
+  profiles?: {
+    fast: string;
+    smart: string;
+    coder: string;
+    agent: string;
+  };
   error?: string;
 }
 

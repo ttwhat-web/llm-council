@@ -14,9 +14,16 @@ The floating, always-on-top assistant ships as a Tauri shell that loads
 In one terminal:
 
 ```bash
-ollama serve                 # start the local model runtime
-ollama pull gemma2:2b        # supervisor model (alias for the gemma4:e4b family)
+ollama serve                       # start the local model runtime
+ollama pull gemma4                 # smart supervisor (Local quality default)
+ollama pull qwen2.5-coder:7b       # code / terminal / AS400
+ollama pull gemma2:2b              # fast fallback / low-resource
+# ollama pull hermes3              # experimental agent (optional)
 ```
+
+You don't need every model — pull whatever fits your hardware. PromptFixer
+falls through `OLLAMA_FALLBACKS` and then the deterministic engine if a
+profile model is missing. See the root README for the full profile table.
 
 In another:
 

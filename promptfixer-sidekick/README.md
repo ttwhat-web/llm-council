@@ -78,29 +78,61 @@ Same path as above. Detail:
 
 Marketed as: **"Unlimited local mode — runs on your own Mac."**
 
+PromptFixer maps the user's quality choice to a *named profile* on your
+local Ollama. You don't pick a model name in the UI — you pick a quality.
+The four profiles are independently configurable via env, so you can swap
+in whatever fits your hardware.
+
+| Profile | Used by quality            | Default model      | Notes                                  |
+| ------- | -------------------------- | ------------------ | -------------------------------------- |
+| Fast    | `fast`                     | `gemma2:2b`        | Low-resource fallback. Not the headline.|
+| Smart   | `smart`, `expert`, `local` | `gemma4`           | Daily-driver supervisor.               |
+| Code    | `code`                     | `qwen2.5-coder:7b` | Also used for Terminal & AS400 work.   |
+| Agent   | (reserved)                 | `hermes3`          | Experimental agent-mode profile.       |
+
+### Recommended setup
+
 ```bash
 # 1. Install Ollama
 brew install ollama   # or curl -fsSL https://ollama.com/install.sh | sh
 ollama serve          # leave running
 
-# 2. Pull a small supervisor model (~1.6 GB)
-ollama pull gemma2:2b
-# or larger: ollama pull llama3:8b
+# 2. Pull the recommended local model set
+ollama pull gemma4              # smart supervisor (default for Local quality)
+ollama pull qwen2.5-coder:7b    # code / terminal / AS400
+ollama pull hermes3             # experimental agent
+ollama pull gemma2:2b           # fast fallback / low-resource
 
 # 3. Point the app at it (Mac-only — do NOT do this on the VPS)
 echo 'OLLAMA_BASE_URL=http://127.0.0.1:11434' >> .env.local
-echo 'OLLAMA_MODEL=gemma2:2b'                >> .env.local
 
-# 4. Restart `npm run dev` and pick "Local Ollama" from the engine selector.
+# 4. Restart `npm run dev` and pick the "Local" quality.
 ```
 
-The bundled Tauri desktop app (`npm run tauri:dev`) is the canonical way to
-ship this to Mac users — same UI, runs locally, talks to the user's own
-Ollama daemon.
+You don't need every model — pull whatever you'll use. PromptFixer falls
+back through `OLLAMA_FALLBACKS`, then to the deterministic engine. **It
+will not silently call cloud** when an Ollama profile is missing unless
+`Allow cloud fallback` is explicitly toggled on.
 
-> **Brief said `gemma4:e4b`.** That alias isn't in the public Ollama registry
-> at time of writing, so the default is the closest small Gemma in the same
-> family (`gemma2:2b`). Override with `OLLAMA_MODEL` whenever the alias ships.
+### Override profile models
+
+```env
+OLLAMA_FAST_MODEL=gemma2:2b
+OLLAMA_SMART_MODEL=gemma4
+OLLAMA_CODER_MODEL=qwen2.5-coder:7b
+OLLAMA_AGENT_MODEL=hermes3
+# OLLAMA_FALLBACKS=gemma4,qwen2.5-coder:7b,gemma2:2b
+```
+
+The bundled Tauri desktop app (`npm run tauri:dev`) is the canonical way
+to ship this to Mac users — same UI, runs locally, talks to the user's
+own Ollama daemon.
+
+> **Note on `gemma4`**: the public Ollama registry is moving fast — if
+> `gemma4` isn't yet a valid tag on your machine, point `OLLAMA_SMART_MODEL`
+> at whatever Gemma generation is current (e.g. `gemma3` / `gemma2:9b`).
+> The product positions `gemma2:2b` purely as the *fast fallback* — it is
+> no longer the headline model.
 
 ## 4. Why the VPS does not run heavy models
 

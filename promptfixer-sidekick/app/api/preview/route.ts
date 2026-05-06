@@ -15,7 +15,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { isMode } from "@/lib/modes";
 import { deterministicPreview, PREVIEW_SYSTEM } from "@/lib/preview";
 import { isClientContext, route } from "@/lib/providers";
-import { getQuality, isModelQuality, resolveCloudModel } from "@/lib/quality";
+import {
+  getQuality,
+  isModelQuality,
+  resolveCloudModel,
+  resolveOllamaModel
+} from "@/lib/quality";
 import {
   clientKeyFromHeaders,
   consume,
@@ -97,7 +102,11 @@ export async function POST(req: NextRequest) {
     usage = result.snapshot;
   }
 
-  const modelOverride = willHitCloud ? resolveCloudModel(modelQuality) : undefined;
+  const modelOverride = willHitCloud
+    ? resolveCloudModel(modelQuality)
+    : routed.resolved === "ollama"
+      ? resolveOllamaModel(modelQuality)
+      : undefined;
 
   const result = await routed.provider.generate(prompt, {
     system: PREVIEW_SYSTEM,
