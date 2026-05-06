@@ -96,3 +96,16 @@ export function getQuality(quality?: ModelQuality): QualityProfile {
 export function modelIdFor(quality: ModelQuality, vendor: "anthropic" | "openai"): string {
   return QUALITY[quality]?.models[vendor] || "";
 }
+
+/**
+ * Pick the cloud model id that matches the active vendor (decided by which
+ * API key is set). Server-only — relies on process.env. Returns undefined
+ * when no cloud key is configured or the quality has no cloud mapping.
+ */
+export function resolveCloudModel(quality: ModelQuality): string | undefined {
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY);
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+  if (hasAnthropic) return modelIdFor(quality, "anthropic") || undefined;
+  if (hasOpenAI) return modelIdFor(quality, "openai") || undefined;
+  return undefined;
+}

@@ -168,8 +168,32 @@ export interface FixResponse {
   supervisor: SupervisorReview;
   usage?: UsageSnapshot;
   score: ScoreCard;
+  insights: import("./insights").InsightReport;
   modelQuality: ModelQuality;
   action?: OutputAction;
+  elapsedMs: number;
+}
+
+export interface PreviewRequest {
+  prompt: string;
+  mode: Mode;
+  modelQuality?: ModelQuality;
+  clientContext?: ClientContext;
+  allowCloudFallback?: boolean;
+}
+
+export interface PreviewResponse {
+  ok: boolean;
+  preview: string;
+  mode: Mode;
+  /** "preview" — never the authoritative answer. UI labels accordingly. */
+  label: "AI response preview";
+  isDeterministic: boolean;
+  resolved: ProviderId;
+  model?: string;
+  latencyMs?: number;
+  usage?: UsageSnapshot;
+  notice?: string;
   elapsedMs: number;
 }
 

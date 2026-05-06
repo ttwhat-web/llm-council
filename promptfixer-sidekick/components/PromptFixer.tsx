@@ -8,10 +8,7 @@ import { ModeSelect } from "./ModeSelect";
 import { QualitySelect } from "./QualitySelect";
 import { EngineStatus } from "./EngineStatus";
 import { Toggle } from "./Toggle";
-import { CopyButton } from "./CopyButton";
-import { SafetyBadge } from "./SafetyBadge";
-import { ScoreBadges } from "./ScoreBadges";
-import { OutputActions } from "./OutputActions";
+import { OutputTabs } from "./OutputTabs";
 import { TemplatePicker } from "./TemplatePicker";
 import { HistoryDrawer } from "./HistoryDrawer";
 import { useClientContext } from "@/lib/clientContext";
@@ -319,85 +316,16 @@ export function PromptFixer({ variant = "web" }: Props) {
             exit={{ opacity: 0 }}
             className="flex min-h-0 flex-1 flex-col gap-3"
           >
-            {/* score row */}
-            <ScoreBadges score={result.score} compact={compact} />
-
-            {/* meta row */}
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/60">
-              <span className="rounded-md bg-white/5 px-2 py-0.5">
-                Mode: <span className="text-white/85">{result.mode}</span>
-              </span>
-              <span className="rounded-md bg-white/5 px-2 py-0.5">
-                Quality: <span className="text-white/85">{result.modelQuality}</span>
-              </span>
-              {result.action && (
-                <span className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-accent">
-                  {result.action}
-                </span>
-              )}
-              <span className="rounded-md bg-white/5 px-2 py-0.5">{result.elapsedMs}ms</span>
-              <span
-                className={clsx(
-                  "rounded-md px-2 py-0.5",
-                  result.supervisor.used
-                    ? "border border-accent/30 bg-accent/10 text-accent"
-                    : "bg-white/5"
-                )}
-              >
-                {result.supervisor.used
-                  ? `${result.supervisor.resolved}`
-                  : `engine: ${result.supervisor.resolved}`}
-              </span>
-              {result.supervisor.fallbackUsed && (
-                <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-amber-200">
-                  fallback ({result.supervisor.requestedEngine} → {result.supervisor.resolved})
-                </span>
-              )}
-            </div>
-
-            {/* prompt */}
-            <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-white/8 bg-black/30">
-              <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
-                <div className="flex flex-col">
-                  <div className="text-[11px] font-medium uppercase tracking-wider text-white/55">
-                    Execution-ready prompt
-                  </div>
-                  <div className="text-[10px] text-white/40">
-                    Copy this into Claude, ChatGPT, Cursor or your AI tool.
-                  </div>
-                </div>
-                <CopyButton text={result.prompt} />
-              </div>
-              <pre className="scrollbar-thin min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-4 py-3 font-mono text-[12px] leading-relaxed text-white/85">
-                {result.prompt}
-              </pre>
-              <div className="border-t border-white/5 px-3 py-2 text-[11px] text-white/45">
-                <span className="text-white/65">Next step:</span> paste this prompt into your
-                AI tool to get the final answer.
-              </div>
-            </div>
-
-            {/* output actions */}
-            <OutputActions
-              onAction={onAction}
+            <OutputTabs
+              result={result}
+              modelQuality={settings.modelQuality}
+              clientContext={clientContext}
+              allowCloudFallback={isLocal ? settings.allowCloudFallback : false}
+              busy={busy}
               busyAction={busyAction}
-              disabled={busy}
+              onAction={onAction}
               compact={compact}
             />
-
-            <SafetyBadge safety={result.safety} />
-
-            {result.supervisor.notes && (
-              <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] text-white/65">
-                <span className="text-white/45">Supervisor note: </span>
-                {result.supervisor.notes}
-              </div>
-            )}
-            {result.supervisor.error && (
-              <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
-                Supervisor: {result.supervisor.error}
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
