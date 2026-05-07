@@ -1,0 +1,397 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// USERS & AUTH
+// =============================================================================
+
+enum UserRole {
+  user
+  trusted_seller
+  admin
+}
+
+model User {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  email        String?  @unique
+  name         String
+  role         UserRole @default(user)
+  trustScore   Int      @default(50)
+  passwordHash String?
+  city         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  splitsOwned     Split[]         @relation("SplitOwner")
+  splitRequests   SplitRequest[]
+  listingsOwned   Listing[]       @relation("ListingSeller")
+  offersMade      Offer[]
+  conversationsA  Conversation[]  @relation("ConvoUserA")
+  conversationsB  Conversation[]  @relation("ConvoUserB")
+  messagesSent    Message[]
+  payments        Payment[]
+  notifications   Notification[]
+  sessions        WsSession[]
+
+  @@index([role])
+  @@index([trustScore])
+}
+
+// =============================================================================
+// PERFUMES (catalog)
+// =============================================================================
+
+model Perfume {
+  id            String   @id @default(cuid())
+  brand         String
+  name          String
+  concentration String
+  notes         String[]
+  createdAt     DateTime @default(now())
+
+  splits   Split[]
+  listings Listing[]
+
+  @@unique([brand, name, concentration])
+  @@index([brand])
+}
+
+// =============================================================================
+// SPLITS  (the core real-time entity)
+// =============================================================================
+
+enum SplitStatus {
+  draft
+  open
+  filled
+  bottle_left
+  closed
+  cancelled
+}
+
+model Split {
+  id                 String       @id @default(cuid())
+  perfumeId          String
+  ownerId            String
+  status             SplitStatus  @default(open)
+
+  totalVolumeMl      Int
+  filledMl           Int          @default(0)
+  bottleSizeMl       Int
+  pricePerMl         Decimal      @db.Decimal(10, 2)
+  allowedIncrements  Int[]
+
+  batchCode          String
+  sourceInfo         String
+  hasBox             Boolean      @default(true)
+  aiRiskScore        String?      // low, low_medium, medium_high, high, manual
+  hasBottleLeft      Boolean      @default(false)
+
+  closesAt           DateTime
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  perfume   Perfume        @relation(fields: [perfumeId], references: [id])
+  owner     User           @relation("SplitOwner", fields: [ownerId], references: [id])
+  requests  SplitRequest[]
+  waitlist  SplitWaitlistEntry[]
+
+  @@index([status])
+  @@index([closesAt])
+  @@index([perfumeId])
+}
+
+enum SplitRequestStatus {
+  pending_payment
+  reserved
+  paid
+  shipped
+  delivered
+  cancelled
+  expired
+}
+
+model SplitRequest {
+  id              String              @id @default(cuid())
+  splitId         String
+  userId          String
+  amountMl        Int
+  totalPrice      Decimal             @db.Decimal(10, 2)
+  status          SplitRequestStatus  @default(pending_payment)
+  isBottleRequest Boolean             @default(false)
+  paymentDeadline DateTime
+  trackingNumber  String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  split    Split    @relation(fields: [splitId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+  payment  Payment? @relation("RequestPayment")
+
+  @@index([splitId, status])
+  @@index([userId])
+}
+
+model SplitWaitlistEntry {
+  id        String   @id @default(cuid())
+  splitId   String
+  userId    String
+  amountMl  Int
+  position  Int
+  createdAt DateTime @default(now())
+
+  split Split @relation(fields: [splitId], references: [id], onDelete: Cascade)
+
+  @@unique([splitId, userId])
+  @@index([splitId, position])
+}
+
+// =============================================================================
+// MARKETPLACE
+// =============================================================================
+
+enum ListingType {
+  sale
+  trade
+  both
+}
+
+enum ListingStatus {
+  pending_review
+  active
+  reserved
+  sold
+  removed
+  rejected
+}
+
+model Listing {
+  id                 String         @id @default(cuid())
+  sellerId           String
+  perfumeId          String
+  type               ListingType
+  price              Decimal?       @db.Decimal(10, 2)
+  bottleSizeMl       Int
+  remainingMl        Int
+  batchCode          String
+  hasBox             Boolean        @default(true)
+  city               String
+  tradeExpectations  String?
+  images             String[]
+  aiRiskScore        String?
+  moderationStatus   String         @default("pending")
+  status             ListingStatus  @default(pending_review)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  seller        User             @relation("ListingSeller", fields: [sellerId], references: [id])
+  perfume       Perfume          @relation(fields: [perfumeId], references: [id])
+  offers        Offer[]
+  conversations Conversation[]
+
+  @@index([status])
+  @@index([sellerId])
+  @@index([perfumeId])
+}
+
+enum OfferType {
+  price
+  trade
+}
+
+enum OfferStatus {
+  pending
+  accepted
+  rejected
+  countered
+  withdrawn
+  expired
+}
+
+model Offer {
+  id               String      @id @default(cuid())
+  listingId        String
+  buyerId          String
+  type             OfferType
+  offeredPrice     Decimal?    @db.Decimal(10, 2)
+  tradeListingId   String?
+  tradeDescription String?
+  note             String?
+  status           OfferStatus @default(pending)
+  parentOfferId    String?     // for counter-offers
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  listing      Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer        User     @relation(fields: [buyerId], references: [id])
+  parentOffer  Offer?   @relation("CounterOffer", fields: [parentOfferId], references: [id])
+  counters     Offer[]  @relation("CounterOffer")
+
+  @@index([listingId, status])
+  @@index([buyerId])
+}
+
+// =============================================================================
+// MESSAGING
+// =============================================================================
+
+model Conversation {
+  id            String   @id @default(cuid())
+  listingId     String?
+  splitId       String?
+  userAId       String
+  userBId       String
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  listing  Listing?  @relation(fields: [listingId], references: [id])
+  userA    User      @relation("ConvoUserA", fields: [userAId], references: [id])
+  userB    User      @relation("ConvoUserB", fields: [userBId], references: [id])
+  messages Message[]
+
+  @@index([userAId, lastMessageAt])
+  @@index([userBId, lastMessageAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  readAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+}
+
+// =============================================================================
+// AI CHECKS
+// =============================================================================
+
+enum AiCheckableType {
+  split
+  listing
+}
+
+enum AiCheckStatus {
+  queued
+  processing
+  done
+  failed
+}
+
+model AiCheck {
+  id              String          @id @default(cuid())
+  checkableType   AiCheckableType
+  checkableId     String
+  status          AiCheckStatus   @default(queued)
+  riskScore       String?
+  reasons         String[]
+  ocrBatchCode    String?
+  scoresJson      Json?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime        @default(now())
+
+  @@index([checkableType, checkableId])
+  @@index([status])
+}
+
+// =============================================================================
+// PAYMENTS
+// =============================================================================
+
+enum PaymentStatus {
+  initiated
+  authorized
+  captured
+  failed
+  refunded
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  userId           String
+  splitRequestId   String?       @unique
+  amount           Decimal       @db.Decimal(10, 2)
+  currency         String        @default("TRY")
+  provider         String        @default("stub")
+  providerRef      String?
+  status           PaymentStatus @default(initiated)
+  failureReason    String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user         User           @relation(fields: [userId], references: [id])
+  splitRequest SplitRequest?  @relation("RequestPayment", fields: [splitRequestId], references: [id])
+
+  @@index([status])
+  @@index([userId])
+}
+
+// =============================================================================
+// NOTIFICATIONS  (delivered via WS user:{id} channel)
+// =============================================================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+// =============================================================================
+// EVENT LOG  (audit trail + replay capability)
+// =============================================================================
+
+model EventLog {
+  id            String   @id @default(cuid())
+  type          String
+  aggregateId   String?
+  aggregateType String?
+  payload       Json
+  actorId       String?
+  channels      String[] // which WS channels this got fanned out to
+  createdAt     DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([aggregateType, aggregateId])
+}
+
+// =============================================================================
+// WEBSOCKET SESSIONS
+// =============================================================================
+
+model WsSession {
+  id           String   @id @default(cuid())
+  socketId     String   @unique
+  userId       String?
+  ipAddress    String?
+  userAgent    String?
+  channels     String[]
+  connectedAt  DateTime @default(now())
+  disconnectedAt DateTime?
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([socketId])
+}
