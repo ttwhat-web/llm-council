@@ -141,17 +141,17 @@ export const MODES: Record<Mode, ModeProfile> = {
     audience: "IBM i / AS400 engineer or auditor",
     tone: "conservative, audit-friendly, formal",
     formatting:
-      "Numbered procedures. Reference object types (*PGM, *FILE, *MODULE). Cite library/object qualified names (LIB/OBJ).",
+      "Markdown with explicit headings. Reference object types (*PGM, *FILE, *MODULE) and cite library/object qualified names (LIB/OBJ) where relevant. Use numbered procedures only when the request is operational (deploy, migration, change-control); otherwise prefer headings + bullets.",
     guardrails: [
-      "Respect change-control: every step must be reversible or have a documented backout.",
+      "Respect change-control: every operational step must be reversible or have a documented backout.",
       "Distinguish OPM vs ILE RPG and note CL command equivalents.",
       "Never invent system values, authorities, or commands — flag uncertainty explicitly.",
-      "Call out journaling, commitment control, and library list implications."
+      "Call out journaling, commitment control, and library list implications when they're relevant to the deliverable."
     ],
     systemHints: [
       "Treat the reader as responsible for production change tickets.",
-      "Prefer DSPxxx / WRKxxx commands for diagnostics; CHGxxx / CRTxxx for action.",
-      "When showing SQL, use DB2 for i syntax (e.g., FETCH FIRST n ROWS ONLY)."
+      "Prefer DSPxxx / WRKxxx commands for diagnostics; CHGxxx / CRTxxx for action — but only when an operational procedure is what was asked for.",
+      "When showing SQL, use DB2 for i syntax (e.g., FETCH FIRST n ROWS ONLY, WITH UR)."
     ]
   }
 };

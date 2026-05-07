@@ -149,7 +149,25 @@ function inferIntent(text: string, mode: Mode): Intent {
   );
   const looksLikeRefactor = /\b(refactor|clean ?up|simplify|optimi[sz]e|rewrite)\b/i.test(trimmed);
   const looksLikeDoc = /\b(document|docstring|readme|explain)\b/i.test(trimmed);
-  const looksLikeReview = /\b(review|audit|critique|check)\b/i.test(trimmed);
+  // Architecture / build intent — must run BEFORE review so a sentence like
+  // "build a modern AS400 inventory system that lets users check stock levels"
+  // doesn't get sucked into the review path by the word "check".
+  const looksLikeArchitecture =
+    /\b(build|design|create|architect(?:ure)?|system|integration|roadmap|mvp|greenfield|modernis[ae]|modernization|migrate|migration plan|spec(?:ification)?|plan)\b/i.test(
+      trimmed
+    );
+  // Operational procedure — only meaningful in AS400 mode (and other ops-y
+  // modes the engine handles with the legacy procedure deliverable).
+  const looksLikeProcedure =
+    /\b(deploy|run\b|execute|change[- ]control|journaling|commitment control|migration step|backout|runbook|operational procedure|runbook step)\b/i.test(
+      trimmed
+    );
+  // Review intent. "audit"/"check" stay as keywords per spec, but only fire
+  // here — architecture takes priority above.
+  const looksLikeReview =
+    /\b(review|audit|check\s|issues|critique|find problems|surface issues|severity)\b/i.test(
+      trimmed
+    );
 
   const intent: Intent = {};
 
@@ -164,6 +182,15 @@ function inferIntent(text: string, mode: Mode): Intent {
   } else if (looksLikeDoc) {
     intent.task = "Produce documentation that lets a new engineer use this confidently.";
     intent.deliverable = "Markdown with a short summary, usage example, and edge cases.";
+  } else if (looksLikeArchitecture) {
+    intent.task =
+      "Produce a complete, opinionated architecture/build plan a small team can execute against. Make assumptions explicit and cut anything that isn't on the MVP path.";
+    intent.deliverable =
+      mode === "as400" ? AS400_ARCHITECTURE_DELIVERABLE : ARCHITECTURE_DELIVERABLE;
+  } else if (looksLikeProcedure && mode === "as400") {
+    intent.task =
+      "Produce an operational procedure for IBM i where every step is reversible.";
+    intent.deliverable = AS400_PROCEDURE_DELIVERABLE;
   } else if (looksLikeReview) {
     intent.task = "Perform a focused review and surface the highest-impact issues first.";
     intent.deliverable = "Issues grouped by severity (Critical / Important / Nit) with concrete fixes.";
@@ -174,11 +201,49 @@ function inferIntent(text: string, mode: Mode): Intent {
 
   if (mode === "as400") {
     intent.context =
-      "Assume the target system is IBM i (V7R3 or later) running ILE programs. Library list, journaling, and authority impact must be considered.";
+      "Assume the target system is IBM i (V7R3 or later). Library list, authority, journaling and commitment control must be considered. Distinguish OPM from ILE where relevant. Use DB2 for i syntax for SQL.";
   }
 
   return intent;
 }
+
+const AS400_ARCHITECTURE_DELIVERABLE = [
+  "Markdown with these sections, in this order:",
+  "1. Assumptions",
+  "2. Target Architecture",
+  "3. IBM i / AS400 Integration Options",
+  "4. DB2 for i Data Model",
+  "5. API Layer Design",
+  "6. Live Stock Sync Strategy",
+  "7. Mobile/Web Dashboard Scope",
+  "8. Role & Authority Model",
+  "9. Audit Log / Journaling / Commitment Control",
+  "10. Offline Mode Strategy",
+  "11. MVP Scope",
+  "12. Deployment Roadmap",
+  "13. Risks and Backout Plan",
+  "14. Questions for IT Team",
+  "",
+  "Each section: 2-6 tight bullets. Cite library/object qualified names (LIB/OBJ) when relevant. Distinguish OPM vs ILE. Reference DB2 for i SQL syntax (FETCH FIRST n ROWS ONLY, WITH UR, etc.). Conservative tone — flag uncertainty rather than inventing system values, authorities, or commands."
+].join("\n");
+
+const AS400_PROCEDURE_DELIVERABLE =
+  "Numbered procedure. Each step lists: command (in CL or SQL), purpose, expected output, and backout. End with an Audit Trail section (ticket, change window, journal receipts).";
+
+const ARCHITECTURE_DELIVERABLE = [
+  "Markdown with these sections, in this order:",
+  "1. Assumptions",
+  "2. Architecture overview",
+  "3. Stack",
+  "4. Data model",
+  "5. API design",
+  "6. MVP scope",
+  "7. Deployment roadmap",
+  "8. Risks & mitigations",
+  "9. Open questions",
+  "",
+  "Each section: 2-6 tight bullets. Quantify when possible. Mark estimates as estimates."
+].join("\n");
 
 function composeContext(input: string, extra?: string): string {
   const base = input.trim();
@@ -204,7 +269,10 @@ function outputFormatFor(mode: Mode, deliverable?: string): string {
     case "business":
       return "TL;DR (1 sentence). Body (≤6 bullets). Recommendation (1 sentence). Open Questions (≤3 bullets).";
     case "as400":
-      return "Numbered procedure. Each step lists: command (in CL or SQL), purpose, expected output, and backout. End with an Audit Trail section.";
+      // Conservative AS400 default — only used when no specific intent fired.
+      // Architecture / procedure intents set their own deliverable above and
+      // skip this branch via the early `if (deliverable) return deliverable`.
+      return "Markdown with explicit headings. Cite library/object qualified names (LIB/OBJ) where applicable. Note authority, journaling and commitment-control implications. Audit-friendly tone — flag uncertainty instead of inventing system values, authorities or commands.";
     case "general":
     default:
       return "Markdown. Lead with the answer. Use bullets where they aid scanning. Cap at 400 words unless the request demands more.";
