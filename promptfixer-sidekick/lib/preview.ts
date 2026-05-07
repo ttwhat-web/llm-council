@@ -76,6 +76,27 @@ const TEMPLATES: Record<Mode, string> = {
       "- Action 3"
     ].join("\n"),
 
+  gemini:
+    [
+      "## Outcome",
+      "Direct one-line statement of what shipped.",
+      "",
+      "## Plan",
+      "```json",
+      "{",
+      "  \"phases\": [",
+      "    { \"name\": \"discover\", \"deliverables\": [\"interview notes\"] },",
+      "    { \"name\": \"build\",    \"deliverables\": [\"v1 prototype\"] }",
+      "  ]",
+      "}",
+      "```",
+      "",
+      "## Assumptions",
+      "- Single user persona — adjust if multi-tenant.",
+      "- Cloud region pinned to us-east-1.",
+      "- No regulated data in scope."
+    ].join("\n"),
+
   cursor:
     [
       "### src/lib/example.ts",

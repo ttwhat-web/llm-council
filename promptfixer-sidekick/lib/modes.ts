@@ -51,6 +51,24 @@ export const MODES: Record<Mode, ModeProfile> = {
       "Optimised for an editor that will apply the patch literally."
     ]
   },
+  gemini: {
+    id: "gemini",
+    label: "Gemini",
+    blurb: "Google Gemini — JSON-friendly, multimodal-aware structure.",
+    audience: "Google Gemini (Pro / Ultra)",
+    tone: "direct, structured, evidence-led",
+    formatting:
+      "Markdown with explicit headings. Prefer JSON or YAML blocks for structured deliverables.",
+    guardrails: [
+      "Open with the target outcome in one line.",
+      "Demand structured (JSON/YAML) output where applicable.",
+      "Cite assumptions and sources rather than embedding them implicitly.",
+      "Forbid filler — no apologies, no restatement of the prompt."
+    ],
+    systemHints: [
+      "Tuned for Gemini's preference for explicit structure and evidence."
+    ]
+  },
   dev: {
     id: "dev",
     label: "Dev",

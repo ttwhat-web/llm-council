@@ -19,45 +19,50 @@ const PLANS: Plan[] = [
     id: "free",
     name: "Free",
     price: "$0",
-    blurb: "Get a feel for the engine.",
+    blurb: "Try the engine.",
     Icon: Zap,
     features: [
-      "10 cloud fixes / day",
-      "Rules engine — unlimited",
-      "Basic modes (General, Claude, ChatGPT, Dev)",
-      "Fast model only"
+      "10 fixes / day",
+      "Fast model only",
+      "Basic modes",
+      "Rules engine — unlimited"
     ],
     cta: "Start free"
   },
   {
     id: "pro",
     name: "Pro",
-    price: "$12 / mo",
-    blurb: "Daily-driver model quality + history.",
+    price: "$14 / mo",
+    blurb: "Daily-driver Command Center.",
     Icon: Crown,
     highlight: true,
     features: [
-      "Smart, Expert & Code models",
-      "Unlimited modes",
-      "Local prompt history",
-      "Templates",
-      "Output variants (Shorter / Stronger / Convert / …)",
-      "Higher daily quota"
+      "Unlimited prompt fixes",
+      "Smart + Code models",
+      "Diff view",
+      "Templates + history",
+      "Prompt variants",
+      "Cursor / Claude optimised outputs",
+      "Local Ollama support",
+      "AI compare mode"
     ],
     cta: "Go Pro"
   },
   {
     id: "operator",
     name: "Operator",
-    price: "$19 / mo",
+    price: "$24 / mo",
     blurb: "Power users running real ops.",
     Icon: Wrench,
     features: [
       "Everything in Pro",
-      "Terminal & AS400 modes with safety screen",
-      "Local Ollama (Mac) — unlimited & private",
-      "Floating desktop assistant",
-      "Project folders (soon)"
+      "AI command workflows (⌘K)",
+      "Repo analysis · diff review",
+      "Prompt → architecture · prompt → code",
+      "Terminal & AS400 modes",
+      "Mission telemetry",
+      "Team workflows",
+      "Future agent actions"
     ],
     cta: "Talk to us"
   }
@@ -67,7 +72,7 @@ export function Pricing({ compact }: { compact?: boolean }) {
   return (
     <div className={clsx("flex flex-col gap-3", compact && "gap-2")}>
       <div className="text-[11px] font-medium uppercase tracking-wider text-white/45">
-        Plans
+        Access levels
       </div>
       {PLANS.map((p) => (
         <PlanCard key={p.id} plan={p} compact={compact} />

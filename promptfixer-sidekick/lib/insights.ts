@@ -153,6 +153,8 @@ function prettyMode(mode: Mode): string {
       return "ChatGPT";
     case "cursor":
       return "Cursor";
+    case "gemini":
+      return "Gemini";
     case "dev":
       return "engineering work";
     case "terminal":
@@ -175,6 +177,8 @@ function modeFitNote(mode: Mode): string {
       return "Markdown structure, action-first wording, bounded next-steps.";
     case "cursor":
       return "File paths and unified-diff blocks — IDE-applies-the-patch shape.";
+    case "gemini":
+      return "Markdown headings + JSON/YAML blocks for structured deliverables.";
     case "dev":
       return "Code-first deliverable with 'Why' and 'Verify' tail.";
     case "terminal":

@@ -13,7 +13,8 @@ interface Props {
 const VARIANTS: Array<{ id: Mode; label: string; tag: string }> = [
   { id: "claude", label: "Claude-style", tag: "XML, calm tone" },
   { id: "chatgpt", label: "ChatGPT-style", tag: "Markdown, action-first" },
-  { id: "cursor", label: "Cursor-style", tag: "File paths, diffs" }
+  { id: "cursor", label: "Cursor-style", tag: "File paths, diffs" },
+  { id: "gemini", label: "Gemini-style", tag: "Headings + JSON / YAML" }
 ];
 
 export function CompareView({ sections, compact }: Props) {
@@ -23,7 +24,7 @@ export function CompareView({ sections, compact }: Props) {
         The same execution-ready prompt, rendered for three different tools.
         Pick whichever matches where you'll paste it.
       </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {VARIANTS.map((v) => {
           const text = renderPrompt(sections, v.id);
           return (

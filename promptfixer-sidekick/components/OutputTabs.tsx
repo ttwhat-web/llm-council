@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Columns, FileText, GitCompare, Lightbulb, Sparkles } from "lucide-react";
+import { Columns, FileText, GitCompare, Hammer, Lightbulb, Sparkles } from "lucide-react";
 import { CopyButton } from "./CopyButton";
+import { ExportMenu } from "./ExportMenu";
 import { OutputActions } from "./OutputActions";
 import { ScoreBadges } from "./ScoreBadges";
 import { SafetyBadge } from "./SafetyBadge";
@@ -11,27 +12,31 @@ import { WhyItWorks } from "./WhyItWorks";
 import { ExecutionPreview } from "./ExecutionPreview";
 import { CompareView } from "./CompareView";
 import { DiffView } from "./DiffView";
+import { ArchitectView } from "./ArchitectView";
 import type {
+  ArchitectResponse,
   ClientContext,
   FixResponse,
   ModelQuality,
   OutputAction
 } from "@/lib/types";
 
-type TabId = "prompt" | "why" | "preview";
+type TabId = "prompt" | "why" | "preview" | "architect";
 
 interface Props {
   result: FixResponse;
   modelQuality: ModelQuality;
   clientContext: ClientContext;
   allowCloudFallback: boolean;
+  architect?: ArchitectResponse | null;
+  forceTab?: TabId;
   busy?: boolean;
   busyAction?: OutputAction | null;
   onAction: (action: OutputAction) => void;
   compact?: boolean;
 }
 
-const TABS: Array<{ id: TabId; label: string; Icon: typeof FileText; pro?: boolean }> = [
+const BASE_TABS: Array<{ id: TabId; label: string; Icon: typeof FileText; pro?: boolean }> = [
   { id: "prompt", label: "Execution-ready prompt", Icon: FileText },
   { id: "why", label: "Why it works", Icon: Lightbulb, pro: true },
   { id: "preview", label: "Execution preview", Icon: Sparkles, pro: true }
@@ -42,6 +47,8 @@ export function OutputTabs({
   modelQuality,
   clientContext,
   allowCloudFallback,
+  architect,
+  forceTab,
   busy,
   busyAction,
   onAction,
@@ -51,6 +58,13 @@ export function OutputTabs({
   const [compare, setCompare] = useState(false);
   const [view, setView] = useState<"final" | "diff">("final");
 
+  const tabs = architect ? [...BASE_TABS, { id: "architect" as TabId, label: "Architect", Icon: Hammer, pro: true }] : BASE_TABS;
+
+  // Auto-jump to Architect when a new plan lands; allow parent to force tab.
+  useEffect(() => {
+    if (forceTab) setTab(forceTab);
+  }, [forceTab]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <ScoreBadges score={result.score} compact={compact} />
@@ -58,7 +72,7 @@ export function OutputTabs({
       <MetaRow result={result} />
 
       <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-white/6 bg-white/[0.02] p-1">
-        {TABS.map((t) => {
+        {tabs.map((t) => {
           const active = tab === t.id;
           return (
             <button
@@ -148,7 +162,10 @@ export function OutputTabs({
                     Copy this into Claude, ChatGPT, Cursor or your AI tool.
                   </div>
                 </div>
-                <CopyButton text={result.prompt} />
+                <div className="flex items-center gap-1.5">
+                  <ExportMenu result={result} />
+                  <CopyButton text={result.prompt} />
+                </div>
               </div>
               <pre className="scrollbar-thin min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-4 py-3 font-mono text-[12px] leading-relaxed text-white/85">
                 {result.prompt}
@@ -195,6 +212,8 @@ export function OutputTabs({
           compact={compact}
         />
       )}
+
+      {tab === "architect" && architect && <ArchitectView data={architect} />}
     </div>
   );
 }

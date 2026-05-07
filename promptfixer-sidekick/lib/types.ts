@@ -16,6 +16,7 @@ export type Mode =
   | "claude"
   | "chatgpt"
   | "cursor"
+  | "gemini"
   | "dev"
   | "terminal"
   | "business"
@@ -201,6 +202,68 @@ export interface CleanResponse {
   ok: boolean;
   cleaned: string;
   removed: string[];
+  elapsedMs: number;
+}
+
+// ---------- Mission Log ----------
+
+export type LogKind = "info" | "ok" | "warn" | "err";
+
+export interface LogEntry {
+  id: string;
+  /** Epoch ms — used for timeline ordering and HH:MM:SS render. */
+  ts: number;
+  kind: LogKind;
+  message: string;
+  /** Optional short tag rendered as a chip prefix (e.g. "router", "safety"). */
+  tag?: string;
+}
+
+// ---------- Architect (Prompt → Code) ----------
+
+export interface ArchitectRoadmapStep {
+  milestone: string;
+  deliverables: string[];
+}
+
+export interface ArchitectRisk {
+  severity: "low" | "medium" | "high";
+  risk: string;
+  mitigation: string;
+}
+
+export interface ArchitectStack {
+  frontend: string[];
+  backend: string[];
+  infra: string[];
+}
+
+export interface ArchitectPlan {
+  architecture: string;
+  stack: ArchitectStack;
+  fileTree: string;
+  prompt: string;
+  roadmap: ArchitectRoadmapStep[];
+  deploymentChecklist: string[];
+  risks: ArchitectRisk[];
+}
+
+export interface ArchitectRequest {
+  input: string;
+  modelQuality?: ModelQuality;
+  clientContext?: ClientContext;
+  allowCloudFallback?: boolean;
+}
+
+export interface ArchitectResponse {
+  ok: true;
+  plan: ArchitectPlan;
+  resolved: ProviderId;
+  model?: string;
+  latencyMs?: number;
+  isDeterministic: boolean;
+  notice?: string;
+  usage?: UsageSnapshot;
   elapsedMs: number;
 }
 

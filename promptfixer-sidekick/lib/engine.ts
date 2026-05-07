@@ -24,11 +24,13 @@ export function detectMode(input: string): Mode {
     );
   const looksLikeChatGPT = /\b(chatgpt|gpt-?\d|openai)\b/i.test(input);
   const looksLikeClaude = /\b(claude|anthropic|sonnet|opus|haiku)\b/i.test(input);
+  const looksLikeGemini = /\b(gemini|bard|google ai)\b/i.test(input);
 
   if (hasAS400) return "as400";
   if (hasShell) return "terminal";
   if (looksLikeClaude) return "claude";
   if (looksLikeChatGPT) return "chatgpt";
+  if (looksLikeGemini) return "gemini";
   if (hasCode) return "dev";
   if (hasBusiness) return "business";
   return "general";
@@ -115,6 +117,8 @@ function roleFor(mode: Mode): string {
       return "a senior product engineer briefing ChatGPT";
     case "cursor":
       return "a senior engineer briefing an IDE coding agent (Cursor) on a precise edit";
+    case "gemini":
+      return "a senior analyst briefing Gemini with structured, evidence-led requirements";
     case "dev":
       return "a staff software engineer pair-programming with the model";
     case "terminal":
@@ -191,6 +195,8 @@ function outputFormatFor(mode: Mode, deliverable?: string): string {
       return "Markdown. Start with the deliverable. End with a single 'Next Steps' bullet list (max 3 items).";
     case "cursor":
       return "For each touched file: '### path/to/file' header followed by a fenced unified-diff block. End with a one-line 'Verify' command.";
+    case "gemini":
+      return "Markdown headings for human-readable sections; embed any structured data inside fenced ```json or ```yaml blocks. End with an 'Assumptions' bullet list.";
     case "dev":
       return "Begin with the patched code in a fenced block. Follow with 'Why' (≤3 bullets) and 'Verify' (≤3 bullets).";
     case "terminal":

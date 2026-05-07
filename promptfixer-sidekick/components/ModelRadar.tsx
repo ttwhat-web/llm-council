@@ -36,6 +36,8 @@ interface Props {
   lastSupervisor?: SupervisorReview;
   lastUsage?: UsageSnapshot;
   busy?: boolean;
+  /** Most recent supervisor latencies for the live sparkline (newest last). */
+  latencyHistory?: number[];
   className?: string;
 }
 
@@ -48,6 +50,7 @@ export function ModelRadar({
   lastSupervisor,
   lastUsage,
   busy,
+  latencyHistory,
   className
 }: Props) {
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -135,6 +138,9 @@ export function ModelRadar({
             <div className="font-mono text-[10px] text-white/45">{latency}ms</div>
           )}
         </div>
+        {latencyHistory && latencyHistory.length > 1 && (
+          <Sparkline values={latencyHistory} />
+        )}
       </div>
 
       {/* status grid */}
@@ -195,14 +201,12 @@ export function ModelRadar({
         </div>
       )}
 
-      {/* routing chain */}
+      {/* routing chain (animated when running or fallback) */}
       <div className="mt-3 border-t border-white/5 pt-2.5">
         <div className="mb-1 text-[9px] font-medium uppercase tracking-[0.18em] text-white/40">
           Routing
         </div>
-        <div className="font-mono text-[10px] leading-tight text-white/65">
-          {routing.length > 0 ? routing.join(" → ") : "—"}
-        </div>
+        <RoutingChain providers={routing} active={busy} fallback={lastSupervisor?.fallbackUsed} />
         {lastSupervisor?.fallbackUsed && (
           <div className="mt-1 inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-amber-200">
             fallback {lastSupervisor.requestedEngine} → {lastSupervisor.resolved}
@@ -210,31 +214,29 @@ export function ModelRadar({
         )}
       </div>
 
-      {/* quota */}
+      {/* quota — ring */}
       {lastUsage && (
-        <div className="mt-3 border-t border-white/5 pt-2.5">
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="text-[9px] uppercase tracking-[0.18em] text-white/40">
+        <div className="mt-3 flex items-center gap-3 border-t border-white/5 pt-2.5">
+          <QuotaRing used={lastUsage.used} limit={lastUsage.limit} />
+          <div className="flex flex-col leading-tight">
+            <span className="text-[9px] font-medium uppercase tracking-[0.18em] text-white/40">
               Quota · {lastUsage.tier}
             </span>
-            <span className="font-mono text-white/65">
-              {lastUsage.used}/{lastUsage.limit}
+            <span className="font-mono text-[11px] text-white/85">
+              {lastUsage.used}
+              <span className="text-white/40">/{lastUsage.limit}</span>
+            </span>
+            <span className="text-[9px] text-white/40">
+              resets {formatReset(lastUsage.resetAt)}
             </span>
           </div>
-          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/5">
-            <div
-              className={clsx(
-                "h-full rounded-full transition-[width]",
-                lastUsage.remaining === 0
-                  ? "bg-red-400/80"
-                  : lastUsage.remaining < 3
-                    ? "bg-amber-400/80"
-                    : "bg-emerald-400/80"
-              )}
-              style={{ width: `${(lastUsage.used / Math.max(1, lastUsage.limit)) * 100}%` }}
-            />
-          </div>
         </div>
+      )}
+
+      {/* Ollama setup helper — only when configured but unreachable, OR when
+          quality=local but Ollama isn't reachable. Inline, copy-paste ready. */}
+      {selectedQuality === "local" && !ollamaReady && (
+        <OllamaSetupHelper configured={ollamaConfigured} />
       )}
 
       {/* footer chips */}
@@ -378,4 +380,149 @@ function isInstalled(model: string, installed?: string[]): boolean {
   if (!installed?.length) return false;
   const family = model.toLowerCase().split(":")[0];
   return installed.some((m) => m.toLowerCase().split(":")[0] === family);
+}
+
+function formatReset(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return iso;
+  }
+}
+
+// ---------- visual sub-components ----------
+
+function RoutingChain({
+  providers,
+  active,
+  fallback
+}: {
+  providers: readonly string[];
+  active?: boolean;
+  fallback?: boolean;
+}) {
+  if (providers.length === 0) {
+    return <div className="font-mono text-[10px] text-white/55">—</div>;
+  }
+  return (
+    <div className="flex items-center gap-1 overflow-hidden">
+      {providers.map((p, i) => {
+        const isLast = i === providers.length - 1;
+        const tone = fallback && i === 0 ? "warn" : i === 0 ? "ok" : "muted";
+        const dot = {
+          ok: "bg-emerald-400 shadow-[0_0_4px_1px_rgba(52,211,153,0.45)]",
+          warn: "bg-amber-400 shadow-[0_0_4px_1px_rgba(251,191,36,0.45)]",
+          muted: "bg-white/30"
+        }[tone];
+        return (
+          <div key={`${p}-${i}`} className="flex items-center gap-1">
+            <span className={clsx("h-1 w-1 shrink-0 rounded-full", dot)} />
+            <span className="font-mono text-[10px] text-white/75">{p}</span>
+            {!isLast && (
+              <span className="relative inline-block h-px w-3 overflow-hidden bg-white/10">
+                {active && (
+                  <span className="absolute inset-y-0 left-0 w-1.5 animate-[shimmer_1.4s_linear_infinite] bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
+                )}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function QuotaRing({ used, limit }: { used: number; limit: number }) {
+  const pct = Math.max(0, Math.min(1, used / Math.max(1, limit)));
+  const r = 14;
+  const c = 2 * Math.PI * r;
+  const dash = c * pct;
+  const tone = pct >= 1 ? "stroke-red-400/85" : pct >= 0.7 ? "stroke-amber-400/85" : "stroke-emerald-400/85";
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" className="shrink-0">
+      <circle
+        cx="18"
+        cy="18"
+        r={r}
+        className="stroke-white/10"
+        strokeWidth="3"
+        fill="none"
+      />
+      <circle
+        cx="18"
+        cy="18"
+        r={r}
+        className={clsx(tone, "transition-[stroke-dasharray]")}
+        strokeWidth="3"
+        strokeDasharray={`${dash} ${c}`}
+        strokeLinecap="round"
+        fill="none"
+        transform="rotate(-90 18 18)"
+      />
+    </svg>
+  );
+}
+
+function Sparkline({ values }: { values: number[] }) {
+  // Last 8 values, normalised. Two-decimal SVG path.
+  const pts = values.slice(-8);
+  const max = Math.max(...pts, 1);
+  const min = Math.min(...pts, 0);
+  const range = Math.max(1, max - min);
+  const w = 100;
+  const h = 14;
+  const step = pts.length > 1 ? w / (pts.length - 1) : w;
+  const path = pts
+    .map((v, i) => {
+      const x = i * step;
+      const y = h - ((v - min) / range) * (h - 2) - 1;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg width={w} height={h} className="mt-1 w-full overflow-visible" viewBox={`0 0 ${w} ${h}`}>
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="1" className="text-accent/70" />
+      {pts.length > 0 && (
+        <circle
+          cx={(pts.length - 1) * step}
+          cy={h - ((pts[pts.length - 1] - min) / range) * (h - 2) - 1}
+          r="1.4"
+          className="fill-accent"
+        />
+      )}
+    </svg>
+  );
+}
+
+function OllamaSetupHelper({ configured }: { configured: boolean }) {
+  const lines = [
+    "brew install ollama",
+    "ollama serve",
+    "ollama pull gemma4",
+    "ollama pull qwen2.5-coder:7b",
+    "ollama pull hermes3",
+    "",
+    "# in your .env.local:",
+    "OLLAMA_BASE_URL=http://127.0.0.1:11434"
+  ].join("\n");
+  return (
+    <div className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] p-2.5">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[9px] font-medium uppercase tracking-[0.18em] text-amber-200/85">
+          Local AI · {configured ? "unreachable" : "not configured"}
+        </span>
+        <button
+          type="button"
+          onClick={() => navigator.clipboard?.writeText(lines)}
+          className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-white/55 transition hover:bg-white/[0.06] hover:text-white/80"
+        >
+          Copy
+        </button>
+      </div>
+      <pre className="scrollbar-thin overflow-auto whitespace-pre-wrap font-mono text-[10px] leading-5 text-amber-100/85">
+        {lines}
+      </pre>
+    </div>
+  );
 }

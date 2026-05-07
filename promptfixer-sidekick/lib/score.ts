@@ -128,6 +128,12 @@ function modelFit(prompt: string, s: PromptSections, mode: Mode): number {
       if (/verify/i.test(prompt)) score += 15;
       if (/```diff|---|\+\+\+/.test(prompt)) score += 15;
       break;
+    case "gemini":
+      if (/```(json|yaml)/i.test(prompt)) score += 25;
+      if (/assumptions/i.test(prompt)) score += 15;
+      if (/^#{1,3}\s/m.test(prompt)) score += 15;
+      if (/(structure|deliverable|outcome)/i.test(prompt)) score += 5;
+      break;
     case "dev":
       if (/```/.test(prompt)) score += 20;
       if (/why|verify|edge cases?/i.test(prompt)) score += 20;
