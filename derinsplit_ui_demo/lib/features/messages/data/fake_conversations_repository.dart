@@ -99,7 +99,7 @@ class FakeConversationsRepository {
   FakeConversationsRepository(this.ref);
 
   Future<void> _delay() async {
-    final ms = ref.read(demoSettingsProvider).delayMs;
+    final ms = ref.read(demoSettingsProvider).effectiveDelayMs;
     await Future.delayed(Duration(milliseconds: ms));
   }
 

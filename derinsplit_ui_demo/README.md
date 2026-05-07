@@ -72,7 +72,25 @@ Splash veya Login ekranındaki **logoya basılı tut** (long-press) ya da Profil
 - **İlan Verebilir** toggle → Pazar sekmesinde "İlan Ver" FAB
 - **Force Error** → Tüm repo çağrıları hata fırlatır (error state'i test et)
 - **Force Empty** → Listeleri boş döndür (empty state'i test et)
+- **Yüksek Trafik** → +900ms ek gecikme + Home'da canlı banner
 - **Network Delay** → 0–2000ms slider (loading state'i test et)
+
+## ✨ Polish Katmanı
+
+- Glassmorphism kartlar (`GlassCard`, `AuroraBackdrop`)
+- Hover-lift + tap-press scale micro-interactions
+- Fade + slide page transitions (`fadeSlidePage`)
+- Splash: elastic logo ölçek + altın shimmer wordmark
+- Chat: animasyonlu typing indicator (yanıt geldiğinde)
+- Listing Wizard AI step: streaming AI mesajları
+  ```
+  › AI authenticity check running...
+  › OCR ile batch kodu okunuyor...
+  › Batch code verified (simulated)
+  › Görsel kalitesi ve şişe uyumu analiz ediliyor...
+  › Risk score: LOW
+  ```
+- Publish başarısı: elastic check + altın CTA
 
 ## 🗺️ Ekranlar (SCR-001..SCR-017)
 

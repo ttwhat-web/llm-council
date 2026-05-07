@@ -6,6 +6,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/utils/format.dart';
 import '../../../core/widgets/ds_chip.dart';
 import '../../../core/widgets/ds_state.dart';
+import '../../../core/widgets/ds_typing.dart';
 import '../data/fake_conversations_repository.dart';
 
 class MessageDetailScreen extends ConsumerStatefulWidget {
@@ -21,6 +22,7 @@ class _MessageDetailScreenState extends ConsumerState<MessageDetailScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   bool _sending = false;
+  bool _otherTyping = false;
 
   @override
   void dispose() {
@@ -38,7 +40,14 @@ class _MessageDetailScreenState extends ConsumerState<MessageDetailScreen> {
         .sendMessage(widget.conversationId, text);
     _input.clear();
     ref.invalidate(messagesProvider(widget.conversationId));
-    setState(() => _sending = false);
+    if (!mounted) return;
+    setState(() {
+      _sending = false;
+      _otherTyping = true;
+    });
+    Future.delayed(const Duration(milliseconds: 2400), () {
+      if (mounted) setState(() => _otherTyping = false);
+    });
   }
 
   @override
@@ -147,8 +156,20 @@ class _MessageDetailScreenState extends ConsumerState<MessageDetailScreen> {
                 return ListView.builder(
                   controller: _scroll,
                   padding: const EdgeInsets.all(12),
-                  itemCount: items.length,
+                  itemCount: items.length + (_otherTyping ? 1 : 0),
                   itemBuilder: (_, i) {
+                    if (i == items.length && _otherTyping) {
+                      return Align(
+                        alignment: Alignment.centerLeft,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: DSTypingIndicator(
+                            key: const ValueKey('typing'),
+                            name: 'Karşı taraf',
+                          ),
+                        ),
+                      );
+                    }
                     final m = items[i];
                     return Align(
                       alignment: m.isMine

@@ -25,6 +25,7 @@ import '../../features/splits/presentation/split_dashboard_screen.dart';
 import '../../features/splits/presentation/split_detail_screen.dart';
 import '../../features/splits/presentation/split_list_screen.dart';
 import '../widgets/main_shell.dart';
+import 'page_transition.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
@@ -53,96 +54,134 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
+      GoRoute(
+        path: '/splash',
+        pageBuilder: (_, __) => fadeSlidePage(child: const SplashScreen()),
+      ),
       GoRoute(
         path: '/onboarding',
-        builder: (_, __) => const OnboardingScreen(),
+        pageBuilder: (_, __) => fadeSlidePage(child: const OnboardingScreen()),
       ),
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (_, __) => fadeSlidePage(child: const LoginScreen()),
+      ),
       GoRoute(
         path: '/search',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SearchScreen(),
+        pageBuilder: (_, __) => fadeSlidePage(child: const SearchScreen()),
       ),
       GoRoute(
         path: '/notifications',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const NotificationsScreen(),
+        pageBuilder: (_, __) =>
+            fadeSlidePage(child: const NotificationsScreen()),
       ),
       GoRoute(
         path: '/splits/:id',
         parentNavigatorKey: _rootKey,
-        builder: (_, s) => SplitDetailScreen(splitId: s.pathParameters['id']!),
+        pageBuilder: (_, s) => fadeSlidePage(
+          child: SplitDetailScreen(splitId: s.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: '/splits/:id/bottle',
         parentNavigatorKey: _rootKey,
-        builder: (_, s) => BottleRequestScreen(splitId: s.pathParameters['id']!),
+        pageBuilder: (_, s) => fadeSlidePage(
+          child: BottleRequestScreen(splitId: s.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: '/payment',
         parentNavigatorKey: _rootKey,
-        builder: (_, s) {
+        pageBuilder: (_, s) {
           final extra = s.extra as Map<String, dynamic>?;
-          return PaymentScreen(
-            title: extra?['title'] as String? ?? 'Ödeme',
-            amount: (extra?['amount'] as num?)?.toDouble() ?? 0,
-            subtitle: extra?['subtitle'] as String?,
+          return fadeSlidePage(
+            child: PaymentScreen(
+              title: extra?['title'] as String? ?? 'Ödeme',
+              amount: (extra?['amount'] as num?)?.toDouble() ?? 0,
+              subtitle: extra?['subtitle'] as String?,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/listings/:id',
         parentNavigatorKey: _rootKey,
-        builder: (_, s) =>
-            ListingDetailScreen(listingId: s.pathParameters['id']!),
+        pageBuilder: (_, s) => fadeSlidePage(
+          child: ListingDetailScreen(listingId: s.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: '/listings/new',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const ListingCreateScreen(),
+        pageBuilder: (_, __) =>
+            fadeSlidePage(child: const ListingCreateScreen()),
       ),
       GoRoute(
         path: '/messages/:id',
         parentNavigatorKey: _rootKey,
-        builder: (_, s) =>
-            MessageDetailScreen(conversationId: s.pathParameters['id']!),
+        pageBuilder: (_, s) => fadeSlidePage(
+          child: MessageDetailScreen(conversationId: s.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: '/orders',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const OrdersScreen(),
+        pageBuilder: (_, __) => fadeSlidePage(child: const OrdersScreen()),
       ),
       GoRoute(
         path: '/orders/:id',
         parentNavigatorKey: _rootKey,
-        builder: (_, s) =>
-            OrderDetailScreen(orderId: s.pathParameters['id']!),
+        pageBuilder: (_, s) => fadeSlidePage(
+          child: OrderDetailScreen(orderId: s.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: '/settings',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SettingsScreen(),
+        pageBuilder: (_, __) => fadeSlidePage(child: const SettingsScreen()),
       ),
       GoRoute(
         path: '/dashboard/splits',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SplitDashboardScreen(),
+        pageBuilder: (_, __) =>
+            fadeSlidePage(child: const SplitDashboardScreen()),
       ),
       GoRoute(
         path: '/dashboard/sales',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const SalesDashboardScreen(),
+        pageBuilder: (_, __) =>
+            fadeSlidePage(child: const SalesDashboardScreen()),
       ),
       ShellRoute(
         navigatorKey: _shellKey,
         builder: (context, state, child) => MainShell(child: child),
         routes: [
-          GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
-          GoRoute(path: '/splits', builder: (_, __) => const SplitListScreen()),
-          GoRoute(path: '/market', builder: (_, __) => const MarketListScreen()),
-          GoRoute(path: '/messages', builder: (_, __) => const MessagesListScreen()),
-          GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+          GoRoute(
+            path: '/home',
+            pageBuilder: (_, __) => fadeSlidePage(child: const HomeScreen()),
+          ),
+          GoRoute(
+            path: '/splits',
+            pageBuilder: (_, __) =>
+                fadeSlidePage(child: const SplitListScreen()),
+          ),
+          GoRoute(
+            path: '/market',
+            pageBuilder: (_, __) =>
+                fadeSlidePage(child: const MarketListScreen()),
+          ),
+          GoRoute(
+            path: '/messages',
+            pageBuilder: (_, __) =>
+                fadeSlidePage(child: const MessagesListScreen()),
+          ),
+          GoRoute(
+            path: '/profile',
+            pageBuilder: (_, __) =>
+                fadeSlidePage(child: const ProfileScreen()),
+          ),
         ],
       ),
     ],

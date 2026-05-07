@@ -6,6 +6,7 @@ class DemoSettings {
   final int delayMs;
   final bool isTrustedSeller;
   final bool canListItems;
+  final bool highTraffic;
 
   const DemoSettings({
     this.forceError = false,
@@ -13,7 +14,10 @@ class DemoSettings {
     this.delayMs = 500,
     this.isTrustedSeller = false,
     this.canListItems = true,
+    this.highTraffic = false,
   });
+
+  int get effectiveDelayMs => highTraffic ? (delayMs + 900) : delayMs;
 
   DemoSettings copyWith({
     bool? forceError,
@@ -21,6 +25,7 @@ class DemoSettings {
     int? delayMs,
     bool? isTrustedSeller,
     bool? canListItems,
+    bool? highTraffic,
   }) {
     return DemoSettings(
       forceError: forceError ?? this.forceError,
@@ -28,6 +33,7 @@ class DemoSettings {
       delayMs: delayMs ?? this.delayMs,
       isTrustedSeller: isTrustedSeller ?? this.isTrustedSeller,
       canListItems: canListItems ?? this.canListItems,
+      highTraffic: highTraffic ?? this.highTraffic,
     );
   }
 }
@@ -41,6 +47,8 @@ class DemoSettingsNotifier extends StateNotifier<DemoSettings> {
       state = state.copyWith(isTrustedSeller: !state.isTrustedSeller);
   void toggleCanList() =>
       state = state.copyWith(canListItems: !state.canListItems);
+  void toggleHighTraffic() =>
+      state = state.copyWith(highTraffic: !state.highTraffic);
   void setDelay(int ms) => state = state.copyWith(delayMs: ms);
 }
 

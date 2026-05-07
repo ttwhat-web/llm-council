@@ -37,6 +37,8 @@ class _ListingCreateScreenState extends ConsumerState<ListingCreateScreen> {
   final List<int> _photosUploaded = [];
   String? _aiResult;
   bool _aiRunning = false;
+  final List<String> _aiLog = [];
+  bool _published = false;
 
   @override
   void dispose() {
@@ -90,10 +92,7 @@ class _ListingCreateScreenState extends ConsumerState<ListingCreateScreen> {
             name: _name.text,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('İlanın incelemeye gönderildi')),
-      );
-      context.go('/dashboard/sales');
+      setState(() => _published = true);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
@@ -107,19 +106,35 @@ class _ListingCreateScreenState extends ConsumerState<ListingCreateScreen> {
     setState(() {
       _aiRunning = true;
       _aiResult = null;
+      _aiLog.clear();
     });
-    final res = await ref
+    final stream = ref
         .read(listingsRepositoryProvider)
-        .runAiCheck(_photosUploaded.map((e) => e.toString()).toList());
+        .runAiCheckStream(_photosUploaded.map((e) => e.toString()).toList());
+    await for (final msg in stream) {
+      if (!mounted) return;
+      setState(() => _aiLog.add(msg));
+      if (msg.startsWith('Risk score:')) {
+        final lvl = msg.contains('HIGH')
+            ? 'high'
+            : msg.contains('MEDIUM')
+                ? 'medium_high'
+                : 'low';
+        setState(() => _aiResult = lvl);
+      }
+    }
     if (!mounted) return;
-    setState(() {
-      _aiRunning = false;
-      _aiResult = res;
-    });
+    setState(() => _aiRunning = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_published) {
+      return _PublishSuccessView(
+        title: '${_brand.text} ${_name.text}',
+        risk: _aiResult,
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('İLAN OLUŞTUR'),
@@ -338,24 +353,69 @@ class _ListingCreateScreenState extends ConsumerState<ListingCreateScreen> {
                     color: DSColors.textSecondary, fontSize: 12),
               ),
               const SizedBox(height: 12),
-              if (_aiRunning)
-                Row(
-                  children: const [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: DSColors.accentGold,
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Text('Analiz ediliyor...',
-                        style: TextStyle(color: DSColors.textSecondary)),
-                  ],
-                )
-              else if (_aiResult != null) ...[
-                Row(children: [RiskBadge(level: _aiResult!)]),
+              if (_aiRunning || _aiLog.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: DSColors.bgPrimary.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: DSColors.glassBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final m in _aiLog)
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 250),
+                          style: TextStyle(
+                            color: m.startsWith('Risk score:')
+                                ? (_aiResult == 'high'
+                                    ? DSColors.error
+                                    : _aiResult == 'medium_high'
+                                        ? DSColors.warning
+                                        : DSColors.success)
+                                : DSColors.textSecondary,
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            fontWeight: m.startsWith('Risk score:')
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text('› $m'),
+                          ),
+                        ),
+                      if (_aiRunning)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Row(
+                            children: const [
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: DSColors.accentGold,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                '...',
+                                style: TextStyle(
+                                  color: DSColors.textTertiary,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              if (_aiResult != null) ...[
+                const SizedBox(height: 10),
+                RiskBadge(level: _aiResult!),
                 const SizedBox(height: 6),
                 Text(
                   _aiResult == 'high'
@@ -530,6 +590,109 @@ class _StepHeader extends StatelessWidget {
             style: const TextStyle(color: DSColors.textSecondary),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PublishSuccessView extends StatefulWidget {
+  final String title;
+  final String? risk;
+  const _PublishSuccessView({required this.title, this.risk});
+
+  @override
+  State<_PublishSuccessView> createState() => _PublishSuccessViewState();
+}
+
+class _PublishSuccessViewState extends State<_PublishSuccessView>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..forward();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ScaleTransition(
+                scale: CurvedAnimation(
+                  parent: _ctrl,
+                  curve: Curves.elasticOut,
+                ),
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const RadialGradient(
+                      colors: [Color(0xFF1E3A2C), Color(0xFF0B0B0F)],
+                    ),
+                    border: Border.all(color: DSColors.success, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: DSColors.success.withOpacity(0.4),
+                        blurRadius: 32,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.check_rounded,
+                      color: DSColors.success, size: 72),
+                ),
+              ),
+              const SizedBox(height: 32),
+              FadeTransition(
+                opacity: _ctrl,
+                child: const Text(
+                  'İlanın yayında!',
+                  style: TextStyle(
+                    color: DSColors.textPrimary,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: DSColors.textSecondary),
+              ),
+              if (widget.risk != null) ...[
+                const SizedBox(height: 12),
+                RiskBadge(level: widget.risk!),
+              ],
+              const SizedBox(height: 36),
+              SizedBox(
+                width: double.infinity,
+                child: DSPrimaryButton(
+                  label: 'İLANIMI GÖR',
+                  onPressed: () => context.go('/dashboard/sales'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: DSSecondaryButton(
+                  label: 'ANA SAYFA',
+                  onPressed: () => context.go('/home'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

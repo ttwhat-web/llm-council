@@ -84,6 +84,13 @@ class _DemoPanel extends ConsumerWidget {
               value: demo.forceEmpty,
               onChanged: (_) => ctrl.toggleEmpty(),
             ),
+            SwitchListTile(
+              activeColor: DSColors.info,
+              title: const Text('Yüksek Trafik Simülasyonu'),
+              subtitle: const Text('+900ms ek gecikme + spike efekti'),
+              value: demo.highTraffic,
+              onChanged: (_) => ctrl.toggleHighTraffic(),
+            ),
             const SizedBox(height: 8),
             Text(
               'Network gecikmesi: ${demo.delayMs} ms',

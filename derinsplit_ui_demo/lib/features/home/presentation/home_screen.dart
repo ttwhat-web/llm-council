@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/demo/demo_control_panel.dart';
+import '../../../core/demo/demo_state.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/format.dart';
 import '../../../core/widgets/ds_badge.dart';
 import '../../../core/widgets/ds_card.dart';
+import '../../../core/widgets/ds_glass.dart';
 import '../../../core/widgets/ds_logo.dart';
 import '../../../core/widgets/ds_progress.dart';
 import '../../../core/widgets/ds_shimmer.dart';
@@ -21,8 +23,13 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authRepositoryProvider).user;
+    final demo = ref.watch(demoSettingsProvider);
     return Scaffold(
+      backgroundColor: DSColors.bgPrimary,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: DSColors.bgPrimary.withOpacity(0.4),
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.tune),
           onPressed: () => showDemoControlPanel(context),
@@ -43,15 +50,18 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: RefreshIndicator(
+      body: AuroraBackdrop(
+        child: RefreshIndicator(
         color: DSColors.accentGold,
         onRefresh: () async {
           ref.invalidate(splitsListProvider);
           ref.invalidate(listingsListProvider);
         },
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 96, 16, 32),
           children: [
+            if (demo.highTraffic) const _HighTrafficBanner(),
+            if (demo.highTraffic) const SizedBox(height: 12),
             if (user != null) _Greeting(name: user.name),
             const SizedBox(height: 12),
             const _HeroDrop(),
@@ -80,6 +90,46 @@ class HomeScreen extends ConsumerWidget {
             const _Announcement(),
           ],
         ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HighTrafficBanner extends StatelessWidget {
+  const _HighTrafficBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.all(14),
+      leftAccent: DSColors.warning,
+      child: Row(
+        children: [
+          const Icon(Icons.bolt, color: DSColors.warning),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Yoğun trafik – yanıtlar biraz gecikebilir.',
+              style: TextStyle(color: DSColors.textPrimary),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: DSColors.warning.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'LIVE',
+              style: TextStyle(
+                color: DSColors.warning,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

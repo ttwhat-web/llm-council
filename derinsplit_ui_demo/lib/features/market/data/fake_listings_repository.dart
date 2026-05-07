@@ -112,7 +112,7 @@ class FakeListingsRepository {
   FakeListingsRepository(this.ref);
 
   Future<void> _delay() async {
-    final ms = ref.read(demoSettingsProvider).delayMs;
+    final ms = ref.read(demoSettingsProvider).effectiveDelayMs;
     await Future.delayed(Duration(milliseconds: ms));
   }
 
@@ -155,6 +155,26 @@ class FakeListingsRepository {
     if (demo.forceError) return 'high';
     if (images.length < 4) return 'medium_high';
     return 'low';
+  }
+
+  Stream<String> runAiCheckStream(List<String> images) async* {
+    final demo = ref.read(demoSettingsProvider);
+    final base = demo.effectiveDelayMs;
+    yield 'AI authenticity check running...';
+    await Future.delayed(Duration(milliseconds: 700 + base ~/ 2));
+    yield 'OCR ile batch kodu okunuyor...';
+    await Future.delayed(Duration(milliseconds: 600 + base ~/ 2));
+    yield 'Batch code verified (simulated)';
+    await Future.delayed(Duration(milliseconds: 500 + base ~/ 2));
+    yield 'Görsel kalitesi ve şişe uyumu analiz ediliyor...';
+    await Future.delayed(Duration(milliseconds: 700 + base ~/ 2));
+    if (demo.forceError) {
+      yield 'Risk score: HIGH';
+    } else if (images.length < 4) {
+      yield 'Risk score: MEDIUM';
+    } else {
+      yield 'Risk score: LOW';
+    }
   }
 }
 

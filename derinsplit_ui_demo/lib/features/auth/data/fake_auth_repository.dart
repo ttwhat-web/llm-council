@@ -23,7 +23,7 @@ class FakeAuthRepository extends StateNotifier<AuthState> {
   FakeAuthRepository(this.ref) : super(const AuthState());
 
   Future<void> _delay() async {
-    final ms = ref.read(demoSettingsProvider).delayMs;
+    final ms = ref.read(demoSettingsProvider).effectiveDelayMs;
     await Future.delayed(Duration(milliseconds: ms));
   }
 
