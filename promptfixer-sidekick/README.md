@@ -1,7 +1,9 @@
-# PromptFixer Sidekick
+# PromptFixer · AI Command Center
 
-Floating prompt optimiser with a Next.js web UI and an optional Tauri desktop
-shell. Three ways to run the AI engine — pick the one that fits how you ship.
+**Mission control for AI workflows.** A web-first console (with an optional
+Tauri desktop shell) that routes, supervises and deploys execution-ready
+prompts for Claude, ChatGPT, Cursor and agents. Three ways to run the AI
+engine — pick the one that fits how you ship.
 
 ```
 INPUT

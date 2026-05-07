@@ -12,11 +12,17 @@ export default function HomePage() {
               <span className="font-mono text-sm text-accent">PF</span>
             </div>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight text-white">
-                PromptFixer Sidekick
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold tracking-tight text-white">
+                  PromptFixer
+                </h1>
+                <span className="rounded-md border border-accent/25 bg-accent/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.18em] text-accent">
+                  AI Command Center
+                </span>
+              </div>
               <p className="text-xs text-white/50">
-                PromptFixer turns rough ideas into execution-ready prompts.
+                Mission control for AI workflows. Route, supervise and deploy structured
+                outputs for Claude, ChatGPT, Cursor and agents.
               </p>
             </div>
           </div>
@@ -41,11 +47,11 @@ export default function HomePage() {
 
           <div className="glass rounded-3xl p-5">
             <div className="text-[11px] font-medium uppercase tracking-wider text-white/45">
-              How it works
+              Operations console
             </div>
             <ol className="mt-3 space-y-2 text-xs text-white/70">
               <li>1. Pick a quality (Fast / Smart / Expert / Code / Local).</li>
-              <li>2. Paste your input. We clean, structure, and supervise it.</li>
+              <li>2. Paste your input. The pipeline cleans, routes, supervises and scores.</li>
               <li>3. Tweak with one click — Shorter, Stronger, Convert to Cursor, …</li>
               <li>4. Copy. History is saved locally so you can come back to it.</li>
             </ol>

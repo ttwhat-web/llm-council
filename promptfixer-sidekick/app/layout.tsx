@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PromptFixer Sidekick",
+  title: "PromptFixer · AI Command Center",
   description:
-    "Floating prompt optimiser. Cleans, structures, and audits your prompts with a local Gemma supervisor.",
-  applicationName: "PromptFixer Sidekick"
+    "Mission control for AI workflows. Route, supervise and deploy execution-ready prompts to Claude, ChatGPT, Cursor and agents.",
+  applicationName: "PromptFixer · AI Command Center"
 };
 
 export const viewport: Viewport = {

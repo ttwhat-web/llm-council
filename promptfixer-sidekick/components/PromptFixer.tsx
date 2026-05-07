@@ -6,7 +6,8 @@ import { Sparkles, Wand2, Eraser, Loader2 } from "lucide-react";
 import clsx from "clsx";
 import { ModeSelect } from "./ModeSelect";
 import { QualitySelect } from "./QualitySelect";
-import { EngineStatus } from "./EngineStatus";
+import { ModelRadar } from "./ModelRadar";
+import { PipelineViz } from "./PipelineViz";
 import { Toggle } from "./Toggle";
 import { OutputTabs } from "./OutputTabs";
 import { TemplatePicker } from "./TemplatePicker";
@@ -189,9 +190,37 @@ export function PromptFixer({ variant = "web" }: Props) {
   }, [callFix]);
 
   return (
-    <div className={clsx("flex h-full w-full flex-col gap-4", compact ? "p-3" : "p-6")}>
+    <div
+      className={clsx(
+        "relative flex h-full w-full flex-col gap-4",
+        compact ? "p-3" : "p-6"
+      )}
+    >
+      {/* ---- top-right Mission Control HUD (web only) ---- */}
+      {!compact && (
+        <div className="pointer-events-none absolute right-5 top-5 z-20 hidden lg:block">
+          <div className="pointer-events-auto">
+            <ModelRadar
+              selectedEngine={derivedEngine}
+              selectedQuality={settings.modelQuality}
+              selectedMode={settings.mode}
+              clientContext={clientContext}
+              allowCloudFallback={isLocal ? settings.allowCloudFallback : false}
+              lastSupervisor={result?.supervisor}
+              lastUsage={result?.usage}
+              busy={busy}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ---- header ---- */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div
+        className={clsx(
+          "flex flex-wrap items-center justify-between gap-2",
+          !compact && "lg:pr-[310px]"
+        )}
+      >
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-accent/15 ring-1 ring-accent/30">
             <Sparkles className="h-4 w-4 text-accent" />
@@ -199,29 +228,21 @@ export function PromptFixer({ variant = "web" }: Props) {
           <div className="leading-tight">
             <div className="text-sm font-semibold text-white">PromptFixer</div>
             {!compact && (
-              <div className="text-[11px] text-white/50">
-                Clean → structure → supervise → ship.
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                AI Command Center
               </div>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <ModeSelect
-            value={settings.mode}
-            onChange={(mode) => setSettings((s) => ({ ...s, mode }))}
-            compact={compact}
-            disabled={settings.autoMode}
-          />
-          <QualitySelect
-            value={settings.modelQuality}
-            onChange={(modelQuality) => setSettings((s) => ({ ...s, modelQuality }))}
-            compact={compact}
-          />
-        </div>
       </div>
 
-      {/* ---- secondary chrome ---- */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ---- unified control row ---- */}
+      <div
+        className={clsx(
+          "flex flex-wrap items-center gap-2",
+          !compact && "lg:pr-[310px]"
+        )}
+      >
         <TemplatePicker
           compact={compact}
           onPick={(t) => {
@@ -230,6 +251,17 @@ export function PromptFixer({ variant = "web" }: Props) {
           }}
         />
         <HistoryDrawer compact={compact} reloadKey={historyKey} onReopen={reopenHistory} />
+        <ModeSelect
+          value={settings.mode}
+          onChange={(mode) => setSettings((s) => ({ ...s, mode }))}
+          compact={compact}
+          disabled={settings.autoMode}
+        />
+        <QualitySelect
+          value={settings.modelQuality}
+          onChange={(modelQuality) => setSettings((s) => ({ ...s, modelQuality }))}
+          compact={compact}
+        />
         <div className="ml-auto">
           <Toggle
             label="Auto mode"
@@ -286,14 +318,27 @@ export function PromptFixer({ variant = "web" }: Props) {
         </button>
       </div>
 
-      <EngineStatus
-        selectedEngine={derivedEngine}
-        clientContext={clientContext}
-        allowCloudFallback={isLocal ? settings.allowCloudFallback : false}
-        lastSupervisor={result?.supervisor}
-        lastUsage={result?.usage}
+      <PipelineViz
+        busy={busy}
+        result={result}
+        autoMode={settings.autoMode}
         compact={compact}
       />
+
+      {/* On compact (Tauri shell): show a stacked Radar below the pipeline. */}
+      {compact && (
+        <ModelRadar
+          selectedEngine={derivedEngine}
+          selectedQuality={settings.modelQuality}
+          selectedMode={settings.mode}
+          clientContext={clientContext}
+          allowCloudFallback={isLocal ? settings.allowCloudFallback : false}
+          lastSupervisor={result?.supervisor}
+          lastUsage={result?.usage}
+          busy={busy}
+          className="!w-full"
+        />
+      )}
 
       <AnimatePresence mode="popLayout">
         {error && (

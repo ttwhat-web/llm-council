@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import clsx from "clsx";
-import { Columns, FileText, Lightbulb, Sparkles } from "lucide-react";
+import { Columns, FileText, GitCompare, Lightbulb, Sparkles } from "lucide-react";
 import { CopyButton } from "./CopyButton";
 import { OutputActions } from "./OutputActions";
 import { ScoreBadges } from "./ScoreBadges";
@@ -10,6 +10,7 @@ import { SafetyBadge } from "./SafetyBadge";
 import { WhyItWorks } from "./WhyItWorks";
 import { ExecutionPreview } from "./ExecutionPreview";
 import { CompareView } from "./CompareView";
+import { DiffView } from "./DiffView";
 import type {
   ClientContext,
   FixResponse,
@@ -48,6 +49,7 @@ export function OutputTabs({
 }: Props) {
   const [tab, setTab] = useState<TabId>("prompt");
   const [compare, setCompare] = useState(false);
+  const [view, setView] = useState<"final" | "diff">("final");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -91,13 +93,34 @@ export function OutputTabs({
 
       {tab === "prompt" && (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] text-white/45">
-              Paste this into Claude, ChatGPT, Cursor or your AI tool.
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1 rounded-lg border border-white/8 bg-white/[0.02] p-0.5">
+              <SegButton
+                Icon={FileText}
+                label="Final"
+                active={view === "final" && !compare}
+                onClick={() => {
+                  setView("final");
+                  setCompare(false);
+                }}
+              />
+              <SegButton
+                Icon={GitCompare}
+                label="Diff"
+                active={view === "diff"}
+                onClick={() => {
+                  setView("diff");
+                  setCompare(false);
+                }}
+              />
             </div>
+
             <button
               type="button"
-              onClick={() => setCompare((v) => !v)}
+              onClick={() => {
+                setCompare((v) => !v);
+                if (!compare) setView("final");
+              }}
               className={clsx(
                 "no-drag inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition",
                 compare
@@ -112,6 +135,8 @@ export function OutputTabs({
 
           {compare ? (
             <CompareView sections={result.sections} compact={compact} />
+          ) : view === "diff" ? (
+            <DiffView before={result.cleaned} after={result.prompt} compact={compact} />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-white/8 bg-black/30">
               <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
@@ -205,5 +230,33 @@ function MetaRow({ result }: { result: FixResponse }) {
         </span>
       )}
     </div>
+  );
+}
+
+function SegButton({
+  Icon,
+  label,
+  active,
+  onClick
+}: {
+  Icon: typeof FileText;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        "no-drag inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition",
+        active
+          ? "bg-accent/15 text-accent shadow-[inset_0_0_0_1px_rgba(124,155,255,0.25)]"
+          : "text-white/65 hover:bg-white/5 hover:text-white/85"
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </button>
   );
 }
