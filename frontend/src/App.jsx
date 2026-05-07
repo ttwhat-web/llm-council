@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import TerminalDashboard from './components/TerminalDashboard';
 import { api } from './api';
 import './App.css';
 
@@ -9,11 +10,22 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [terminalMode, setTerminalMode] = useState(() => {
+    return localStorage.getItem('llmcouncil_terminal_mode') === '1';
+  });
+  const [councilModels, setCouncilModels] = useState([]);
 
-  // Load conversations on mount
+  // Load conversations and council config on mount
   useEffect(() => {
     loadConversations();
+    api.getCouncilConfig()
+      .then((cfg) => setCouncilModels(cfg.council || []))
+      .catch((err) => console.error('Failed to load council config:', err));
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('llmcouncil_terminal_mode', terminalMode ? '1' : '0');
+  }, [terminalMode]);
 
   // Load conversation details when selected
   useEffect(() => {
@@ -181,6 +193,27 @@ function App() {
     }
   };
 
+  // Auto-create a conversation when entering terminal mode without one selected,
+  // so the user can start typing immediately.
+  useEffect(() => {
+    if (terminalMode && !currentConversationId) {
+      handleNewConversation();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terminalMode]);
+
+  if (terminalMode) {
+    return (
+      <TerminalDashboard
+        conversation={currentConversation}
+        onSendMessage={handleSendMessage}
+        isLoading={isLoading}
+        councilModels={councilModels}
+        onExit={() => setTerminalMode(false)}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <Sidebar
@@ -194,6 +227,13 @@ function App() {
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
       />
+      <button
+        className="terminal-mode-toggle"
+        onClick={() => setTerminalMode(true)}
+        title="Switch to JARVIS terminal view"
+      >
+        ◉ TERMINAL
+      </button>
     </div>
   );
 }

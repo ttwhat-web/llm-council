@@ -13,3 +13,27 @@
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
 }
+
+.terminal-mode-toggle {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 40;
+  padding: 6px 14px;
+  background: #02060f;
+  color: #00d4ff;
+  border: 1px solid #00d4ff;
+  border-radius: 2px;
+  font-family: 'Share Tech Mono', 'Consolas', monospace;
+  font-size: 12px;
+  letter-spacing: 0.25em;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.35);
+  transition: all 0.15s;
+}
+
+.terminal-mode-toggle:hover {
+  background: #00d4ff;
+  color: #02060f;
+  box-shadow: 0 0 14px rgba(0, 212, 255, 0.7);
+}
