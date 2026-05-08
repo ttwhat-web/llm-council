@@ -6,101 +6,160 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/data/fake_auth_repository.dart';
 import '../demo/demo_control_panel.dart';
+import '../state/user_mode_provider.dart';
 import '../theme/tokens.dart';
 
 class _NavItem {
   final String label;
-  final String? path;
+  final String path;
   final bool comingSoon;
   const _NavItem(this.label, this.path, {this.comingSoon = false});
 }
 
+/// Top floating navbar used on every desktop screen.
+///
+/// Layout (left → right):
+///   1. IG + WhatsApp icons
+///   2. DERIN SPLIT wordmark
+///   3. Pill nav (ANA SAYFA · SPLIT · HESABIM · ŞİŞE · DEKANT)
+///        active item = solid black pill, white text
+///        inactive  = transparent, ink secondary text
+///   4. Settings icon
+///   5. OTURUMU KAPAT button
+///
+/// Two visual variants for the surrounding chrome — `dark` (default) sits
+/// on the cinematic home, `light` is used over the parchment dashboard /
+/// catalog pages so contrast stays readable.
 class WebPillNavbar extends ConsumerWidget {
-  const WebPillNavbar({super.key});
+  final NavbarVariant variant;
+  const WebPillNavbar({super.key, this.variant = NavbarVariant.dark});
 
   static const _height = 64.0;
+
+  static const _items = [
+    _NavItem('ANA SAYFA', '/home'),
+    _NavItem('SPLIT', '/splits'),
+    _NavItem('HESABIM', '/profile'),
+    _NavItem('ŞİŞE', '/market'),
+    _NavItem('DEKANT', '/dekant', comingSoon: true),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final loc = GoRouterState.of(context).matchedLocation;
-    final user = ref.watch(authRepositoryProvider).user;
-
-    final items = <_NavItem>[
-      const _NavItem('ANA SAYFA', '/home'),
-      const _NavItem('SPLIT', '/splits'),
-      const _NavItem('İLANLAR', '/market'),
-      const _NavItem('ŞİŞE', '/splits?bottle=1'),
-      const _NavItem('DEKANT', null, comingSoon: true),
-    ];
+    final isLight = variant == NavbarVariant.light;
+    final navFill = isLight
+        ? Colors.white.withOpacity(0.62)
+        : Colors.white.withOpacity(0.04);
+    final navBorder = isLight
+        ? DSColors.lightBorder
+        : DSColors.glassBorder;
+    final iconColor = isLight ? DSColors.lightInk : DSColors.textPrimary;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+      padding: const EdgeInsets.fromLTRB(28, 22, 28, 0),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(_height),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
             height: _height,
             decoration: BoxDecoration(
+              color: navFill,
               borderRadius: BorderRadius.circular(_height),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(0.05),
-                  Colors.white.withOpacity(0.015),
-                ],
-              ),
-              border: Border.all(color: DSColors.glassBorder),
+              border: Border.all(color: navBorder),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.45),
+                  color: Colors.black.withOpacity(isLight ? 0.18 : 0.4),
                   blurRadius: 28,
                   offset: const Offset(0, 10),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(
                 children: [
-                  // Logo
+                  // 1) Social icons
+                  _SocialIcon(
+                    icon: Icons.camera_alt_outlined,
+                    semanticLabel: 'Instagram',
+                    color: iconColor,
+                  ),
+                  const SizedBox(width: 6),
+                  _SocialIcon(
+                    icon: Icons.chat_outlined,
+                    semanticLabel: 'WhatsApp',
+                    color: iconColor,
+                  ),
+                  const SizedBox(width: 18),
+
+                  // 2) Logo / wordmark
                   GestureDetector(
                     onLongPress: () => showDemoControlPanel(context),
                     onTap: () => context.go('/home'),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: _Wordmark(),
+                    child: _Wordmark(light: isLight),
+                  ),
+
+                  const SizedBox(width: 28),
+
+                  // 3) Pill nav (centered using Spacers)
+                  Expanded(
+                    child: Center(
+                      child: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          for (final item in _items)
+                            _NavLink(
+                              label: item.label,
+                              active: !item.comingSoon &&
+                                  loc.startsWith(item.path),
+                              comingSoon: item.comingSoon,
+                              isLight: isLight,
+                              onTap: () {
+                                if (item.comingSoon) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(const SnackBar(
+                                    content: Text(
+                                      'DEKANT bölümü yakında açılıyor.',
+                                      style: TextStyle(
+                                        color: DSColors.bgPrimary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    backgroundColor:
+                                        DSColors.accentGoldLight,
+                                  ));
+                                  return;
+                                }
+                                context.go(item.path);
+                              },
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                  const Spacer(),
-                  // Center nav items
-                  for (final item in items)
-                    _NavLink(
-                      label: item.label,
-                      active: item.path != null && loc.startsWith(item.path!.split('?').first) &&
-                          (item.path!.contains('bottle=1')
-                              ? false
-                              : true),
-                      onTap: item.comingSoon
-                          ? () => _comingSoonSnack(context)
-                          : () => context.go(item.path!),
-                      comingSoon: item.comingSoon,
-                    ),
-                  const Spacer(),
-                  // Right cluster
+
+                  const SizedBox(width: 12),
+
+                  // 4) Settings
                   IconButton(
-                    icon: const Icon(Icons.search,
-                        color: DSColors.textPrimary, size: 20),
-                    onPressed: () => context.push('/search'),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.notifications_outlined,
-                        color: DSColors.textPrimary, size: 20),
-                    onPressed: () => context.push('/notifications'),
+                    icon: Icon(Icons.settings_outlined,
+                        color: iconColor, size: 20),
+                    onPressed: () => context.push('/settings'),
+                    tooltip: 'Ayarlar',
                   ),
                   const SizedBox(width: 4),
-                  _ProfileChip(name: user?.name),
+
+                  // 5) OTURUMU KAPAT
+                  _LogoutButton(
+                    isLight: isLight,
+                    onTap: () {
+                      ref.read(authRepositoryProvider.notifier).logout();
+                      ref.read(userModeProvider.notifier).clear();
+                      context.go('/login');
+                    },
+                  ),
                   const SizedBox(width: 6),
                 ],
               ),
@@ -110,26 +169,17 @@ class WebPillNavbar extends ConsumerWidget {
       ),
     );
   }
-
-  static void _comingSoonSnack(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'DEKANT bölümü yakında açılıyor.',
-          style: TextStyle(color: DSColors.bgPrimary, fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: DSColors.accentGoldLight,
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
 }
 
+enum NavbarVariant { dark, light }
+
 class _Wordmark extends StatelessWidget {
-  const _Wordmark();
+  final bool light;
+  const _Wordmark({required this.light});
 
   @override
   Widget build(BuildContext context) {
+    final accent = DSColors.accentGold;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -138,24 +188,24 @@ class _Wordmark extends StatelessWidget {
           height: 26,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: DSColors.accentGold, width: 1),
+            border: Border.all(color: accent, width: 1),
             boxShadow: [
               BoxShadow(
-                color: DSColors.accentGold.withOpacity(0.4),
+                color: accent.withOpacity(0.4),
                 blurRadius: 12,
               ),
             ],
           ),
-          child: const Icon(Icons.water_drop_outlined,
-              color: DSColors.accentGold, size: 14),
+          child: Icon(Icons.water_drop_outlined,
+              color: accent, size: 14),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         ShaderMask(
           shaderCallback: (b) => DSColors.goldGradient.createShader(b),
-          child: const Text(
+          child: Text(
             'DERİN  SPLIT',
             style: TextStyle(
-              color: DSColors.accentGold,
+              color: accent,
               fontSize: 14,
               letterSpacing: 4,
               fontWeight: FontWeight.w800,
@@ -168,16 +218,49 @@ class _Wordmark extends StatelessWidget {
   }
 }
 
+class _SocialIcon extends StatelessWidget {
+  final IconData icon;
+  final String semanticLabel;
+  final Color color;
+  const _SocialIcon({
+    required this.icon,
+    required this.semanticLabel,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Semantics(
+        label: semanticLabel,
+        button: true,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: color.withOpacity(0.18)),
+          ),
+          child: Icon(icon, color: color.withOpacity(0.85), size: 16),
+        ),
+      ),
+    );
+  }
+}
+
 class _NavLink extends StatefulWidget {
   final String label;
   final bool active;
-  final VoidCallback onTap;
   final bool comingSoon;
+  final bool isLight;
+  final VoidCallback onTap;
   const _NavLink({
     required this.label,
     required this.active,
-    required this.onTap,
     required this.comingSoon,
+    required this.isLight,
+    required this.onTap,
   });
 
   @override
@@ -189,11 +272,18 @@ class _NavLinkState extends State<_NavLink> {
 
   @override
   Widget build(BuildContext context) {
+    // Spec: active = solid BLACK pill with WHITE text on both variants.
+    final activeBg = const Color(0xFF14140F);
+    final inkBase = widget.isLight ? DSColors.lightInk : DSColors.textPrimary;
+    final inkSecondary =
+        widget.isLight ? DSColors.lightInkSecondary : DSColors.textSecondary;
+
     final color = widget.active
-        ? DSColors.accentGoldLight
+        ? Colors.white
         : _hover
-            ? DSColors.textPrimary
-            : DSColors.textSecondary;
+            ? inkBase
+            : inkSecondary;
+
     return MouseRegion(
       cursor: widget.comingSoon
           ? SystemMouseCursors.help
@@ -203,22 +293,18 @@ class _NavLinkState extends State<_NavLink> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(40),
             color: widget.active
-                ? DSColors.accentGold.withOpacity(0.10)
-                : Colors.transparent,
-            boxShadow: widget.active
-                ? [
-                    BoxShadow(
-                      color: DSColors.accentGold.withOpacity(0.18),
-                      blurRadius: 14,
-                    ),
-                  ]
-                : null,
+                ? activeBg
+                : _hover
+                    ? (widget.isLight
+                        ? Colors.white.withOpacity(0.55)
+                        : Colors.white.withOpacity(0.04))
+                    : Colors.transparent,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -235,9 +321,10 @@ class _NavLinkState extends State<_NavLink> {
               if (widget.comingSoon) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: DSColors.accentGoldLight.withOpacity(0.16),
+                    color: DSColors.accentGoldLight.withOpacity(0.18),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(
@@ -259,50 +346,49 @@ class _NavLinkState extends State<_NavLink> {
   }
 }
 
-class _ProfileChip extends StatelessWidget {
-  final String? name;
-  const _ProfileChip({required this.name});
+class _LogoutButton extends StatefulWidget {
+  final bool isLight;
+  final VoidCallback onTap;
+  const _LogoutButton({required this.isLight, required this.onTap});
+
+  @override
+  State<_LogoutButton> createState() => _LogoutButtonState();
+}
+
+class _LogoutButtonState extends State<_LogoutButton> {
+  bool _hover = false;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.go('/profile'),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(8, 6, 14, 6),
+    final ink = widget.isLight ? DSColors.lightInk : DSColors.textPrimary;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(40),
-            border: Border.all(color: DSColors.glassBorder),
+            border: Border.all(color: ink.withOpacity(_hover ? 0.7 : 0.22)),
+            color: _hover
+                ? ink.withOpacity(widget.isLight ? 0.05 : 0.06)
+                : Colors.transparent,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 26,
-                height: 26,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: DSColors.bgTertiary,
-                ),
-                child: Center(
-                  child: Text(
-                    (name?.isNotEmpty ?? false) ? name![0] : '·',
-                    style: const TextStyle(
-                      color: DSColors.accentGold,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
+              Icon(Icons.logout, size: 13, color: ink),
               const SizedBox(width: 8),
               Text(
-                name ?? 'PROFİL',
-                style: const TextStyle(
-                  color: DSColors.textSecondary,
-                  fontSize: 11.5,
-                  letterSpacing: 1.6,
-                  fontWeight: FontWeight.w700,
+                'OTURUMU KAPAT',
+                style: TextStyle(
+                  color: ink,
+                  fontSize: 10.5,
+                  letterSpacing: 1.8,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],

@@ -6,14 +6,17 @@ import '../../../core/demo/demo_control_panel.dart';
 import '../../../core/models/user_mode.dart';
 import '../../../core/state/user_mode_provider.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/ds_card.dart';
 import '../../auth/data/fake_auth_repository.dart';
+import 'account_dashboard_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (context.isDesktop) return const AccountDashboardScreen();
     final user = ref.watch(authRepositoryProvider).user;
     final mode = ref.watch(userModeProvider);
     return Scaffold(

@@ -1,6 +1,3 @@
-import 'dart:math' as math;
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,10 +5,17 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/cinematic_backdrop.dart';
+import '../../../core/widgets/perfume_image.dart';
 import '../../../core/widgets/web_navbar.dart';
 import '../../auth/data/fake_auth_repository.dart';
 
-/// Cinematic luxury home page. Used when width >= tablet breakpoint.
+/// Cinematic luxury home page (desktop / large tablet).
+///
+/// Layout:
+///   [ floating glass pill navbar ]
+///   [ massive editorial hero — dark perfume bg + Hoş geldiniz ]
+///   [ 3 luxury feature cards: SPLIT · ŞİŞE SATIŞLARI · DEKANT ]
+///   [ minimal footer ]
 class CinematicHomeScreen extends ConsumerWidget {
   const CinematicHomeScreen({super.key});
 
@@ -27,17 +31,13 @@ class CinematicHomeScreen extends ConsumerWidget {
           child: Column(
             children: [
               const WebPillNavbar(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
               _Hero(name: user?.name, screenWidth: w),
-              const SizedBox(height: 80),
-              _ChapterDivider(),
-              const SizedBox(height: 56),
+              const SizedBox(height: 64),
               _CategoryRow(screenWidth: w),
-              const SizedBox(height: 100),
-              _ManifestoStrip(),
-              const SizedBox(height: 60),
+              const SizedBox(height: 80),
               _Footer(),
-              const SizedBox(height: 40),
+              const SizedBox(height: 36),
             ],
           ),
         ),
@@ -47,333 +47,323 @@ class CinematicHomeScreen extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HERO
+// HERO  — large rounded rectangle with dark perfume bg + "Hoş geldiniz"
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _Hero extends StatefulWidget {
+class _Hero extends StatelessWidget {
   final String? name;
   final double screenWidth;
   const _Hero({this.name, required this.screenWidth});
 
   @override
-  State<_Hero> createState() => _HeroState();
+  Widget build(BuildContext context) {
+    final padding = screenWidth >= 1400 ? 56.0 : 32.0;
+    final heroHeight = screenWidth >= 1400 ? 460.0 : 380.0;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1480),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: padding, vertical: 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: SizedBox(
+              height: heroHeight,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 1) Dark perfume mood background
+                  const _HeroBackdrop(),
+
+                  // 2) Bottom-to-top dark gradient for legibility
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomLeft,
+                        end: Alignment.topRight,
+                        colors: [
+                          Color(0xCC000000),
+                          Color(0x88000000),
+                          Color(0x44000000),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // 3) Editorial copy on the left
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      screenWidth >= 1100 ? 64 : 32,
+                      40,
+                      32,
+                      40,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        // eyebrow
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                                color: DSColors.accentGold.withOpacity(0.4)),
+                            borderRadius: BorderRadius.circular(40),
+                          ),
+                          child: const Text(
+                            'PRIVATE COLLECTOR CLUB',
+                            style: TextStyle(
+                              color: DSColors.accentGoldLight,
+                              fontSize: 10.5,
+                              letterSpacing: 3,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        // headline
+                        ShaderMask(
+                          shaderCallback: (rect) => const LinearGradient(
+                            colors: [
+                              Color(0xFFF5F1E8),
+                              Color(0xFFE8C879),
+                              Color(0xFFF5F1E8),
+                            ],
+                          ).createShader(rect),
+                          child: Text(
+                            'Hoş geldiniz',
+                            style: TextStyle(
+                              color: DSColors.textPrimary,
+                              fontFamily: 'Georgia',
+                              fontSize: screenWidth >= 1400 ? 88 : 68,
+                              height: 1.0,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -1.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        // subtitle
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 600),
+                          child: const Text(
+                            'Türkiye’nin en seçkin parfüm topluluğuna adım atın. '
+                            'Kokuların dünyasını keşfetmek için bölümleri inceleyin.',
+                            style: TextStyle(
+                              color: DSColors.textSecondary,
+                              fontSize: 15.5,
+                              height: 1.65,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 26),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _CinematicButton(
+                              label: 'HEMEN KEŞFET',
+                              gold: true,
+                              onTap: () => context.go('/market'),
+                            ),
+                            const SizedBox(width: 14),
+                            _CinematicButton(
+                              label: 'SPLITLER',
+                              gold: false,
+                              onTap: () => context.go('/splits'),
+                            ),
+                          ],
+                        ),
+                        if (name != null) ...[
+                          const SizedBox(height: 18),
+                          Text(
+                            'HOŞ GELDİN, ${name!.toUpperCase()}.',
+                            style: const TextStyle(
+                              color: DSColors.textTertiary,
+                              fontSize: 11,
+                              letterSpacing: 2,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  // 4) Crest emblem on the right (only on wide screens)
+                  if (screenWidth >= 1100)
+                    const Positioned(
+                      right: 60,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(child: _Crest()),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _HeroState extends State<_Hero> with TickerProviderStateMixin {
-  late final AnimationController _entrance = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1100),
-  )..forward();
+class _HeroBackdrop extends StatelessWidget {
+  const _HeroBackdrop();
 
-  late final AnimationController _glow = AnimationController(
+  @override
+  Widget build(BuildContext context) {
+    // Editorial dark fragrance backdrop. Supports a real bg drop-in
+    // by replacing this with `Image.asset('assets/images/perfumes/hero.jpg')`.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF14110A),
+                Color(0xFF06070A),
+                Color(0xFF130D14),
+              ],
+            ),
+          ),
+        ),
+        // diffuse amber spotlight on the right
+        Positioned(
+          right: -120,
+          top: -80,
+          child: Container(
+            width: 600,
+            height: 600,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  DSColors.accentGold.withOpacity(0.22),
+                  DSColors.accentGold.withOpacity(0),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // smoky violet underglow
+        Positioned(
+          left: -100,
+          bottom: -100,
+          child: Container(
+            width: 460,
+            height: 460,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Color(0x336B3E8E),
+                  Color(0x006B3E8E),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Crest extends StatefulWidget {
+  const _Crest();
+
+  @override
+  State<_Crest> createState() => _CrestState();
+}
+
+class _CrestState extends State<_Crest>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 4),
   )..repeat(reverse: true);
 
   @override
   void dispose() {
-    _entrance.dispose();
-    _glow.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final wide = widget.screenWidth >= 1100;
-    final padding = widget.screenWidth >= 1400 ? 96.0 : 56.0;
-
-    final fade = CurvedAnimation(parent: _entrance, curve: Curves.easeOutCubic);
-    final slide = Tween<Offset>(
-      begin: const Offset(0, 0.06),
-      end: Offset.zero,
-    ).animate(fade);
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 1480),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: padding, vertical: 60),
-        child: wide
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    flex: 6,
-                    child: SlideTransition(
-                      position: slide,
-                      child: FadeTransition(
-                        opacity: fade,
-                        child: _HeroCopy(name: widget.name),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 80),
-                  Expanded(
-                    flex: 5,
-                    child: AnimatedBuilder(
-                      animation: _glow,
-                      builder: (context, _) =>
-                          _HeroEmblem(pulse: _glow.value),
-                    ),
-                  ),
-                ],
-              )
-            : Column(
-                children: [
-                  AnimatedBuilder(
-                    animation: _glow,
-                    builder: (context, _) => _HeroEmblem(pulse: _glow.value),
-                  ),
-                  const SizedBox(height: 48),
-                  SlideTransition(
-                    position: slide,
-                    child: FadeTransition(
-                      opacity: fade,
-                      child: _HeroCopy(name: widget.name, alignCenter: true),
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-class _HeroCopy extends StatelessWidget {
-  final String? name;
-  final bool alignCenter;
-  const _HeroCopy({this.name, this.alignCenter = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final align = alignCenter ? CrossAxisAlignment.center : CrossAxisAlignment.start;
-    final textAlign = alignCenter ? TextAlign.center : TextAlign.left;
-
-    return Column(
-      crossAxisAlignment: align,
-      children: [
-        // Eyebrow
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            border: Border.all(color: DSColors.accentGold.withOpacity(0.45)),
-            borderRadius: BorderRadius.circular(40),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final glow = 0.55 + 0.25 * _ctrl.value;
+        return SizedBox(
+          width: 320,
+          height: 320,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
               Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: DSColors.accentGoldLight,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'PRIVATE COLLECTOR CLUB · DAVETLİ',
-                style: TextStyle(
-                  color: DSColors.accentGoldLight,
-                  fontSize: 11,
-                  letterSpacing: 3,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 28),
-
-        // Massive hero
-        ShaderMask(
-          shaderCallback: (rect) => const LinearGradient(
-            colors: [
-              Color(0xFFF5F1E8),
-              Color(0xFFE8C879),
-              Color(0xFFF5F1E8),
-            ],
-            stops: [0.0, 0.5, 1.0],
-          ).createShader(rect),
-          child: Text(
-            'TÜRKİYE’NİN\nEN SEÇKİN\nPARFÜM TOPLULUĞU',
-            textAlign: textAlign,
-            style: const TextStyle(
-              color: DSColors.textPrimary,
-              fontFamily: 'Georgia',
-              fontSize: 58,
-              fontWeight: FontWeight.w700,
-              height: 1.05,
-              letterSpacing: -0.5,
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Subtext
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Text(
-            'Kokuların dünyasını keşfetmek, paylaşmak ve koleksiyonunu büyütmek '
-            'için doğru yerdesin. Niche & rare şişeler küratör süzgecinden geçer.',
-            textAlign: textAlign,
-            style: const TextStyle(
-              color: DSColors.textSecondary,
-              fontSize: 16,
-              height: 1.65,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ),
-        const SizedBox(height: 36),
-
-        // CTA cluster
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _CinematicButton(
-              label: 'HEMEN KEŞFET',
-              gold: true,
-              onTap: () => context.go('/splits'),
-            ),
-            const SizedBox(width: 16),
-            _CinematicButton(
-              label: 'KAYIT İSTEĞİ GÖNDER',
-              gold: false,
-              onTap: () => context.push('/request-access'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 28),
-        if (name != null)
-          Text(
-            'Hoş geldin, ${name!.toUpperCase()}.',
-            style: const TextStyle(
-              color: DSColors.textTertiary,
-              fontSize: 12,
-              letterSpacing: 2,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _HeroEmblem extends StatelessWidget {
-  final double pulse;
-  const _HeroEmblem({required this.pulse});
-
-  @override
-  Widget build(BuildContext context) {
-    final glow = 0.55 + 0.25 * pulse;
-    return Center(
-      child: SizedBox(
-        height: 540,
-        width: 540,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // outer ring glow
-            Container(
-              width: 480,
-              height: 480,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    DSColors.accentGold.withOpacity(0.25 * glow),
-                    DSColors.accentGold.withOpacity(0),
-                  ],
-                ),
-              ),
-            ),
-            // outer crest ring
-            Transform.rotate(
-              angle: pulse * math.pi * 2 * 0.05,
-              child: Container(
-                width: 360,
-                height: 360,
+                width: 320,
+                height: 320,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: DSColors.accentGold.withOpacity(0.35),
-                    width: 1,
+                  gradient: RadialGradient(
+                    colors: [
+                      DSColors.accentGold.withOpacity(0.20 * glow),
+                      DSColors.accentGold.withOpacity(0),
+                    ],
                   ),
                 ),
               ),
-            ),
-            // mid ring
-            Container(
-              width: 290,
-              height: 290,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const RadialGradient(
-                  colors: [
-                    Color(0xFF1A130F),
-                    Color(0xFF06070A),
+              Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const RadialGradient(
+                    colors: [Color(0xFF1A130F), Color(0xFF06070A)],
+                  ),
+                  border: Border.all(
+                    color: DSColors.accentGold.withOpacity(0.55),
+                    width: 1.4,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: DSColors.accentGold.withOpacity(0.40 * glow),
+                      blurRadius: 60,
+                      spreadRadius: 4,
+                    ),
                   ],
                 ),
-                border: Border.all(
-                  color: DSColors.accentGold.withOpacity(0.55),
-                  width: 1.4,
+              ),
+              ShaderMask(
+                shaderCallback: (b) => DSColors.goldGradient.createShader(b),
+                child: const Icon(
+                  Icons.water_drop_outlined,
+                  size: 100,
+                  color: DSColors.accentGold,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: DSColors.accentGold.withOpacity(0.45 * glow),
-                    blurRadius: 60,
-                    spreadRadius: 4,
-                  ),
-                ],
               ),
-            ),
-            // inner emblem
-            ShaderMask(
-              shaderCallback: (b) => DSColors.goldGradient.createShader(b),
-              child: const Icon(
-                Icons.water_drop_outlined,
-                size: 130,
-                color: DSColors.accentGold,
-              ),
-            ),
-            // vertical bottle silhouette behind emblem
-            Positioned(
-              bottom: 0,
-              child: Opacity(
-                opacity: 0.18,
-                child: Container(
-                  width: 90,
-                  height: 220,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        DSColors.accentGold.withOpacity(0.35),
-                      ],
-                    ),
+              Positioned(
+                bottom: 38,
+                child: Text(
+                  'DERİN  SPLIT',
+                  style: TextStyle(
+                    color: DSColors.accentGoldLight.withOpacity(0.7),
+                    fontFamily: 'Georgia',
+                    fontSize: 11,
+                    letterSpacing: 4,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-            ),
-            // subtle wordmark at bottom
-            Positioned(
-              bottom: 30,
-              child: Text(
-                'DERİN  SPLIT',
-                style: TextStyle(
-                  color: DSColors.accentGoldLight.withOpacity(0.5),
-                  fontFamily: 'Georgia',
-                  fontSize: 13,
-                  letterSpacing: 5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -405,7 +395,7 @@ class _CinematicButtonState extends State<_CinematicButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
           transform: Matrix4.identity()..translate(0.0, _hover ? -2.0 : 0.0),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(40),
@@ -414,7 +404,7 @@ class _CinematicButtonState extends State<_CinematicButton> {
             border: widget.gold
                 ? null
                 : Border.all(
-                    color: DSColors.accentGold.withOpacity(_hover ? 1 : 0.55),
+                    color: DSColors.accentGoldLight.withOpacity(_hover ? 1 : 0.6),
                     width: 1.2,
                   ),
             boxShadow: widget.gold
@@ -430,10 +420,11 @@ class _CinematicButtonState extends State<_CinematicButton> {
           child: Text(
             widget.label,
             style: TextStyle(
-              color: widget.gold ? DSColors.bgPrimary : DSColors.accentGoldLight,
-              fontSize: 12,
+              color:
+                  widget.gold ? DSColors.bgPrimary : DSColors.accentGoldLight,
+              fontSize: 11.5,
               fontWeight: FontWeight.w800,
-              letterSpacing: 3,
+              letterSpacing: 2.6,
             ),
           ),
         ),
@@ -443,62 +434,7 @@ class _CinematicButtonState extends State<_CinematicButton> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CHAPTER DIVIDER
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ChapterDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 720,
-        child: Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      DSColors.accentGold.withOpacity(0),
-                      DSColors.accentGold.withOpacity(0.5),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                '◆',
-                style: TextStyle(
-                  color: DSColors.accentGold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Container(
-                height: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      DSColors.accentGold.withOpacity(0.5),
-                      DSColors.accentGold.withOpacity(0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 3 LUXURY CATEGORY CARDS
+// CATEGORY ROW — 3 luxury cards with perfume image bg + black gradient overlay
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _CategoryRow extends StatelessWidget {
@@ -508,57 +444,35 @@ class _CategoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wide = screenWidth >= 1100;
-    final padding = screenWidth >= 1400 ? 96.0 : 56.0;
+    final padding = screenWidth >= 1400 ? 56.0 : 32.0;
     final cards = [
       _CategoryCard(
-        eyebrow: '01 — KATEGORİ',
-        kicker: 'AKTİF',
-        kickerColor: DSColors.success,
         title: 'SPLIT',
         subtitle:
             'Parfümleri paylaşın, ml veya şişe taleplerini zaman sırasıyla yönetin.',
         cta: 'İNCELE',
-        emblem: Icons.water_drop_outlined,
-        bgGradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0F1014), Color(0xFF06070A)],
-        ),
-        accent: DSColors.accentGold,
+        kicker: 'AKTİF',
+        kickerColor: DSColors.success,
+        mood: PerfumeMood.amber,
         onTap: () => context.go('/splits'),
       ),
       _CategoryCard(
-        eyebrow: '02 — KATEGORİ',
-        kicker: 'AKTİF',
-        kickerColor: DSColors.success,
         title: 'ŞİŞE SATIŞLARI',
         subtitle:
-            'Parfüm şişelerini inceleyin ve satın alma talebi gönderin. Takas & teklif.',
+            'Parfüm şişelerini inceleyin ve satın alma talebi gönderin.',
         cta: 'İNCELE',
-        emblem: Icons.spa_outlined,
-        bgGradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF111017), Color(0xFF06070A)],
-        ),
-        accent: DSColors.accentGoldLight,
+        kicker: 'AKTİF',
+        kickerColor: DSColors.success,
+        mood: PerfumeMood.violet,
         onTap: () => context.go('/market'),
       ),
       _CategoryCard(
-        eyebrow: '03 — KATEGORİ',
+        title: 'DEKANT',
+        subtitle: 'Dekant satış yakında.',
+        cta: 'İNCELE',
         kicker: 'YAKINDA',
         kickerColor: DSColors.warning,
-        title: 'DEKANT',
-        subtitle:
-            'Seçkin kokuların küçük keşifleri. Küratör kürasyonlu samples koleksiyonu.',
-        cta: 'BİLDİRİMLER İÇİN KAYIT',
-        emblem: Icons.science_outlined,
-        bgGradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0E0D14), Color(0xFF06070A)],
-        ),
-        accent: DSColors.warning,
+        mood: PerfumeMood.smoke,
         comingSoon: true,
         onTap: () {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -597,7 +511,7 @@ class _CategoryRow extends StatelessWidget {
                   for (var i = 0; i < cards.length; i++) ...[
                     cards[i],
                     if (i < cards.length - 1) const SizedBox(height: 20),
-                  ]
+                  ],
                 ],
               ),
       ),
@@ -606,28 +520,22 @@ class _CategoryRow extends StatelessWidget {
 }
 
 class _CategoryCard extends StatefulWidget {
-  final String eyebrow;
-  final String kicker;
-  final Color kickerColor;
   final String title;
   final String subtitle;
   final String cta;
-  final IconData emblem;
-  final Gradient bgGradient;
-  final Color accent;
+  final String kicker;
+  final Color kickerColor;
+  final PerfumeMood mood;
   final bool comingSoon;
   final VoidCallback onTap;
 
   const _CategoryCard({
-    required this.eyebrow,
-    required this.kicker,
-    required this.kickerColor,
     required this.title,
     required this.subtitle,
     required this.cta,
-    required this.emblem,
-    required this.bgGradient,
-    required this.accent,
+    required this.kicker,
+    required this.kickerColor,
+    required this.mood,
     required this.onTap,
     this.comingSoon = false,
   });
@@ -636,8 +544,7 @@ class _CategoryCard extends StatefulWidget {
   State<_CategoryCard> createState() => _CategoryCardState();
 }
 
-class _CategoryCardState extends State<_CategoryCard>
-    with SingleTickerProviderStateMixin {
+class _CategoryCardState extends State<_CategoryCard> {
   bool _hover = false;
 
   @override
@@ -663,7 +570,7 @@ class _CategoryCardState extends State<_CategoryCard>
               ),
               if (_hover)
                 BoxShadow(
-                  color: widget.accent.withOpacity(0.22),
+                  color: DSColors.accentGold.withOpacity(0.22),
                   blurRadius: 48,
                   spreadRadius: 1,
                 ),
@@ -674,68 +581,57 @@ class _CategoryCardState extends State<_CategoryCard>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // base gradient
-                DecoratedBox(decoration: BoxDecoration(gradient: widget.bgGradient)),
-
-                // editorial diagonal lines
-                CustomPaint(painter: _DiagonalLinesPainter()),
-
-                // big translucent emblem behind content
-                Positioned(
-                  right: -50,
-                  bottom: -40,
-                  child: Opacity(
-                    opacity: _hover ? 0.18 : 0.12,
-                    child: Icon(
-                      widget.emblem,
-                      size: 360,
-                      color: widget.accent,
+                // 1) Perfume photo backdrop — replaceable via assetPath
+                PerfumeImage(
+                  mood: widget.mood,
+                  borderRadius: BorderRadius.circular(28),
+                  aspectRatio: 100 / 460,
+                ),
+                // 2) Black gradient overlay for legibility
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x55000000),
+                        Color(0xCC000000),
+                        Color(0xEE000000),
+                      ],
+                      stops: [0.0, 0.55, 1.0],
                     ),
                   ),
                 ),
-
-                // animated glow border on hover
+                // 3) Animated gold border on hover
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 320),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(28),
                     border: Border.all(
                       color: _hover
-                          ? widget.accent.withOpacity(0.55)
+                          ? DSColors.accentGold.withOpacity(0.6)
                           : DSColors.glassBorder,
                       width: _hover ? 1.4 : 1,
                     ),
                   ),
                 ),
-
-                // ── content ───────────────────────────────────────────
+                // 4) Content
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 26, 28, 26),
+                  padding: const EdgeInsets.fromLTRB(28, 26, 28, 28),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // eyebrow + kicker
                       Row(
                         children: [
-                          Text(
-                            widget.eyebrow,
-                            style: const TextStyle(
-                              color: DSColors.textTertiary,
-                              fontSize: 10,
-                              letterSpacing: 2.8,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
                           const Spacer(),
+                          // Kicker badge
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
+                                horizontal: 12, vertical: 5),
                             decoration: BoxDecoration(
                               color: widget.kickerColor.withOpacity(0.16),
                               border: Border.all(
-                                color: widget.kickerColor.withOpacity(0.5),
+                                color: widget.kickerColor.withOpacity(0.55),
                               ),
                               borderRadius: BorderRadius.circular(20),
                             ),
@@ -743,8 +639,8 @@ class _CategoryCardState extends State<_CategoryCard>
                               widget.kicker,
                               style: TextStyle(
                                 color: widget.kickerColor,
-                                fontSize: 9.5,
-                                letterSpacing: 1.6,
+                                fontSize: 10,
+                                letterSpacing: 1.8,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -752,20 +648,21 @@ class _CategoryCardState extends State<_CategoryCard>
                         ],
                       ),
                       const Spacer(),
-                      // title — massive
                       AnimatedDefaultTextStyle(
                         duration: const Duration(milliseconds: 260),
                         style: TextStyle(
-                          color: _hover ? widget.accent : DSColors.textPrimary,
+                          color: _hover
+                              ? DSColors.accentGoldLight
+                              : DSColors.textPrimary,
                           fontFamily: 'Georgia',
                           fontWeight: FontWeight.w800,
                           fontSize: 36,
-                          height: 1,
+                          height: 1.0,
                           letterSpacing: -0.5,
                         ),
                         child: Text(widget.title),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       Text(
                         widget.subtitle,
                         style: const TextStyle(
@@ -775,53 +672,49 @@ class _CategoryCardState extends State<_CategoryCard>
                         ),
                       ),
                       const SizedBox(height: 22),
-                      // CTA
-                      Row(
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 240),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(40),
-                              border: Border.all(
-                                color: widget.accent.withOpacity(_hover ? 1 : 0.5),
-                              ),
-                              color: _hover
-                                  ? widget.accent.withOpacity(0.12)
-                                  : Colors.transparent,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  widget.cta,
-                                  style: TextStyle(
-                                    color: widget.accent,
-                                    fontSize: 10.5,
-                                    letterSpacing: 2.2,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.arrow_forward,
-                                  color: widget.accent,
-                                  size: 14,
-                                ),
-                              ],
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 240),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 9),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(40),
+                          border: Border.all(
+                            color: DSColors.accentGoldLight.withOpacity(
+                              _hover ? 1 : 0.55,
                             ),
                           ),
-                          const Spacer(),
-                          if (widget.comingSoon)
-                            const Icon(
-                              Icons.lock_outline,
-                              color: DSColors.textTertiary,
-                              size: 16,
+                          color: _hover
+                              ? DSColors.accentGold.withOpacity(0.12)
+                              : Colors.transparent,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.cta,
+                              style: const TextStyle(
+                                color: DSColors.accentGoldLight,
+                                fontSize: 11,
+                                letterSpacing: 2.4,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                        ],
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.arrow_forward,
+                              color: DSColors.accentGoldLight,
+                              size: 14,
+                            ),
+                            if (widget.comingSoon) ...[
+                              const SizedBox(width: 8),
+                              const Icon(
+                                Icons.lock_outline,
+                                color: DSColors.textTertiary,
+                                size: 13,
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -835,137 +728,13 @@ class _CategoryCardState extends State<_CategoryCard>
   }
 }
 
-class _DiagonalLinesPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = DSColors.accentGold.withOpacity(0.05)
-      ..strokeWidth = 0.6
-      ..style = PaintingStyle.stroke;
-    const step = 28.0;
-    for (double x = -size.height; x < size.width; x += step) {
-      canvas.drawLine(
-        Offset(x, 0),
-        Offset(x + size.height, size.height),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DiagonalLinesPainter old) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MANIFESTO STRIP + FOOTER
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ManifestoStrip extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final w = context.screenWidth;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1280),
-        child: Padding(
-          padding:
-              EdgeInsets.symmetric(horizontal: w >= 1400 ? 96 : 56),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 56),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withOpacity(0.04),
-                      Colors.white.withOpacity(0.01),
-                    ],
-                  ),
-                  border: Border.all(color: DSColors.glassBorder),
-                ),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  runSpacing: 32,
-                  children: const [
-                    _StatBlock(
-                      number: '142+',
-                      label: 'AKTİF SPLİT',
-                    ),
-                    _StatBlock(
-                      number: '38',
-                      label: 'ÜLKE BAYİSİ DOĞRULANDI',
-                    ),
-                    _StatBlock(
-                      number: '%99.4',
-                      label: 'AI ORİJİNALLİK ÖN GEÇİŞ',
-                    ),
-                    _StatBlock(
-                      number: '< 2s',
-                      label: 'ORTALAMA EŞLEŞME SÜRESİ',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatBlock extends StatelessWidget {
-  final String number;
-  final String label;
-  const _StatBlock({required this.number, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 220,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ShaderMask(
-            shaderCallback: (b) => DSColors.goldGradient.createShader(b),
-            child: Text(
-              number,
-              style: const TextStyle(
-                color: DSColors.accentGold,
-                fontFamily: 'Georgia',
-                fontSize: 44,
-                fontWeight: FontWeight.w700,
-                height: 1,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: DSColors.textTertiary,
-              fontSize: 10.5,
-              letterSpacing: 1.8,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _Footer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = context.screenWidth;
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: w >= 1400 ? 96 : 56),
+      padding:
+          EdgeInsets.symmetric(horizontal: w >= 1400 ? 56 : 32, vertical: 8),
       child: Column(
         children: [
           Container(
@@ -980,12 +749,12 @@ class _Footer extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 24,
-            runSpacing: 16,
+            runSpacing: 12,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1006,7 +775,7 @@ class _Footer extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Text(
+                  const Text(
                     'DERİN  SPLIT  ·  PRIVATE COLLECTOR CLUB  ·  EST. 2026',
                     style: TextStyle(
                       color: DSColors.textTertiary,
@@ -1018,7 +787,7 @@ class _Footer extends StatelessWidget {
                   ),
                 ],
               ),
-              Text(
+              const Text(
                 'KVKK  ·  KULLANIM KOŞULLARI  ·  İLETİŞİM',
                 style: TextStyle(
                   color: DSColors.textTertiary,

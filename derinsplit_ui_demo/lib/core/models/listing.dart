@@ -19,6 +19,19 @@ class Listing {
   final String? tradeExpectations;
   final DateTime createdAt;
 
+  /// Display label for stock state — e.g. "STOKTA", "STOKTA YOK
+  /// (SİPARİŞ ÜSÜLÜ 7-10 GÜN)". Used by the Şişe catalog grid.
+  final String stockLabel;
+  final bool inStock;
+
+  /// "TESTER" / "BOXED" / "TRAVEL". Renders as a small uppercase
+  /// chip on the product card.
+  final String? variantLabel;
+
+  /// Mood key for `PerfumeImage` placeholder until a real photo is
+  /// dropped into `assets/images/perfumes/`.
+  final String moodKey;
+
   const Listing({
     required this.id,
     required this.brand,
@@ -39,6 +52,10 @@ class Listing {
     this.images = const [],
     this.tradeExpectations,
     required this.createdAt,
+    this.stockLabel = 'STOKTA',
+    this.inStock = true,
+    this.variantLabel,
+    this.moodKey = 'amber',
   });
 
   String get displayName => '$brand $name';

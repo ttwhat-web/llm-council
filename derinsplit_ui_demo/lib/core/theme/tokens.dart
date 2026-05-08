@@ -49,6 +49,17 @@ class DSColors {
   static Color glassFill = const Color(0xFFF5F1E8).withOpacity(0.04);
   static Color glassBorder = const Color(0xFFC8A24A).withOpacity(0.18);
   static Color goldGlow = const Color(0xFFC8A24A).withOpacity(0.25);
+
+  // Light surfaces — used by the Şişe catalog + Hesabım dashboard pages.
+  // These sit on top of the dark cinematic backdrop as large frosted
+  // glass panels, mirroring the derinsplit.com dashboard look.
+  static const lightSurface = Color(0xFFEDEBE6);   // soft parchment grey
+  static const lightSurfaceMuted = Color(0xFFE3E0D8);
+  static Color lightCard = const Color(0xFFFFFFFF).withOpacity(0.78);
+  static Color lightBorder = const Color(0xFF1A1A1A).withOpacity(0.08);
+  static const lightInk = Color(0xFF14140F);       // primary text on light bg
+  static const lightInkSecondary = Color(0xFF55524C);
+  static const lightInkTertiary = Color(0xFF8C8780);
 }
 
 class DSSpacing {

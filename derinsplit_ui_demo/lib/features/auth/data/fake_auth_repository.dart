@@ -42,7 +42,7 @@ class FakeAuthRepository extends StateNotifier<AuthState> {
     final demo = ref.read(demoSettingsProvider);
     final user = AppUser(
       id: 'u_demo',
-      name: name ?? 'Berke Ö.',
+      name: name ?? 'Tunç Tunçel',
       phone: phone,
       role: demo.isTrustedSeller ? 'trusted_seller' : 'user',
       canListItems: demo.canListItems,
