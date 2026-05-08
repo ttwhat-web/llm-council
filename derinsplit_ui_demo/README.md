@@ -1,5 +1,18 @@
 # DerinSplit – Flutter UI Demo (MVP, no backend)
 
+> ## ⚡ Hızlı Referans
+>
+> | | |
+> |--|--|
+> | **OTP kodu** | `123456` |
+> | **Demo panel** | Logoya **uzun bas** (Splash / Login / Home / Profile) |
+> | **Modlar** | Buyer • Seller • Trusted Seller (kilitli) • Explore (giriş gerekmez) |
+> | **Preview deploy** | <https://app.netlify.com/drop> → `build/web/` klasörünü sürükle-bırak |
+> | **Önceden zip'lenmiş build** | `derinsplit_ui_demo/derinsplit_web_preview.zip` (7.4 MB) |
+> | **Local preview** | `flutter pub get && flutter run -d chrome` |
+
+---
+
 Premium niche parfüm topluluğu için iki modüllü mobil uygulama: **Split (dekant)** ve **Pazar (marketplace)**. Bu repo, **backend kurmadan** ayağa kalkan bir Flutter UI demosudur. iOS, Android, Huawei (APK), Honor (APK) ve Web (canlı önizleme) hedefler.
 
 > Tüm veriler `Fake*Repository` sınıflarından gelir. `Future.delayed` ile gerçekçi network gecikmesi simüle edilir.
