@@ -5,6 +5,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/cinematic_backdrop.dart';
 import '../../../core/widgets/light_panel.dart';
+import '../../../core/widgets/perfume_image.dart';
 import '../../../core/widgets/web_navbar.dart';
 import '../../auth/data/fake_auth_repository.dart';
 
@@ -89,6 +90,10 @@ class _AccountDashboardScreenState
                       ),
                       const SizedBox(height: 24),
 
+                      // Stats row — always shown
+                      const _StatsRow(),
+                      const SizedBox(height: 28),
+
                       // Tabs
                       _Tabs(selected: _tab, onChanged: (i) => setState(() => _tab = i)),
 
@@ -116,6 +121,9 @@ class _AccountDashboardScreenState
                         const _OrdersTabContent()
                       else
                         const _PaymentsTabContent(),
+
+                      const SizedBox(height: 32),
+                      _ActivityAndRecs(wide: w >= 1100),
                     ],
                   ),
                 ),
@@ -483,6 +491,419 @@ class _PaymentsTabContent extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATS ROW — small metric tiles above the tabs
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _StatsRow extends StatelessWidget {
+  const _StatsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = const [
+      _Stat(label: 'TRUST SCORE', value: '92', accent: '%92', tone: _StatTone.gold),
+      _Stat(label: 'AKTİF SİPARİŞ', value: '3', accent: 'KARGO', tone: _StatTone.dark),
+      _Stat(label: 'TOPLAM SPLİT', value: '14', accent: '+2 BU AY', tone: _StatTone.dark),
+      _Stat(label: 'KOLEKSİYON', value: '47.520 ₺', accent: 'PİYASA', tone: _StatTone.dark),
+    ];
+    return LayoutBuilder(
+      builder: (context, c) {
+        final wide = c.maxWidth >= 900;
+        if (wide) {
+          return Row(
+            children: [
+              for (var i = 0; i < stats.length; i++) ...[
+                Expanded(child: stats[i]),
+                if (i < stats.length - 1) const SizedBox(width: 14),
+              ],
+            ],
+          );
+        }
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final s in stats)
+              SizedBox(
+                width: c.maxWidth / 2 - 6,
+                child: s,
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+enum _StatTone { gold, dark }
+
+class _Stat extends StatelessWidget {
+  final String label;
+  final String value;
+  final String accent;
+  final _StatTone tone;
+  const _Stat({
+    required this.label,
+    required this.value,
+    required this.accent,
+    required this.tone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isGold = tone == _StatTone.gold;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: isGold
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFE8C879), Color(0xFFC8A24A)],
+              )
+            : null,
+        color: isGold ? null : Colors.white,
+        border: isGold ? null : Border.all(color: DSColors.lightBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isGold ? 0.18 : 0.06),
+            blurRadius: isGold ? 28 : 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: isGold
+                  ? const Color(0xCC14140F)
+                  : DSColors.lightInkTertiary,
+              fontSize: 10,
+              letterSpacing: 1.6,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+              color: isGold ? const Color(0xFF14140F) : DSColors.lightInk,
+              fontFamily: 'Georgia',
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            accent,
+            style: TextStyle(
+              color: isGold
+                  ? const Color(0xCC14140F)
+                  : DSColors.lightInkSecondary,
+              fontSize: 10,
+              letterSpacing: 1.4,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTIVITY + RECOMMENDATIONS — bottom of dashboard
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ActivityAndRecs extends StatelessWidget {
+  final bool wide;
+  const _ActivityAndRecs({required this.wide});
+
+  @override
+  Widget build(BuildContext context) {
+    if (wide) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Expanded(flex: 5, child: _ActivityFeed()),
+          SizedBox(width: 24),
+          Expanded(flex: 4, child: _Recommendations()),
+        ],
+      );
+    }
+    return Column(
+      children: const [
+        _ActivityFeed(),
+        SizedBox(height: 20),
+        _Recommendations(),
+      ],
+    );
+  }
+}
+
+class _ActivityFeed extends StatelessWidget {
+  const _ActivityFeed();
+
+  @override
+  Widget build(BuildContext context) {
+    final items = const [
+      _Activity(
+        title: 'Xerjoff Naxos splitine 5 ml katıldınız.',
+        subtitle: '2 saat önce · ₺900',
+        icon: Icons.science_outlined,
+        color: DSColors.success,
+      ),
+      _Activity(
+        title: 'Layton Exclusif ilanına 9.200 ₺ teklif verdiniz.',
+        subtitle: 'Dün · BEKLEMEDE',
+        icon: Icons.attach_money,
+        color: DSColors.warning,
+      ),
+      _Activity(
+        title: 'Kargo: Roja Elysium 100 ml — kargoda.',
+        subtitle: '2 gün önce · YK1Z9',
+        icon: Icons.local_shipping_outlined,
+        color: DSColors.info,
+      ),
+      _Activity(
+        title: 'Trust score 90 → 92 yükseldi.',
+        subtitle: '5 gün önce',
+        icon: Icons.trending_up,
+        color: DSColors.accentGold,
+      ),
+    ];
+    return LightCard(
+      padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+      borderRadius: 22,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Text(
+                'SON HAREKETLER',
+                style: TextStyle(
+                  color: DSColors.lightInk,
+                  fontSize: 12,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Spacer(),
+              Text(
+                'TÜMÜNÜ GÖR  →',
+                style: TextStyle(
+                  color: DSColors.lightInkSecondary,
+                  fontSize: 10,
+                  letterSpacing: 1.6,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 28),
+          for (var i = 0; i < items.length; i++) ...[
+            items[i],
+            if (i < items.length - 1) const Divider(height: 22),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Activity extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  const _Activity({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.4)),
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: DSColors.lightInk,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: DSColors.lightInkTertiary,
+                  fontSize: 11,
+                  letterSpacing: 1,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Recommendations extends StatelessWidget {
+  const _Recommendations();
+
+  @override
+  Widget build(BuildContext context) {
+    final picks = const [
+      _RecPick(
+        brand: 'XERJOFF',
+        name: 'Naxos',
+        line: '180 ₺/ml · SPLIT',
+        mood: PerfumeMood.amber,
+        shape: BottleShape.niche,
+      ),
+      _RecPick(
+        brand: 'NISHANE',
+        name: 'Hacivat',
+        line: '7.500 ₺ · ŞİŞE',
+        mood: PerfumeMood.citrus,
+        shape: BottleShape.dome,
+      ),
+      _RecPick(
+        brand: 'ROJA',
+        name: 'Elysium Parfum',
+        line: '220 ₺/ml · SPLIT',
+        mood: PerfumeMood.ivory,
+        shape: BottleShape.round,
+      ),
+    ];
+    return LightCard(
+      padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
+      borderRadius: 22,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'SİZE ÖZEL ÖNERİLER',
+            style: TextStyle(
+              color: DSColors.lightInk,
+              fontSize: 12,
+              letterSpacing: 2,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Divider(height: 28),
+          for (var i = 0; i < picks.length; i++) ...[
+            picks[i],
+            if (i < picks.length - 1) const SizedBox(height: 14),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RecPick extends StatelessWidget {
+  final String brand;
+  final String name;
+  final String line;
+  final PerfumeMood mood;
+  final BottleShape shape;
+  const _RecPick({
+    required this.brand,
+    required this.name,
+    required this.line,
+    required this.mood,
+    required this.shape,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 64,
+          child: PerfumeImage(
+            mood: mood,
+            shape: shape,
+            aspectRatio: 1,
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                brand,
+                style: const TextStyle(
+                  color: DSColors.lightInkTertiary,
+                  fontSize: 9.5,
+                  letterSpacing: 1.6,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                name,
+                style: const TextStyle(
+                  color: DSColors.lightInk,
+                  fontFamily: 'Georgia',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                line,
+                style: const TextStyle(
+                  color: DSColors.lightInkSecondary,
+                  fontSize: 11,
+                  letterSpacing: 1,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Icon(
+          Icons.arrow_forward,
+          color: DSColors.lightInkSecondary,
+          size: 16,
+        ),
+      ],
     );
   }
 }

@@ -89,38 +89,12 @@ class _Catalog extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Header
-        const Text(
-          'ŞİŞE İLANLARI',
-          style: TextStyle(
-            color: DSColors.lightInk,
-            fontFamily: 'Georgia',
-            fontSize: 36,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Satışa sunulan parfüm şişelerini inceleyin ve satın alma talebi gönderin.',
-          style: TextStyle(
-            color: DSColors.lightInkSecondary,
-            fontSize: 14.5,
-            height: 1.55,
-          ),
-        ),
+        const _CatalogHero(),
         const SizedBox(height: 30),
-        Container(
-          height: 1,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                DSColors.lightInk.withOpacity(0.18),
-                DSColors.lightInk.withOpacity(0.0),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 28),
+
+        // Filter bar
+        _FilterBar(totalCount: items.length),
+        const SizedBox(height: 24),
 
         // Grid
         GridView.builder(
@@ -136,6 +110,284 @@ class _Catalog extends StatelessWidget {
           itemBuilder: (_, i) => _ProductCard(listing: items[i]),
         ),
       ],
+    );
+  }
+}
+
+class _CatalogHero extends StatelessWidget {
+  const _CatalogHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(28, 24, 28, 26),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF14110A),
+            Color(0xFF06070A),
+          ],
+        ),
+        border: Border.all(color: DSColors.glassBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.45),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            flex: 5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: DSColors.accentGold.withOpacity(0.5),
+                    ),
+                    borderRadius: BorderRadius.circular(40),
+                  ),
+                  child: const Text(
+                    'KÜRATÖR ONAYLI · BATCH DOĞRULAMALI',
+                    style: TextStyle(
+                      color: DSColors.accentGoldLight,
+                      fontSize: 9.5,
+                      letterSpacing: 2.4,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ShaderMask(
+                  shaderCallback: (rect) => const LinearGradient(
+                    colors: [
+                      Color(0xFFF5F1E8),
+                      Color(0xFFE8C879),
+                      Color(0xFFF5F1E8),
+                    ],
+                  ).createShader(rect),
+                  child: const Text(
+                    'ŞİŞE İLANLARI',
+                    style: TextStyle(
+                      color: DSColors.textPrimary,
+                      fontFamily: 'Georgia',
+                      fontSize: 42,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.8,
+                      height: 1.0,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Satışa sunulan parfüm şişelerini inceleyin ve satın alma '
+                  'talebi gönderin. Tüm ilanlar küratör süzgecinden geçer.',
+                  style: TextStyle(
+                    color: DSColors.textSecondary,
+                    fontSize: 14,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 28),
+          Expanded(
+            flex: 3,
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 10,
+              runSpacing: 10,
+              children: const [
+                _StatPill(value: '142+', label: 'AKTİF İLAN'),
+                _StatPill(value: '38', label: 'ONAYLI BAYİ'),
+                _StatPill(value: '%99.4', label: 'AI GEÇİŞ'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  final String value;
+  final String label;
+  const _StatPill({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 18, 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.08),
+            Colors.white.withOpacity(0.02),
+          ],
+        ),
+        border: Border.all(color: DSColors.glassBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ShaderMask(
+            shaderCallback: (b) => DSColors.goldGradient.createShader(b),
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: DSColors.accentGoldLight,
+                fontFamily: 'Georgia',
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                height: 1.0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: DSColors.textTertiary,
+              fontSize: 9,
+              letterSpacing: 1.4,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterBar extends StatefulWidget {
+  final int totalCount;
+  const _FilterBar({required this.totalCount});
+
+  @override
+  State<_FilterBar> createState() => _FilterBarState();
+}
+
+class _FilterBarState extends State<_FilterBar> {
+  String _stock = 'TÜMÜ';
+  String _format = 'TÜMÜ';
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: DSColors.lightInk,
+            borderRadius: BorderRadius.circular(40),
+          ),
+          child: Text(
+            '${widget.totalCount} ŞİŞE',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10.5,
+              letterSpacing: 1.6,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        for (final s in const ['TÜMÜ', 'STOKTA', 'ÖN SİPARİŞ'])
+          _LightChip(
+            label: s,
+            selected: _stock == s,
+            onTap: () => setState(() => _stock = s),
+          ),
+        Container(
+          width: 1,
+          height: 18,
+          color: DSColors.lightInk.withOpacity(0.15),
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+        ),
+        for (final s in const ['TÜMÜ', 'TESTER', 'BOXED'])
+          _LightChip(
+            label: s,
+            selected: _format == s,
+            onTap: () => setState(() => _format = s),
+          ),
+        const Spacer(),
+        _LightChip(
+          label: 'BRANDS  ▾',
+          selected: false,
+          onTap: () {},
+        ),
+        _LightChip(
+          label: 'FİYAT  ▾',
+          selected: false,
+          onTap: () {},
+        ),
+        _LightChip(
+          label: 'ŞEHİR  ▾',
+          selected: false,
+          onTap: () {},
+        ),
+      ],
+    );
+  }
+}
+
+class _LightChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _LightChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(40),
+            color: selected ? DSColors.lightInk : Colors.transparent,
+            border: Border.all(
+              color: selected
+                  ? DSColors.lightInk
+                  : DSColors.lightInk.withOpacity(0.18),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : DSColors.lightInk,
+              fontSize: 10.5,
+              letterSpacing: 1.6,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -158,6 +410,17 @@ class _ProductCardState extends State<_ProductCard> {
         'smoke' => PerfumeMood.smoke,
         'ivory' => PerfumeMood.ivory,
         _ => PerfumeMood.amber,
+      };
+
+  BottleShape get _shape => switch (widget.listing.brand.toLowerCase()) {
+        var b when b.contains('xerjoff') => BottleShape.niche,
+        var b when b.contains('clive') => BottleShape.tall,
+        var b when b.contains('roja') => BottleShape.round,
+        var b when b.contains('amouage') => BottleShape.tall,
+        var b when b.contains('nishane') => BottleShape.dome,
+        var b when b.contains('marly') => BottleShape.flask,
+        var b when b.contains('initio') => BottleShape.dome,
+        _ => BottleShape.flask,
       };
 
   @override
@@ -184,6 +447,7 @@ class _ProductCardState extends State<_ProductCard> {
                   children: [
                     PerfumeImage(
                       mood: _mood,
+                      shape: _shape,
                       aspectRatio: 1,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(18),
