@@ -4,9 +4,13 @@
  * call, no AI inference.
  */
 
+import { renderPrompt } from "./engine";
 import type { FixResponse } from "./types";
 
 export type ExportFormat =
+  | "claude-prompt"
+  | "chatgpt-prompt"
+  | "gemini-prompt"
   | "cursor-task"
   | "markdown-spec"
   | "prd"
@@ -24,6 +28,66 @@ export interface ExportDef {
 }
 
 export const EXPORT_DEFS: ExportDef[] = [
+  {
+    id: "claude-prompt",
+    label: "Claude Prompt",
+    blurb: "Optimised for Anthropic Claude — XML blocks, assumptions, no filler.",
+    filename: () => "claude-prompt.md",
+    format: (r) => {
+      // Rebuild in Claude's preferred XML shape regardless of the source mode,
+      // so a "Claude Prompt" export is always Claude-shaped output.
+      const xml = renderPrompt(r.sections, "claude");
+      return [
+        "<!-- Claude-optimised prompt. Paste into Claude. -->",
+        "",
+        xml,
+        "",
+        "<assumptions>",
+        "Before producing the deliverable, list the assumptions you made (≤5 bullets) instead of asking clarifying questions. Only flag genuine ambiguities; don't restate the prompt.",
+        "</assumptions>",
+        "",
+        "<thinking>",
+        "Use this block only when reasoning is non-trivial. Keep it short and structured.",
+        "</thinking>",
+        "",
+        "Produce the deliverable inside <answer>...</answer>. Lead with the answer; justify after."
+      ].join("\n");
+    }
+  },
+  {
+    id: "chatgpt-prompt",
+    label: "ChatGPT Prompt",
+    blurb: "Optimised for OpenAI ChatGPT — markdown, action-first.",
+    filename: () => "chatgpt-prompt.md",
+    format: (r) => {
+      const md = renderPrompt(r.sections, "chatgpt");
+      return [
+        md,
+        "",
+        "# Assumptions",
+        "List explicit assumptions before answering. Don't stall on ambiguity — pick a reasonable call and note it here.",
+        "",
+        "When ready, produce the deliverable. End with a single 'Next Steps' bullet list (max 3 items)."
+      ].join("\n");
+    }
+  },
+  {
+    id: "gemini-prompt",
+    label: "Gemini Prompt",
+    blurb: "Optimised for Google Gemini — headings + JSON / YAML structure.",
+    filename: () => "gemini-prompt.md",
+    format: (r) => {
+      const md = renderPrompt(r.sections, "gemini");
+      return [
+        md,
+        "",
+        "## Assumptions",
+        "List the assumptions you made before answering. Mark estimates as estimates and cite sources where applicable.",
+        "",
+        "Embed any structured deliverable inside fenced ```json or ```yaml blocks."
+      ].join("\n");
+    }
+  },
   {
     id: "cursor-task",
     label: "Cursor Task",
