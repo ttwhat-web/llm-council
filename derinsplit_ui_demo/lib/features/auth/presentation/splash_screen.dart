@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/demo/demo_control_panel.dart';
+import '../../../core/state/user_mode_provider.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/ds_glass.dart';
 import '../../../core/widgets/ds_logo.dart';
@@ -43,10 +44,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   void _navigate() {
     if (!mounted) return;
     final auth = ref.read(authRepositoryProvider);
+    final mode = ref.read(userModeProvider);
     if (!auth.onboardingDone) {
       context.go('/onboarding');
     } else if (!auth.isAuthenticated) {
       context.go('/login');
+    } else if (mode == null) {
+      context.go('/mode-select');
     } else {
       context.go('/home');
     }

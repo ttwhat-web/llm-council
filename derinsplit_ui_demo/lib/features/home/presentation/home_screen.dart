@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/demo/demo_control_panel.dart';
 import '../../../core/demo/demo_state.dart';
+import '../../../core/models/user_mode.dart';
+import '../../../core/state/user_mode_provider.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/format.dart';
 import '../../../core/widgets/ds_badge.dart';
@@ -24,6 +26,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authRepositoryProvider).user;
     final demo = ref.watch(demoSettingsProvider);
+    final mode = ref.watch(userModeProvider) ?? UserMode.buyer;
     return Scaffold(
       backgroundColor: DSColors.bgPrimary,
       extendBodyBehindAppBar: true,
@@ -62,35 +65,381 @@ class HomeScreen extends ConsumerWidget {
           children: [
             if (demo.highTraffic) const _HighTrafficBanner(),
             if (demo.highTraffic) const SizedBox(height: 12),
-            if (user != null) _Greeting(name: user.name),
-            const SizedBox(height: 12),
-            const _HeroDrop(),
-            const SizedBox(height: 24),
-            _SectionHeader(
-              title: 'Yeni Splitler',
-              onSeeAll: () => context.go('/splits'),
-            ),
-            const SizedBox(height: 12),
-            const _SplitsCarousel(),
-            const SizedBox(height: 24),
-            _SectionHeader(
-              title: 'Şişeli Kalan',
-              onSeeAll: () => context.go('/splits'),
-            ),
-            const SizedBox(height: 12),
-            const _BottleLeftCarousel(),
-            const SizedBox(height: 24),
-            _SectionHeader(
-              title: 'Yeni İlanlar',
-              onSeeAll: () => context.go('/market'),
-            ),
-            const SizedBox(height: 12),
-            const _ListingsCarousel(),
+            _ModeHero(mode: mode, name: user?.name),
+            const SizedBox(height: 16),
+            const _PrivateClubBanner(),
+            const SizedBox(height: 20),
+            ..._modeSections(context, mode),
             const SizedBox(height: 24),
             const _Announcement(),
           ],
         ),
         ),
+      ),
+    );
+  }
+}
+
+List<Widget> _modeSections(BuildContext context, UserMode mode) {
+  switch (mode) {
+    case UserMode.buyer:
+      return [
+        _SectionHeader(
+          title: 'Yeni Splitler',
+          onSeeAll: () => context.go('/splits'),
+        ),
+        const SizedBox(height: 12),
+        const _SplitsCarousel(),
+        const SizedBox(height: 24),
+        _SectionHeader(
+          title: 'Şişeli Kalan',
+          onSeeAll: () => context.go('/splits'),
+        ),
+        const SizedBox(height: 12),
+        const _BottleLeftCarousel(),
+        const SizedBox(height: 24),
+        _SectionHeader(
+          title: 'Takaslık İlanlar',
+          onSeeAll: () => context.go('/market'),
+        ),
+        const SizedBox(height: 12),
+        const _ListingsCarousel(),
+      ];
+    case UserMode.seller:
+      return [
+        _SellerQuickActions(),
+        const SizedBox(height: 22),
+        _SectionHeader(
+          title: 'İlanlarım',
+          onSeeAll: () => context.push('/dashboard/sales'),
+        ),
+        const SizedBox(height: 12),
+        const _ListingsCarousel(),
+        const SizedBox(height: 24),
+        _SectionHeader(
+          title: 'Yeni Splitler',
+          onSeeAll: () => context.go('/splits'),
+        ),
+        const SizedBox(height: 12),
+        const _SplitsCarousel(),
+      ];
+    case UserMode.trustedSeller:
+      return [
+        _TrustedSellerActions(),
+        const SizedBox(height: 22),
+        _SectionHeader(
+          title: 'Açık Splitlerim',
+          onSeeAll: () => context.push('/dashboard/splits'),
+        ),
+        const SizedBox(height: 12),
+        const _SplitsCarousel(),
+        const SizedBox(height: 24),
+        _SectionHeader(
+          title: 'Şişeli Kalan',
+          onSeeAll: () => context.go('/splits'),
+        ),
+        const SizedBox(height: 12),
+        const _BottleLeftCarousel(),
+      ];
+    case UserMode.explore:
+      return [
+        const _ExploreLockedBanner(),
+        const SizedBox(height: 22),
+        _SectionHeader(
+          title: 'Vitrin — Yeni Splitler',
+          onSeeAll: () => context.go('/login'),
+        ),
+        const SizedBox(height: 12),
+        const _SplitsCarousel(),
+        const SizedBox(height: 24),
+        _SectionHeader(
+          title: 'Vitrin — Yeni İlanlar',
+          onSeeAll: () => context.go('/login'),
+        ),
+        const SizedBox(height: 12),
+        const _ListingsCarousel(),
+      ];
+  }
+}
+
+class _ModeHero extends StatelessWidget {
+  final UserMode mode;
+  final String? name;
+  const _ModeHero({required this.mode, this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      liftOnHover: false,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      leftAccent: mode.accent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(mode.icon, color: mode.accent, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                mode.title.toUpperCase(),
+                style: TextStyle(
+                  color: mode.accent,
+                  fontSize: 11,
+                  letterSpacing: 1.4,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => context.push('/mode-select'),
+                child: Text(
+                  'değiştir',
+                  style: TextStyle(
+                    color: DSColors.textTertiary,
+                    fontSize: 11,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            name == null ? 'Hoş geldin.' : 'Hoş geldin, $name.',
+            style: const TextStyle(
+              color: DSColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            mode.subtitle,
+            style: const TextStyle(
+              color: DSColors.textSecondary,
+              fontSize: 12.5,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrivateClubBanner extends StatelessWidget {
+  const _PrivateClubBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      liftOnHover: false,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Row(
+        children: [
+          ShaderMask(
+            shaderCallback: (b) => DSColors.goldGradient.createShader(b),
+            child: const Icon(Icons.diamond_outlined, color: DSColors.accentGold),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Sistem hazırlanıyor.',
+                  style: TextStyle(
+                    color: DSColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'DerinSplit kapalı koleksiyoner topluluğu — yakında yeni dropplar.',
+                  style: TextStyle(
+                    color: DSColors.textSecondary,
+                    fontSize: 12,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SellerQuickActions extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.add_circle_outline,
+            label: 'Yeni İlan Ver',
+            onTap: () => context.push('/listings/new'),
+            accent: DSColors.accentGold,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.attach_money,
+            label: 'Gelen Teklifler',
+            onTap: () => context.push('/dashboard/sales'),
+            accent: DSColors.info,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrustedSellerActions extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.science_outlined,
+            label: 'Split Aç',
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Split açma akışı (V1.1)')),
+            ),
+            accent: DSColors.accentGold,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _QuickActionCard(
+            icon: Icons.dashboard_customize_outlined,
+            label: 'Katılımcılar',
+            onTap: () => context.push('/dashboard/splits'),
+            accent: DSColors.info,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color accent;
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      onTap: onTap,
+      leftAccent: accent,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      child: Row(
+        children: [
+          Icon(icon, color: accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: DSColors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.arrow_forward_ios,
+            size: 12,
+            color: DSColors.textTertiary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExploreLockedBanner extends StatelessWidget {
+  const _ExploreLockedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      leftAccent: DSColors.warning,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.lock_outline, color: DSColors.warning, size: 18),
+              SizedBox(width: 8),
+              Text(
+                'KEŞFET MODU',
+                style: TextStyle(
+                  color: DSColors.warning,
+                  fontSize: 11,
+                  letterSpacing: 1.4,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Vitrini önizliyorsun. Mesajlaşma, teklif ve split talepleri kayıtlı '
+            'üyelere açıktır.',
+            style: TextStyle(
+              color: DSColors.textSecondary,
+              fontSize: 12.5,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => context.push('/request-access'),
+                  icon: const Icon(Icons.send, size: 16),
+                  label: const Text('KAYIT İSTEĞİ GÖNDER'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: DSColors.accentGold,
+                    foregroundColor: DSColors.bgPrimary,
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => context.go('/login'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    side: const BorderSide(color: DSColors.accentGold),
+                  ),
+                  child: const Text(
+                    'GİRİŞ YAP',
+                    style: TextStyle(
+                      color: DSColors.accentGold,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/ds_button.dart';
+import '../../../core/widgets/ds_glass.dart';
 import '../data/fake_auth_repository.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -19,22 +20,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   static const _pages = [
     _Page(
-      icon: Icons.science_outlined,
-      title: 'Splitlerle Tanış',
+      icon: Icons.diamond_outlined,
+      title: 'Türkiye’nin En Derin\nParfüm Koleksiyonerleri',
       subtitle:
-          'Premium niche parfümleri ml bazında, güvenli ve şeffaf bir şekilde paylaş.',
+          'DerinSplit kapalı bir koleksiyoner topluluğudur. Niche & rare şişeler '
+          'küratör süzgecinden geçer.',
+    ),
+    _Page(
+      icon: Icons.science_outlined,
+      title: 'Splitler & Şişeli Kalan',
+      subtitle:
+          'Bir şişeyi tek başına almak zorunda değilsin. Ml bazında paylaş, '
+          'kalanı sahibine bırak.',
     ),
     _Page(
       icon: Icons.verified_user_outlined,
       title: 'Güven Odaklı',
       subtitle:
-          'AI destekli orijinallik ön kontrolü, batch doğrulama ve trust score ile bilinçli al-sat.',
-    ),
-    _Page(
-      icon: Icons.diamond_outlined,
-      title: 'Topluluk',
-      subtitle:
-          'Pazar üzerinde diğer koleksiyonerlerle satış, takas ve mesajlaşma.',
+          'AI destekli orijinallik ön kontrolü, batch doğrulama, trust score '
+          've küratör onaylı satıcılar.',
     ),
   ];
 
@@ -67,7 +71,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ],
       ),
-      body: SafeArea(
+      body: AuroraBackdrop(
+        child: SafeArea(
         child: Column(
           children: [
             Expanded(
@@ -104,6 +109,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/data/fake_auth_repository.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/mode_select_screen.dart';
 import '../../features/auth/presentation/onboarding_screen.dart';
+import '../../features/auth/presentation/request_access_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/home/presentation/notifications_screen.dart';
@@ -24,6 +26,8 @@ import '../../features/splits/presentation/payment_screen.dart';
 import '../../features/splits/presentation/split_dashboard_screen.dart';
 import '../../features/splits/presentation/split_detail_screen.dart';
 import '../../features/splits/presentation/split_list_screen.dart';
+import '../models/user_mode.dart';
+import '../state/user_mode_provider.dart';
 import '../widgets/main_shell.dart';
 import 'page_transition.dart';
 
@@ -32,6 +36,7 @@ final _shellKey = GlobalKey<NavigatorState>();
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authRepositoryProvider);
+  final mode = ref.watch(userModeProvider);
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/splash',
@@ -40,16 +45,41 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
       final loggingIn = loc == '/login' || loc == '/splash';
       final onboarding = loc.startsWith('/onboarding');
+      final atRequestAccess = loc.startsWith('/request-access');
+      final atModeSelect = loc.startsWith('/mode-select');
 
       if (loc == '/splash') return null;
-      if (!auth.onboardingDone && !onboarding && !loggingIn) {
+      if (!auth.onboardingDone &&
+          !onboarding &&
+          !loggingIn &&
+          !atRequestAccess) {
         return '/onboarding';
       }
-      if (auth.onboardingDone && !auth.isAuthenticated && !loggingIn && !onboarding) {
+
+      // Explore mode — allow unauthed access ONLY when mode == explore.
+      final isExplore = mode == UserMode.explore;
+
+      if (auth.onboardingDone &&
+          !auth.isAuthenticated &&
+          !isExplore &&
+          !loggingIn &&
+          !onboarding &&
+          !atRequestAccess &&
+          !atModeSelect) {
         return '/login';
       }
+
+      // Authed (or explore) but no mode chosen → mode select.
+      if ((auth.isAuthenticated || isExplore) &&
+          mode == null &&
+          !atModeSelect &&
+          !atRequestAccess) {
+        return '/mode-select';
+      }
+
+      // Already authed → don't show login/onboarding.
       if (auth.isAuthenticated && (loc == '/login' || onboarding)) {
-        return '/home';
+        return mode == null ? '/mode-select' : '/home';
       }
       return null;
     },
@@ -65,6 +95,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         pageBuilder: (_, __) => fadeSlidePage(child: const LoginScreen()),
+      ),
+      GoRoute(
+        path: '/request-access',
+        pageBuilder: (_, __) =>
+            fadeSlidePage(child: const RequestAccessScreen()),
+      ),
+      GoRoute(
+        path: '/mode-select',
+        pageBuilder: (_, s) {
+          final explore = s.uri.queryParameters['explore'] == '1';
+          return fadeSlidePage(
+            child: ModeSelectScreen(exploreOnly: explore),
+          );
+        },
       ),
       GoRoute(
         path: '/search',
@@ -192,5 +236,6 @@ class _AuthListenable extends ChangeNotifier {
   final Ref ref;
   _AuthListenable(this.ref) {
     ref.listen(authRepositoryProvider, (_, __) => notifyListeners());
+    ref.listen(userModeProvider, (_, __) => notifyListeners());
   }
 }

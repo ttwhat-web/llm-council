@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/user_mode.dart';
+import '../state/user_mode_provider.dart';
 import '../theme/tokens.dart';
 import 'demo_state.dart';
 
@@ -23,6 +25,8 @@ class _DemoPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final demo = ref.watch(demoSettingsProvider);
     final ctrl = ref.read(demoSettingsProvider.notifier);
+    final mode = ref.watch(userModeProvider);
+    final modeCtrl = ref.read(userModeProvider.notifier);
 
     return SafeArea(
       child: Padding(
@@ -56,6 +60,60 @@ class _DemoPanel extends ConsumerWidget {
               style: TextStyle(color: DSColors.textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.swap_horiz,
+                    color: DSColors.accentGold,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Kullanım Modu',
+                    style: TextStyle(
+                      color: DSColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  DropdownButton<UserMode?>(
+                    value: mode,
+                    dropdownColor: DSColors.bgTertiary,
+                    underline: const SizedBox.shrink(),
+                    iconEnabledColor: DSColors.accentGold,
+                    items: [
+                      const DropdownMenuItem<UserMode?>(
+                        value: null,
+                        child: Text(
+                          'Seçilmedi',
+                          style: TextStyle(color: DSColors.textTertiary),
+                        ),
+                      ),
+                      for (final m in UserMode.values)
+                        DropdownMenuItem<UserMode?>(
+                          value: m,
+                          child: Text(
+                            m.title,
+                            style: const TextStyle(
+                              color: DSColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                    ],
+                    onChanged: (m) {
+                      if (m == null) {
+                        modeCtrl.clear();
+                      } else {
+                        modeCtrl.select(m);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: DSColors.surface, height: 24),
             SwitchListTile(
               activeColor: DSColors.accentGold,
               title: const Text('Trusted Seller (Split Aç)'),

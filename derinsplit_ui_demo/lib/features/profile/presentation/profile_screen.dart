@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/demo/demo_control_panel.dart';
+import '../../../core/models/user_mode.dart';
+import '../../../core/state/user_mode_provider.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/ds_card.dart';
 import '../../auth/data/fake_auth_repository.dart';
@@ -13,7 +15,9 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authRepositoryProvider).user;
+    final mode = ref.watch(userModeProvider);
     return Scaffold(
+      backgroundColor: DSColors.bgPrimary,
       appBar: AppBar(
         title: const Text('PROFİL'),
         actions: [
@@ -89,6 +93,12 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _MenuTile(
+            icon: mode?.icon ?? Icons.tune,
+            label: 'Kullanım Modunu Değiştir',
+            badge: mode == null ? null : _modeShortLabel(mode),
+            onTap: () => context.push('/mode-select'),
+          ),
+          _MenuTile(
             icon: Icons.receipt_long_outlined,
             label: 'Siparişlerim',
             onTap: () => context.push('/orders'),
@@ -126,12 +136,26 @@ class ProfileScreen extends ConsumerWidget {
             destructive: true,
             onTap: () {
               ref.read(authRepositoryProvider.notifier).logout();
+              ref.read(userModeProvider.notifier).clear();
               context.go('/login');
             },
           ),
         ],
       ),
     );
+  }
+}
+
+String _modeShortLabel(UserMode m) {
+  switch (m) {
+    case UserMode.buyer:
+      return 'ALICI';
+    case UserMode.seller:
+      return 'SATICI';
+    case UserMode.trustedSeller:
+      return 'TRUSTED';
+    case UserMode.explore:
+      return 'KEŞFET';
   }
 }
 
