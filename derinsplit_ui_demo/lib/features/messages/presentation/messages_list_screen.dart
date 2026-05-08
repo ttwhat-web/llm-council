@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/format.dart';
-import '../../../core/widgets/ds_badge.dart';
 import '../../../core/widgets/ds_card.dart';
 import '../../../core/widgets/ds_state.dart';
 import '../data/fake_conversations_repository.dart';

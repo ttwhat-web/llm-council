@@ -4,6 +4,44 @@ Premium niche parfüm topluluğu için iki modüllü mobil uygulama: **Split (de
 
 > Tüm veriler `Fake*Repository` sınıflarından gelir. `Future.delayed` ile gerçekçi network gecikmesi simüle edilir.
 
+---
+
+## ⚡ Önizleme — Tek tıkla canlı URL
+
+```bash
+flutter pub get
+flutter build web --release
+# → build/web/ klasörü hazır (24 MB)
+```
+
+### Seçenek A — Netlify Drop (en kolay, ~2 dk, hesap gerekmez)
+
+1. <https://app.netlify.com/drop> adresini aç.
+2. `derinsplit_ui_demo/build/web/` klasörünü tarayıcıya **sürükle-bırak**.
+3. Anında üretilen `https://<random>.netlify.app` link'i client'a gönder.
+
+### Seçenek B — Vercel (CLI)
+
+```bash
+cd derinsplit_ui_demo/build/web
+npx vercel --prod         # ilk seferinde login + projeyi onayla
+# → https://<proje>.vercel.app
+```
+
+### Seçenek C — Firebase Hosting
+
+```bash
+cd derinsplit_ui_demo
+npx firebase-tools login
+npx firebase-tools init hosting   # public dir = build/web, single-page = Yes
+npx firebase-tools deploy --only hosting
+# → https://<proje>.web.app
+```
+
+> **Local preview:** `cd derinsplit_ui_demo && flutter run -d chrome`
+
+---
+
 ## 📦 Stack
 
 - Flutter 3.x (Material 3, Dark + Gold tema)

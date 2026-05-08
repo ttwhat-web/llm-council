@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/tokens.dart';
-import '../../../core/utils/format.dart';
 import '../../../core/widgets/ds_badge.dart';
 import '../../../core/widgets/ds_button.dart';
 import '../../../core/widgets/ds_card.dart';
