@@ -39,7 +39,7 @@ export function HistoryDrawer({ onReopen, compact, reloadKey }: Props) {
         )}
       >
         <HistoryIcon className="h-3.5 w-3.5" />
-        History
+        Mission Archive
       </button>
 
       <AnimatePresence>
@@ -64,7 +64,7 @@ export function HistoryDrawer({ onReopen, compact, reloadKey }: Props) {
               <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-white">
                   <HistoryIcon className="h-4 w-4 text-accent" />
-                  History
+                  Mission Archive
                   <span className="text-[11px] text-white/45">({entries.length})</span>
                 </div>
                 <div className="flex items-center gap-1">

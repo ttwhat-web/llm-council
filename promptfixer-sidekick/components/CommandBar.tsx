@@ -172,9 +172,11 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onAction: (action: CommandAction) => void;
+  /** Optional preset query when the palette opens (e.g. from the strip's /export chip). */
+  initialQuery?: string;
 }
 
-export function CommandBar({ open, onClose, onAction }: Props) {
+export function CommandBar({ open, onClose, onAction, initialQuery }: Props) {
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -193,12 +195,12 @@ export function CommandBar({ open, onClose, onAction }: Props) {
   // Reset state on open + autofocus.
   useEffect(() => {
     if (open) {
-      setQ("");
+      setQ(initialQuery || "");
       setActive(0);
       const t = setTimeout(() => inputRef.current?.focus(), 30);
       return () => clearTimeout(t);
     }
-  }, [open]);
+  }, [open, initialQuery]);
 
   // Keep active index in range as the filter changes.
   useEffect(() => {

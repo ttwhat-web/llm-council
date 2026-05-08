@@ -28,7 +28,7 @@ export function TemplatePicker({ onPick, compact }: Props) {
         )}
       >
         <LayoutTemplate className="h-3.5 w-3.5" />
-        Templates
+        Mission Templates
       </button>
 
       <AnimatePresence>

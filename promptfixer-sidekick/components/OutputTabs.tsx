@@ -6,8 +6,6 @@ import { Columns, FileText, GitCompare, Hammer, Lightbulb, Sparkles } from "luci
 import { CopyButton } from "./CopyButton";
 import { ExportMenu } from "./ExportMenu";
 import { OutputActions } from "./OutputActions";
-import { ScoreBadges } from "./ScoreBadges";
-import { SafetyBadge } from "./SafetyBadge";
 import { WhyItWorks } from "./WhyItWorks";
 import { ExecutionPreview } from "./ExecutionPreview";
 import { CompareView } from "./CompareView";
@@ -37,7 +35,7 @@ interface Props {
 }
 
 const BASE_TABS: Array<{ id: TabId; label: string; Icon: typeof FileText; pro?: boolean }> = [
-  { id: "prompt", label: "Execution-ready prompt", Icon: FileText },
+  { id: "prompt", label: "Mission Output", Icon: FileText },
   { id: "why", label: "Why it works", Icon: Lightbulb, pro: true },
   { id: "preview", label: "Execution preview", Icon: Sparkles, pro: true }
 ];
@@ -67,10 +65,6 @@ export function OutputTabs({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <ScoreBadges score={result.score} compact={compact} />
-
-      <MetaRow result={result} />
-
       <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-white/6 bg-white/[0.02] p-1">
         {tabs.map((t) => {
           const active = tab === t.id;
@@ -156,7 +150,7 @@ export function OutputTabs({
               <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
                 <div className="flex flex-col">
                   <div className="text-[11px] font-medium uppercase tracking-wider text-white/55">
-                    Execution-ready prompt
+                    Mission Output
                   </div>
                   <div className="text-[10px] text-white/40">
                     Copy this into Claude, ChatGPT, Cursor or your AI tool.
@@ -183,8 +177,6 @@ export function OutputTabs({
             disabled={busy}
             compact={compact}
           />
-
-          <SafetyBadge safety={result.safety} />
 
           {result.supervisor.notes && (
             <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] text-white/65">
@@ -218,7 +210,12 @@ export function OutputTabs({
   );
 }
 
-function MetaRow({ result }: { result: FixResponse }) {
+/**
+ * Telemetry pills that summarise the last result. Lifted out of the prompt
+ * tab and exported so the Operations Pipeline column can render it next
+ * to the score badges and safety status.
+ */
+export function MetaRow({ result }: { result: FixResponse }) {
   return (
     <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/60">
       <span className="rounded-md bg-white/5 px-2 py-0.5">
