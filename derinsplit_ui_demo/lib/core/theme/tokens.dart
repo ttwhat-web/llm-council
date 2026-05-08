@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
 
 class DSColors {
-  static const bgPrimary = Color(0xFF0B0B0F);
-  static const bgSecondary = Color(0xFF141420);
-  static const bgTertiary = Color(0xFF1B1B2A);
-  static const surface = Color(0xFF252538);
+  // Cinematic luxury palette — deep midnight + warm ivory + venetian gold
+  static const bgPrimary = Color(0xFF06070A);       // saf siyah değil, hafif mavi-mor underglow
+  static const bgSecondary = Color(0xFF121218);     // card surface (alpha applied where used)
+  static const bgTertiary = Color(0xFF1A1A24);
+  static const surface = Color(0xFF24242F);
 
+  // Warm venetian gold (more amber than yellow)
   static const accentGold = Color(0xFFC8A24A);
-  static const accentGoldLight = Color(0xFFE2C46E);
-  static const accentGoldDark = Color(0xFFA8842F);
+  static const accentGoldLight = Color(0xFFE8C879);
+  static const accentGoldDark = Color(0xFF8E6F2C);
 
-  static const textPrimary = Color(0xFFFFFFFF);
-  static const textSecondary = Color(0xFFB5B5C5);
-  static const textTertiary = Color(0xFF7A7A8C);
+  // Ivory/parchment text — never pure white (luxury houses never use #FFF)
+  static const textPrimary = Color(0xFFF5F1E8);
+  static const textSecondary = Color(0xB8F5F1E8);   // 0.72 opacity
+  static const textTertiary = Color(0x80F5F1E8);    // 0.50 opacity
 
-  static const success = Color(0xFF4ADE80);
-  static const warning = Color(0xFFFBBF24);
-  static const error = Color(0xFFF87171);
-  static const info = Color(0xFF60A5FA);
+  static const success = Color(0xFF6BB77B);
+  static const warning = Color(0xFFD4A65B);
+  static const error = Color(0xFFD97373);
+  static const info = Color(0xFF7896C8);
 
   static const goldGradient = LinearGradient(
     colors: [accentGoldLight, accentGold, accentGoldDark],
@@ -26,23 +29,26 @@ class DSColors {
   );
 
   static const heroGradient = LinearGradient(
-    colors: [Color(0xFF0B0B0F), Color(0xFF1B1B2A)],
+    colors: [Color(0xFF06070A), Color(0xFF0E0F18)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
+  // Slightly warm aurora for splash / mode select
   static const auroraGradient = LinearGradient(
     colors: [
-      Color(0xFF1B1B2A),
-      Color(0xFF2A1F38),
-      Color(0xFF1B1B2A),
+      Color(0xFF0A0B12),
+      Color(0xFF15101C),
+      Color(0xFF0A0B12),
     ],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  static Color glassFill = const Color(0xFFFFFFFF).withOpacity(0.04);
-  static Color glassBorder = const Color(0xFFFFFFFF).withOpacity(0.08);
+  // Glass tones — tuned for the cinematic palette
+  static Color glassFill = const Color(0xFFF5F1E8).withOpacity(0.04);
+  static Color glassBorder = const Color(0xFFC8A24A).withOpacity(0.18);
+  static Color goldGlow = const Color(0xFFC8A24A).withOpacity(0.25);
 }
 
 class DSSpacing {

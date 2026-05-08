@@ -8,6 +8,7 @@ import '../../../core/models/user_mode.dart';
 import '../../../core/state/user_mode_provider.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/format.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/ds_badge.dart';
 import '../../../core/widgets/ds_card.dart';
 import '../../../core/widgets/ds_glass.dart';
@@ -18,12 +19,16 @@ import '../../../core/widgets/ds_state.dart';
 import '../../auth/data/fake_auth_repository.dart';
 import '../../market/data/fake_listings_repository.dart';
 import '../../splits/data/fake_splits_repository.dart';
+import 'cinematic_home_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Desktop / large tablet → cinematic home page.
+    // Mobile → existing mode-aware compact layout.
+    if (context.isDesktop) return const CinematicHomeScreen();
     final user = ref.watch(authRepositoryProvider).user;
     final demo = ref.watch(demoSettingsProvider);
     final mode = ref.watch(userModeProvider) ?? UserMode.buyer;

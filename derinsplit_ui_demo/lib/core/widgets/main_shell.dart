@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../models/user_mode.dart';
 import '../state/user_mode_provider.dart';
 import '../theme/tokens.dart';
+import '../utils/responsive.dart';
+import 'web_navbar.dart';
 
 class MainShell extends ConsumerWidget {
   final Widget child;
@@ -30,6 +32,8 @@ class MainShell extends ConsumerWidget {
     final loc = GoRouterState.of(context).matchedLocation;
     final idx = _indexForLocation(loc);
     final mode = ref.watch(userModeProvider) ?? UserMode.buyer;
+    final isDesktop = context.isDesktop;
+    final isHome = loc.startsWith('/home');
 
     Widget? fab;
     if (idx == 1 && mode.canOpenSplit) {
@@ -63,6 +67,35 @@ class MainShell extends ConsumerWidget {
       fab = _LockedFab(
         label: 'Trusted Seller Başvur',
         onPressed: () => context.go('/mode-select'),
+      );
+    }
+
+    // On desktop:
+    //   - Home renders its own cinematic pill navbar inside its body, so we
+    //     don't add anything here.
+    //   - Other shell tabs (splits/market/messages/profile) get the same
+    //     pill navbar floated above the page content.
+    if (isDesktop) {
+      if (isHome) {
+        return Scaffold(
+          backgroundColor: DSColors.bgPrimary,
+          body: child,
+        );
+      }
+      return Scaffold(
+        backgroundColor: DSColors.bgPrimary,
+        body: Stack(
+          children: [
+            Positioned.fill(child: child),
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: WebPillNavbar(),
+            ),
+          ],
+        ),
+        floatingActionButton: fab,
       );
     }
 
