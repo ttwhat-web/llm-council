@@ -1,0 +1,156 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   DERIN SPLIT — Web MVP design tokens
+   Light luxury parchment + warm gold accent.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg:           #F1EEE6;   /* parchment / cream */
+  --bg-soft:      #E9E5DA;
+  --surface:     #FFFFFF;
+  --ink:         #14140F;
+  --ink-2:       #3A372F;
+  --ink-3:       #6B675D;
+  --ink-4:       #A8A294;
+  --line:        rgba(20, 20, 15, 0.10);
+
+  --gold:        #C8A24A;
+  --gold-light:  #E8C879;
+  --gold-dark:   #8E6F2C;
+
+  --success:     #4D8A5E;
+  --warning:     #B58730;
+  --error:       #A33B3B;
+
+  --radius-sm:    8px;
+  --radius:      14px;
+  --radius-lg:   24px;
+  --radius-pill: 999px;
+
+  --serif: Georgia, 'Times New Roman', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+          Arial, 'Noto Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: inherit; text-decoration: none; }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: 14px;
+}
+
+/* ─── shared layout helpers ────────────────────────────────────────────── */
+
+.container {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+@media (max-width: 720px) {
+  .container { padding: 0 18px; }
+}
+
+.serif { font-family: var(--serif); }
+
+.eyebrow {
+  font-size: 10.5px;
+  letter-spacing: 2.4px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 12px 22px;
+  font-size: 11.5px;
+  letter-spacing: 1.8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s;
+}
+.btn-dark {
+  background: var(--ink);
+  color: #fff;
+}
+.btn-dark:hover { transform: translateY(-1px); box-shadow: 0 12px 24px rgba(0,0,0,.18); }
+
+.btn-gold {
+  background: linear-gradient(135deg, var(--gold-light), var(--gold), var(--gold-dark));
+  color: var(--ink);
+  box-shadow: 0 10px 22px rgba(200, 162, 74, 0.32);
+}
+.btn-gold:hover { transform: translateY(-1px); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid rgba(20, 20, 15, 0.18);
+}
+.btn-outline:hover { background: rgba(20,20,15,.04); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.chip-success { color: var(--success); background: rgba(77, 138, 94, 0.12); border: 1px solid rgba(77, 138, 94, 0.4); }
+.chip-warn    { color: var(--warning); background: rgba(181, 135, 48, 0.14); border: 1px solid rgba(181, 135, 48, 0.4); }
+.chip-error   { color: var(--error); background: rgba(163, 59, 59, 0.10); border: 1px solid rgba(163, 59, 59, 0.4); }
+.chip-gold    { color: var(--ink); background: linear-gradient(135deg, var(--gold-light), var(--gold)); border: 0; }
+
+/* ─── editorial card surface ────────────────────────────────────────────── */
+
+.surface {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 22px rgba(20, 20, 15, 0.06);
+}
+
+/* fade-in for newly mounted lists (give the live store a feel) */
+@keyframes ds-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: ds-fade-up .35s ease both; }
+
+/* ─── perfume photo placeholder ─────────────────────────────────────────── */
+.perfume-placeholder {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+}
