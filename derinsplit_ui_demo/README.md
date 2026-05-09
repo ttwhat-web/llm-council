@@ -1,5 +1,47 @@
 # DerinSplit – Flutter UI Demo (MVP, no backend)
 
+## DerinSplit Preview — One Minute Deploy
+
+The fastest way to get a public preview URL in front of a stakeholder.
+
+| | |
+|--|--|
+| **Pre-built artifact** | [`derinsplit_ui_demo/derinsplit_web_preview.zip`](./derinsplit_web_preview.zip) (7.4 MB) |
+| **Raw download** | <https://github.com/ttwhat-web/llm-council/raw/claude/derinsplit-flutter-mvp-SKkVB/derinsplit_ui_demo/derinsplit_web_preview.zip> |
+| **OTP code** | `123456` |
+| **Demo control panel** | Long-press the logo on Splash / Login / Home / Profile |
+
+### 60-second Netlify Drop deploy
+
+1. **Download** `derinsplit_web_preview.zip` from the raw link above (or grab it locally with `git pull`).
+2. **Unzip** anywhere on your machine — you'll get a `build/web/` folder.
+3. **Open** <https://app.netlify.com/drop> and **drag the `web/` folder** (the one *inside* `build/`) onto the page.
+4. Netlify produces a `https://<random>.netlify.app` URL within seconds. Share it.
+
+> **Tip:** drop the inner `web/` folder, not the outer `build/`. Netlify treats whatever folder you drop as the document root — `index.html` must be at the root.
+
+### Alternative deploy targets
+
+```bash
+# Vercel
+cd derinsplit_ui_demo/build/web && npx vercel --prod
+
+# Firebase Hosting
+cd derinsplit_ui_demo
+npx firebase-tools init hosting    # public dir = build/web, single-page = Yes
+npx firebase-tools deploy --only hosting
+```
+
+### Local preview
+
+```bash
+cd derinsplit_ui_demo
+flutter pub get
+flutter run -d chrome              # http://localhost:<random>
+```
+
+---
+
 > ## ⚡ Hızlı Referans
 >
 > | | |
