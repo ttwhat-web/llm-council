@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/demo/demo_control_panel.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/format.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/ds_badge.dart';
 import '../../../core/widgets/ds_card.dart';
 import '../../../core/widgets/ds_chip.dart';
@@ -12,6 +13,7 @@ import '../../../core/widgets/ds_progress.dart';
 import '../../../core/widgets/ds_shimmer.dart';
 import '../../../core/widgets/ds_state.dart';
 import '../data/fake_splits_repository.dart';
+import 'splits_catalog_screen.dart';
 
 class SplitListScreen extends ConsumerStatefulWidget {
   const SplitListScreen({super.key});
@@ -25,6 +27,11 @@ class _SplitListScreenState extends ConsumerState<SplitListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (context.isDesktop) return const SplitsCatalogScreen();
+    return _buildMobile(context);
+  }
+
+  Widget _buildMobile(BuildContext context) {
     final async = ref.watch(splitsListProvider(_filter));
     return Scaffold(
       appBar: AppBar(

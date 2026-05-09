@@ -27,6 +27,7 @@ import '../../features/splits/presentation/split_dashboard_screen.dart';
 import '../../features/splits/presentation/split_detail_screen.dart';
 import '../../features/splits/presentation/split_list_screen.dart';
 import '../models/user_mode.dart';
+import '../preview_flags.dart';
 import '../state/user_mode_provider.dart';
 import '../widgets/main_shell.dart';
 import 'page_transition.dart';
@@ -39,7 +40,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   final mode = ref.watch(userModeProvider);
   return GoRouter(
     navigatorKey: _rootKey,
-    initialLocation: '/splash',
+    initialLocation: kPreviewMode ? '/home' : '/splash',
     refreshListenable: _AuthListenable(ref),
     redirect: (context, state) {
       final loc = state.matchedLocation;

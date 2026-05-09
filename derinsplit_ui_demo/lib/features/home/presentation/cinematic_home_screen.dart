@@ -2,20 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/preview_flags.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/cinematic_backdrop.dart';
+import '../../../core/widgets/light_panel.dart';
 import '../../../core/widgets/perfume_image.dart';
 import '../../../core/widgets/web_navbar.dart';
 import '../../auth/data/fake_auth_repository.dart';
 
-/// Cinematic luxury home page (desktop / large tablet).
+/// Light luxury home page (desktop / large tablet).
 ///
 /// Layout:
-///   [ floating glass pill navbar ]
-///   [ massive editorial hero — dark perfume bg + Hoş geldiniz ]
-///   [ 3 luxury feature cards: SPLIT · ŞİŞE SATIŞLARI · DEKANT ]
-///   [ minimal footer ]
+///   [ floating glass pill navbar — light variant ]
+///   [ LightFrostedPanel containing the entire editorial spread ]
+///       hero (dark perfume card on light surface)
+///       3 feature cards (dark photo cards)
+///       featured splits carousel
+///       NASIL ÇALIŞIR triptych
+///       curator's note
+///       newsletter strip
+///   [ Preview v2 footer stamp ]
 class CinematicHomeScreen extends ConsumerWidget {
   const CinematicHomeScreen({super.key});
 
@@ -23,30 +30,79 @@ class CinematicHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authRepositoryProvider).user;
     final w = context.screenWidth;
+    final outerPad = w >= 1400 ? 56.0 : 32.0;
 
     return Scaffold(
       backgroundColor: DSColors.bgPrimary,
       body: CinematicBackdrop(
+        grainOpacity: 0.04,
         child: SingleChildScrollView(
           child: Column(
             children: [
-              const WebPillNavbar(),
+              const WebPillNavbar(variant: NavbarVariant.light),
               const SizedBox(height: 28),
-              _Hero(name: user?.name, screenWidth: w),
-              const SizedBox(height: 64),
-              _CategoryRow(screenWidth: w),
-              const SizedBox(height: 96),
-              _FeaturedSplits(screenWidth: w),
-              const SizedBox(height: 96),
-              _HowItWorks(screenWidth: w),
-              const SizedBox(height: 96),
-              _CuratorsNote(screenWidth: w),
-              const SizedBox(height: 96),
-              _NewsletterStrip(screenWidth: w),
-              const SizedBox(height: 80),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: outerPad),
+                child: LightFrostedPanel(
+                  padding: EdgeInsets.fromLTRB(
+                    w >= 1400 ? 40 : 24,
+                    w >= 1400 ? 40 : 28,
+                    w >= 1400 ? 40 : 24,
+                    w >= 1400 ? 56 : 40,
+                  ),
+                  child: Column(
+                    children: [
+                      _Hero(name: user?.name, screenWidth: w),
+                      const SizedBox(height: 56),
+                      _CategoryRow(screenWidth: w),
+                      const SizedBox(height: 80),
+                      _FeaturedSplits(screenWidth: w),
+                      const SizedBox(height: 80),
+                      _HowItWorks(screenWidth: w),
+                      const SizedBox(height: 80),
+                      _CuratorsNote(screenWidth: w),
+                      const SizedBox(height: 56),
+                      _NewsletterStrip(screenWidth: w),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              _PreviewStamp(),
+              const SizedBox(height: 24),
               _Footer(),
               const SizedBox(height: 36),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewStamp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(40),
+          gradient: DSColors.goldGradient,
+          boxShadow: [
+            BoxShadow(
+              color: DSColors.accentGold.withOpacity(0.4),
+              blurRadius: 14,
+            ),
+          ],
+        ),
+        child: Text(
+          kPreviewVersion.toUpperCase(),
+          style: const TextStyle(
+            color: DSColors.bgPrimary,
+            fontSize: 11,
+            letterSpacing: 2.4,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -1191,7 +1247,7 @@ class _HowItWorks extends StatelessWidget {
                   Text(
                     'NASIL ÇALIŞIR',
                     style: TextStyle(
-                      color: DSColors.accentGoldLight,
+                      color: DSColors.accentGoldDark,
                       fontSize: 10.5,
                       letterSpacing: 3,
                       fontWeight: FontWeight.w700,
@@ -1201,7 +1257,7 @@ class _HowItWorks extends StatelessWidget {
                   Text(
                     'Üç adımda topluluğa katılın',
                     style: TextStyle(
-                      color: DSColors.textPrimary,
+                      color: DSColors.lightInk,
                       fontFamily: 'Georgia',
                       fontSize: 32,
                       fontWeight: FontWeight.w700,
@@ -1254,15 +1310,15 @@ class _Step extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(26, 28, 26, 30),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.045),
-            Colors.white.withOpacity(0.015),
-          ],
-        ),
-        border: Border.all(color: DSColors.glassBorder),
+        color: Colors.white,
+        border: Border.all(color: DSColors.lightBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1292,7 +1348,7 @@ class _Step extends StatelessWidget {
                 child: Text(
                   no,
                   style: const TextStyle(
-                    color: DSColors.accentGoldLight,
+                    color: DSColors.accentGoldDark,
                     fontFamily: 'Georgia',
                     fontSize: 36,
                     fontWeight: FontWeight.w800,
@@ -1306,7 +1362,7 @@ class _Step extends StatelessWidget {
           Text(
             title,
             style: const TextStyle(
-              color: DSColors.textPrimary,
+              color: DSColors.lightInk,
               fontSize: 14,
               letterSpacing: 2,
               fontWeight: FontWeight.w800,
@@ -1316,7 +1372,7 @@ class _Step extends StatelessWidget {
           Text(
             body,
             style: const TextStyle(
-              color: DSColors.textSecondary,
+              color: DSColors.lightInkSecondary,
               fontSize: 13.5,
               height: 1.6,
             ),

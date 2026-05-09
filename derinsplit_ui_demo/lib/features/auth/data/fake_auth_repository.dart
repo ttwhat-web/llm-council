@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/demo/demo_state.dart';
 import '../../../core/models/user.dart';
+import '../../../core/preview_flags.dart';
 
 class AuthState {
   final AppUser? user;
@@ -18,9 +19,27 @@ class AuthState {
   }
 }
 
+const _previewUser = AppUser(
+  id: 'u_preview',
+  name: 'Tunç Tunçel',
+  phone: '+90 533 381 92 00',
+  role: 'user',
+  canListItems: true,
+  phoneVerified: true,
+  trustScore: 92,
+  city: 'İstanbul',
+);
+
 class FakeAuthRepository extends StateNotifier<AuthState> {
   final Ref ref;
-  FakeAuthRepository(this.ref) : super(const AuthState());
+  FakeAuthRepository(this.ref) : super(_initialState());
+
+  static AuthState _initialState() {
+    if (kPreviewMode) {
+      return const AuthState(user: _previewUser, onboardingDone: true);
+    }
+    return const AuthState();
+  }
 
   Future<void> _delay() async {
     final ms = ref.read(demoSettingsProvider).effectiveDelayMs;
