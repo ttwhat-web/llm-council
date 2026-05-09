@@ -6,8 +6,9 @@ The fastest way to get a public preview URL in front of a stakeholder.
 
 | | |
 |--|--|
-| **Pre-built artifact** | [`derinsplit_ui_demo/derinsplit_web_preview.zip`](./derinsplit_web_preview.zip) (7.4 MB) |
+| **Pre-built artifact** | [`derinsplit_ui_demo/derinsplit_web_preview.zip`](./derinsplit_web_preview.zip) (897 KB) |
 | **Raw download** | <https://github.com/ttwhat-web/llm-council/raw/claude/derinsplit-flutter-mvp-SKkVB/derinsplit_ui_demo/derinsplit_web_preview.zip> |
+| **Renderer** | HTML (no CanvasKit / WASM dependency) — works on any static host |
 | **OTP code** | `123456` |
 | **Demo control panel** | Long-press the logo on Splash / Login / Home / Profile |
 
