@@ -18,6 +18,7 @@ import { HeaderStatus } from "./HeaderStatus";
 import { AgentActions } from "./AgentActions";
 import { LivePreview } from "./LivePreview";
 import { MissionLog } from "./MissionLog";
+import { MissionAlertInbox } from "./MissionAlertInbox";
 import { MissionAlertToggle } from "./MissionAlertToggle";
 import { ScoreBadges } from "./ScoreBadges";
 import { SafetyBadge } from "./SafetyBadge";
@@ -97,6 +98,7 @@ export function PromptFixer({ variant = "web" }: Props) {
   const [busyArchitect, setBusyArchitect] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
+  const [inboxReloadKey, setInboxReloadKey] = useState(0);
   const [log, setLog] = useState<LogEntry[]>([]);
   const [latencyHistory, setLatencyHistory] = useState<number[]>([]);
   const [architect, setArchitect] = useState<ArchitectResponse | null>(null);
@@ -196,6 +198,11 @@ export function PromptFixer({ variant = "web" }: Props) {
           saveEntry(entry);
           setHistoryKey((k) => k + 1);
         }
+        // Inbox refresh — gives the fire-and-forget dispatcher a moment
+        // to land its write before the GET. The poll catches it either way.
+        if (MISSION_ALERTS_FLAG && settings.alertUser) {
+          setTimeout(() => setInboxReloadKey((k) => k + 1), 600);
+        }
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -247,6 +254,9 @@ export function PromptFixer({ variant = "web" }: Props) {
           )
         )
       );
+      if (MISSION_ALERTS_FLAG && settings.alertUser) {
+        setTimeout(() => setInboxReloadKey((k) => k + 1), 600);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -598,6 +608,13 @@ export function PromptFixer({ variant = "web" }: Props) {
           ) : (
             <PipelineEmpty />
           )}
+
+          <MissionAlertInbox
+            unlocked={MISSION_ALERTS_FLAG}
+            userEmail={settings.alertUser}
+            reloadKey={inboxReloadKey}
+            compact={compact}
+          />
         </section>
 
         {/* ---------- COLUMN 3 — OUTPUT CONSOLE ---------- */}

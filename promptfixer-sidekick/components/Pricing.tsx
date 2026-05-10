@@ -39,7 +39,8 @@ const PLANS: Plan[] = [
     features: [
       "Unlimited prompt fixes",
       "Smart + Code models · priority routing",
-      "Telegram Mission Alerts",
+      "Personal Telegram alerts",
+      "Mission Alert Inbox",
       "Diff view",
       "Mission Templates · Mission Archive",
       "Prompt variants",

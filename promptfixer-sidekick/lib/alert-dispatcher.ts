@@ -1,15 +1,16 @@
 /**
  * Auto-trigger dispatcher. Wires `shouldAlertHuman` + `formatAlertMessage`
- * + `sendTelegramAlert` together so the route handlers can fire alerts
- * with one call.
+ * + `sendTelegramAlert` + `createAlertRecord` (the in-app inbox) together
+ * so route handlers fire alerts with one call.
  *
  * The dispatch is non-blocking — promises returned from `dispatchAlert`
  * are deliberately not awaited by callers. The route handler's response
- * goes out first; the alert flies in the background.
+ * goes out first; the alert and the inbox write fly in the background.
  *
  * Server-only. No client imports.
  */
 
+import { createAlertRecord, type AlertSentTo } from "./alert-inbox";
 import {
   consumeAlertBudget,
   formatAlertMessage,
@@ -31,7 +32,7 @@ export interface DispatchInput extends AlertContext {
   clientKey: string;
   /** Human-readable surface label e.g. "fix · dev" or "architect". */
   surface: string;
-  /** Optional user identifier surfaced in the message body. */
+  /** Optional user identifier surfaced in the message body + inbox attribution. */
   user?: string;
   /** Truncated mission text (raw user input). */
   mission: string;
@@ -41,20 +42,28 @@ export interface DispatchResult {
   triggered: boolean;
   sent?: boolean;
   reason?: string;
+  /** id of the inbox record when one was written. */
+  inboxId?: string;
 }
 
 /**
- * Decide → format → send. Always resolves; never throws. Intended use:
+ * Decide → record (inbox) → send (Telegram). Always resolves; never throws.
  *
- *   void dispatchAlert({ clientKey, surface, mission, fix, ... });
+ *   - When the master feature flag is off, nothing happens.
+ *   - When `shouldAlertHuman` returns null, nothing happens.
+ *   - Otherwise:
+ *       * Inbox: a record is written iff `input.user` is present.
+ *         The record's `sentTo` reflects what actually happened with
+ *         Telegram (user / admin / none).
+ *       * Telegram: tries the user-linked chat first, falls back to
+ *         TELEGRAM_ADMIN_CHAT_ID, skips silently when neither is set
+ *         or when no bot token is configured.
  *
- * The route handler returns its response without awaiting the promise.
+ * Inbox write failures are logged + swallowed and do not affect the
+ * Telegram send (or vice versa).
  */
 export async function dispatchAlert(input: DispatchInput): Promise<DispatchResult> {
   if (!ALERTS_ENABLED) return { triggered: false, reason: "feature_disabled" };
-  if (!hasTelegramToken()) {
-    return { triggered: false, reason: "no_token" };
-  }
 
   const decision = shouldAlertHuman(input);
   if (!decision) return { triggered: false };
@@ -62,51 +71,86 @@ export async function dispatchAlert(input: DispatchInput): Promise<DispatchResul
   // Resolve destination chat:
   //   1. user-linked chat (if input.user provided AND linked)
   //   2. admin fallback (TELEGRAM_ADMIN_CHAT_ID)
-  //   3. neither → silently skip
-  const userChatId = await getTelegramChatIdForUser(input.user).catch(() => null);
-  const adminChatId = getAdminTelegramChatId();
-  const chatId = userChatId || adminChatId;
-  if (!chatId) {
-    return { triggered: true, sent: false, reason: "no_chat" };
-  }
+  //   3. neither → no Telegram send (sentTo "none"), inbox still records.
+  const tokenOk = hasTelegramToken();
+  const userChatId = tokenOk
+    ? await getTelegramChatIdForUser(input.user).catch(() => null)
+    : null;
+  const adminChatId = tokenOk ? getAdminTelegramChatId() : "";
+  const chatId = userChatId || adminChatId || "";
 
   // Per-(client, alertType, chat) rate bucket so a noisy mission doesn't
-  // also spam the admin if the user is also linked.
-  const key = `alert:${input.clientKey}:${decision.type}:${chatId}`;
-  if (!consumeAlertBudget(key)) {
-    return { triggered: true, sent: false, reason: "rate_limited" };
+  // double-spam the same chat. Inbox writes are NOT rate-limited — they
+  // are private to the user.
+  let rateLimited = false;
+  if (chatId) {
+    const key = `alert:${input.clientKey}:${decision.type}:${chatId}`;
+    if (!consumeAlertBudget(key)) rateLimited = true;
   }
 
-  const message = formatAlertMessage({
-    type: decision.type,
-    severity: decision.severity,
-    mission: input.mission,
-    summary: decision.reason,
-    surface: input.surface,
-    user: input.user
-  });
+  let telegramSent = false;
+  let sentTo: AlertSentTo = "none";
+  let sendReason: string | undefined;
 
-  const send = await sendTelegramAlert(message, { chatId, parseMode: "HTML" });
+  if (chatId && !rateLimited) {
+    const message = formatAlertMessage({
+      type: decision.type,
+      severity: decision.severity,
+      mission: input.mission,
+      summary: decision.reason,
+      surface: input.surface,
+      user: input.user
+    });
+    const send = await sendTelegramAlert(message, { chatId, parseMode: "HTML" });
+    telegramSent = send.ok;
+    sendReason = send.reason;
+    if (send.ok) sentTo = userChatId ? "user" : "admin";
+  } else if (rateLimited) {
+    sendReason = "rate_limited";
+  } else if (!tokenOk) {
+    sendReason = "no_token";
+  } else {
+    sendReason = "no_chat";
+  }
+
+  // Inbox: write a record when we have a user identity. Anonymous alerts
+  // (admin-only, no user supplied) are not recorded — there is no inbox
+  // to read them from anyway.
+  let inboxId: string | undefined;
+  if (input.user) {
+    try {
+      const record = await createAlertRecord({
+        userEmail: input.user,
+        type: decision.type,
+        severity: decision.severity,
+        mission: input.mission,
+        summary: decision.reason,
+        reason: sendReason && !telegramSent ? sendReason : undefined,
+        sentTo,
+        telegramSent
+      });
+      if (record) inboxId = record.id;
+    } catch (err) {
+      console.warn("[alert-dispatcher] inbox write failed:", (err as Error)?.message);
+    }
+  }
+
   return {
     triggered: true,
-    sent: send.ok,
-    reason: send.ok ? (userChatId ? "sent_user" : "sent_admin") : send.reason
+    sent: telegramSent,
+    reason: telegramSent ? `sent_${sentTo}` : sendReason,
+    inboxId
   };
 }
 
 /**
- * Fire-and-forget wrapper. Use this from route handlers when you do NOT
- * want to await the network round-trip before returning the response.
- *
- *   fireAndForgetAlert({ ... });   // no await
+ * Fire-and-forget wrapper. Use from route handlers when the response
+ * should not wait for Telegram + inbox. On Next.js Node runtime the event
+ * loop continues after the response is sent, so the promise resolves
+ * cleanly. On Edge runtime use `waitUntil(...)` instead.
  */
 export function fireAndForgetAlert(input: DispatchInput): void {
-  // Note: in Next.js Node runtime the event loop continues after the
-  // response is sent, so this resolves cleanly. On Edge runtime use
-  // `waitUntil(...)` instead.
   void dispatchAlert(input).catch((err) => {
-    // dispatchAlert is already try/catch-safe internally; this catch is
-    // a belt-and-braces guard for unexpected programmer errors.
     console.warn("[alert-dispatcher] unexpected:", (err as Error)?.message);
   });
 }
