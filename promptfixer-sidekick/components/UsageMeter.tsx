@@ -1,29 +1,42 @@
 "use client";
 
 import clsx from "clsx";
-import { Crown, Zap } from "lucide-react";
+import { Crown, ShieldCheck, Zap } from "lucide-react";
 import type { BillingSnapshot } from "@/lib/billing";
 
 /**
  * Compact daily-budget chip.
  *
- * Free: "X / 10 today" with a thin progress bar that turns amber
- *       at 80% and rose at 100%.
- * Pro:  "Pro · unlimited" with a Crown glyph.
+ * Sources, in order of preference:
+ *   1. `serverBilling` — the snapshot from `/api/billing/me`. Always
+ *      authoritative when present (we don't trust localStorage for
+ *      billing decisions).
+ *   2. `billing` — the Phase-3 client-only snapshot. Used while the
+ *      first server fetch is in flight, or when the API is offline.
  *
- * Click → opens the upgrade modal (caller-supplied callback). The chip
- * is always interactive so users on Pro can also use it as the "manage
- * plan" entry point.
+ * The chip displays a "Server verified" tick for `auth` source plans
+ * and "Local preview" for `dev-override`.
  */
+
+export interface ServerBillingMini {
+  plan: "free" | "pro" | "team" | "enterprise";
+  isPro: boolean;
+  source: "auth" | "dev-override" | "default";
+  quota: { used: number; limit: number; remaining: number; resetAt: string };
+}
 
 interface Props {
   billing: BillingSnapshot;
+  serverBilling?: ServerBillingMini | null;
   onClick: () => void;
   compact?: boolean;
 }
 
-export function UsageMeter({ billing, onClick, compact }: Props) {
-  if (billing.tier === "pro") {
+export function UsageMeter({ billing, serverBilling, onClick, compact }: Props) {
+  // Pro / Team / Enterprise — show "unlimited" with verification badge.
+  const effectivePro = serverBilling ? serverBilling.isPro : billing.tier === "pro";
+  if (effectivePro) {
+    const verified = serverBilling?.source === "auth";
     return (
       <button
         type="button"
@@ -32,24 +45,40 @@ export function UsageMeter({ billing, onClick, compact }: Props) {
           "no-drag inline-flex items-center gap-1.5 rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 transition hover:bg-accent/[0.16]",
           compact ? "text-[10px]" : "text-[11px]"
         )}
-        title="Pro Preview · click for plans"
+        title={verified ? "Server-verified Pro" : "Pro preview · click for plans"}
       >
-        <Crown className="h-3 w-3 text-accent" />
-        <span className="font-medium text-accent">Pro</span>
+        {verified ? (
+          <ShieldCheck className="h-3 w-3 text-emerald-300" />
+        ) : (
+          <Crown className="h-3 w-3 text-accent" />
+        )}
+        <span className="font-medium text-accent">
+          {serverBilling?.plan ? labelFor(serverBilling.plan) : "Pro"}
+        </span>
         <span className="font-mono text-[10px] uppercase tracking-wider text-accent/75">
           unlimited
         </span>
+        {!verified && (
+          <span className="hidden font-mono text-[9px] uppercase tracking-wider text-amber-300 md:inline">
+            preview
+          </span>
+        )}
       </button>
     );
   }
 
-  const pct = Math.min(100, Math.round((billing.used / Math.max(1, billing.limit)) * 100));
-  const tone =
-    billing.atLimit
-      ? "rose"
-      : billing.used / billing.limit >= 0.8
-        ? "amber"
-        : "ok";
+  // Free path. Prefer the server quota if available; fall back to local.
+  const used = serverBilling ? serverBilling.quota.used : billing.used;
+  const limit = serverBilling ? serverBilling.quota.limit : billing.limit;
+  const remaining = serverBilling
+    ? serverBilling.quota.remaining
+    : billing.remaining === Number.POSITIVE_INFINITY
+      ? 0
+      : billing.remaining;
+  const atLimit = limit > 0 && used >= limit;
+  const ratio = limit > 0 ? used / limit : 0;
+  const tone: "ok" | "amber" | "rose" = atLimit ? "rose" : ratio >= 0.8 ? "amber" : "ok";
+
   const wrapperCls = {
     rose: "border-rose-400/40 bg-rose-500/10 hover:bg-rose-500/[0.16]",
     amber: "border-amber-400/35 bg-amber-500/10 hover:bg-amber-500/[0.15]",
@@ -65,6 +94,7 @@ export function UsageMeter({ billing, onClick, compact }: Props) {
     amber: "bg-amber-400",
     ok: "bg-accent"
   }[tone];
+  const pct = limit > 0 ? Math.min(100, Math.round(ratio * 100)) : 0;
 
   return (
     <button
@@ -75,11 +105,11 @@ export function UsageMeter({ billing, onClick, compact }: Props) {
         wrapperCls,
         compact ? "text-[10px]" : "text-[11px]"
       )}
-      title={billing.atLimit ? "Daily free limit reached" : `${billing.remaining} fixes left today`}
+      title={atLimit ? "Daily free limit reached" : `${remaining} fixes left today`}
     >
       <Zap className={clsx("h-3 w-3", textCls)} />
       <span className={clsx("font-medium", textCls)}>
-        {billing.used}/{billing.limit}
+        {used}/{limit}
       </span>
       <span className="hidden font-mono text-[9px] uppercase tracking-wider text-white/45 md:inline">
         today
@@ -90,6 +120,22 @@ export function UsageMeter({ billing, onClick, compact }: Props) {
           style={{ width: `${pct}%` }}
         />
       </span>
+      {serverBilling && (
+        <ShieldCheck className="ml-1 hidden h-3 w-3 text-emerald-300/70 md:inline" />
+      )}
     </button>
   );
+}
+
+function labelFor(plan: "free" | "pro" | "team" | "enterprise"): string {
+  switch (plan) {
+    case "pro":
+      return "Pro";
+    case "team":
+      return "Team";
+    case "enterprise":
+      return "Enterprise";
+    default:
+      return "Free";
+  }
 }

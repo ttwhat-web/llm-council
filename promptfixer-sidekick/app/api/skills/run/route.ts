@@ -3,17 +3,22 @@
  *
  * Generic skill-runner. Takes `{ skillId, input }`, validates the id
  * against the registry, refuses planned/unknown skills, and invokes
- * the shipped skill's runner. Wraps the same metering + alert path the
- * dedicated /api/fix and /api/architect routes use, so a click on a
- * skill suggestion never bypasses the daily budget.
+ * the shipped skill's runner. Cloud-bound skills (prompt-fixer,
+ * architect) go through the Phase-4 server billing gate so the daily
+ * budget is enforced regardless of what the browser believes.
  *
  * Response shape:
  *   { ok: true, skillId, status, result: SkillResult, usage? }
- *   { ok: false, error: "unknown_skill" | "not_implemented" | "rate_limited" }
+ *   { ok: false, code, message, ... }
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { fireAndForgetAlert } from "@/lib/alert-dispatcher";
+import {
+  billingErrorResponse,
+  requestExceedsSize,
+  runBillingGate
+} from "@/lib/billing/server";
 import { isClientContext, route } from "@/lib/providers";
 import { getQuality, isModelQuality } from "@/lib/quality";
 import { architectSkill } from "@/lib/skills/architect";
@@ -21,12 +26,6 @@ import { promptCleanerSkill } from "@/lib/skills/prompt-cleaner";
 import { promptFixerSkill } from "@/lib/skills/prompt-fixer";
 import { getSkill } from "@/lib/skills/registry";
 import type { Skill, SkillContext, SkillId, SkillResult } from "@/lib/skills/types";
-import {
-  clientKeyFromHeaders,
-  consume,
-  FREE_DAILY_LIMIT,
-  peek
-} from "@/lib/usage";
 import type {
   ClientContext,
   Engine,
@@ -36,6 +35,8 @@ import type {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const MAX_BODY_BYTES = 64 * 1024;
 
 const VALID_SKILL_IDS: SkillId[] = [
   "prompt-fixer",
@@ -68,40 +69,32 @@ interface RunBody {
 }
 
 export async function POST(req: NextRequest) {
+  if (requestExceedsSize(req, MAX_BODY_BYTES)) {
+    return billingErrorResponse("payload_too_large", "Request body too large.", 413);
+  }
+
   let body: RunBody;
   try {
     body = (await req.json()) as RunBody;
   } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
+    return billingErrorResponse("invalid_json", "Invalid JSON body.", 400);
   }
 
   if (!isSkillId(body.skillId)) {
-    return NextResponse.json({ ok: false, error: "unknown_skill" }, { status: 400 });
+    return billingErrorResponse("unknown_skill", "Unknown skill id.", 400);
   }
 
   const skill = getSkill(body.skillId);
   if (!skill) {
-    return NextResponse.json({ ok: false, error: "unknown_skill" }, { status: 400 });
+    return billingErrorResponse("unknown_skill", "Unknown skill id.", 400);
   }
   if (skill.meta.status !== "shipped") {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "not_implemented",
-        skillId: body.skillId,
-        status: skill.meta.status
-      },
-      { status: 400 }
+    return billingErrorResponse(
+      "not_implemented",
+      `Skill "${body.skillId}" is not yet shipped (status: ${skill.meta.status}).`,
+      400
     );
   }
-
-  // Skill-specific input shaping + metering decision.
-  const tier: Tier = "free";
-  const clientKey = clientKeyFromHeaders(req.headers);
-  const ctx: SkillContext = {
-    clientKey,
-    user: typeof body.alertUser === "string" ? body.alertUser : undefined
-  };
 
   const modelQuality: ModelQuality = isModelQuality(body.modelQuality)
     ? body.modelQuality
@@ -112,34 +105,29 @@ export async function POST(req: NextRequest) {
   const allowCloudFallback =
     modelQuality === "local" && body.allowCloudFallback === true;
 
-  // Pre-flight metering for cloud-bound skills. Same predicate the
-  // dedicated routes use.
-  let usage = peek(clientKey, tier);
-  let willHitCloud = false;
-  if (skill.meta.id === "prompt-fixer" || skill.meta.id === "architect") {
-    const requestedEngine: Engine = getQuality(modelQuality).engine;
-    const routed = route(requestedEngine, clientContext, { allowCloudFallback });
-    willHitCloud = routed.resolved === "cloud";
-    if (willHitCloud) {
-      const result = consume(clientKey, tier);
-      if (!result.allowed) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: `Daily ${tier} limit reached (${result.snapshot.limit}/day). Resets at ${result.snapshot.resetAt}.`,
-            usage: result.snapshot
-          },
-          { status: 429 }
-        );
-      }
-      usage = result.snapshot;
-    }
-  }
+  const requestedEngine: Engine = getQuality(modelQuality).engine;
+  const routed = route(requestedEngine, clientContext, { allowCloudFallback });
+  const willHitCloud = routed.resolved === "cloud";
+  const isCloudBoundSkill =
+    skill.meta.id === "prompt-fixer" || skill.meta.id === "architect";
 
-  // Run the skill via its typed module export so we keep the I/O type
-  // information at the call site.
+  // Phase-4 gate: rate limit + plan resolution + quota consume on
+  // cloud-bound skills.
+  const gate = await runBillingGate(req, {
+    rateLimit: "cloudGenerate",
+    action: "cloud-fix",
+    consume: isCloudBoundSkill && willHitCloud
+  });
+  if (!gate.ok) return gate.errorResponse!;
+
+  const tier: Tier = gate.isPro ? "pro" : "free";
+  const ctx: SkillContext = {
+    clientKey: gate.identity.id,
+    user: typeof body.alertUser === "string" ? body.alertUser : undefined
+  };
+
   let result: SkillResult<unknown>;
-  let mission = ""; // surface label for the alert payload
+  let mission = "";
   switch (skill.meta.id) {
     case "prompt-fixer": {
       const inputText = typeof body.input === "string" ? body.input : "";
@@ -162,19 +150,17 @@ export async function POST(req: NextRequest) {
     case "prompt-cleaner": {
       const inputText = typeof body.input === "string" ? body.input : "";
       mission = inputText;
-      result = (await promptCleanerSkill.run({ input: inputText }, ctx)) as SkillResult<unknown>;
+      result = (await promptCleanerSkill.run(
+        { input: inputText },
+        ctx
+      )) as SkillResult<unknown>;
       break;
     }
     case "architect": {
       const inputText = typeof body.input === "string" ? body.input : "";
       mission = inputText;
       result = (await architectSkill.run(
-        {
-          input: inputText,
-          modelQuality,
-          clientContext,
-          allowCloudFallback
-        },
+        { input: inputText, modelQuality, clientContext, allowCloudFallback },
         ctx
       )) as SkillResult<unknown>;
       break;
@@ -186,11 +172,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Mission Alerts — non-blocking. Hard failures from prompt-fixer fire
-  // admin-only; soft cases require user opt-in.
   if (skill.meta.id === "prompt-fixer" && result.ok) {
     fireAndForgetAlert({
-      clientKey,
+      clientKey: gate.identity.id,
       surface: `skill:prompt-fixer · ${result.mode ?? "general"}`,
       user: ctx.user,
       mission,
@@ -200,19 +184,24 @@ export async function POST(req: NextRequest) {
   }
 
   const headers = new Headers();
-  headers.set("X-RateLimit-Limit", String(usage.limit));
-  headers.set("X-RateLimit-Remaining", String(usage.remaining));
-  headers.set("X-RateLimit-Reset", usage.resetAt);
-  if (FREE_DAILY_LIMIT > 0) headers.set("X-Free-Daily-Limit", String(FREE_DAILY_LIMIT));
+  headers.set("X-Plan", gate.plan);
+  if (gate.usage && gate.usage.limit > 0) {
+    headers.set("X-RateLimit-Limit", String(gate.usage.limit));
+    headers.set("X-RateLimit-Remaining", String(gate.usage.remaining));
+    headers.set("X-RateLimit-Reset", gate.usage.resetAt);
+  }
 
-  return NextResponse.json(
-    {
-      ok: true,
-      skillId: skill.meta.id,
-      status: skill.meta.status,
-      result,
-      usage
-    },
-    { status: 200, headers }
+  return gate.attach(
+    NextResponse.json(
+      {
+        ok: true,
+        skillId: skill.meta.id,
+        status: skill.meta.status,
+        result,
+        plan: gate.plan,
+        usage: gate.usage
+      },
+      { status: 200, headers }
+    )
   );
 }

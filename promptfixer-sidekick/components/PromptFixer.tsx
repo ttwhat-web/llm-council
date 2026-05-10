@@ -25,7 +25,7 @@ import { SafetyBadge } from "./SafetyBadge";
 import { ArchitectView } from "./ArchitectView";
 import { SkillSuggestions } from "./SkillSuggestions";
 import { SkillsExplorer } from "./SkillsExplorer";
-import { UsageMeter } from "./UsageMeter";
+import { UsageMeter, type ServerBillingMini } from "./UsageMeter";
 import { UpgradeModal } from "./UpgradeModal";
 import { SavedStacks } from "./SavedStacks";
 import { WorkflowRecorder } from "./WorkflowRecorder";
@@ -144,6 +144,10 @@ export function PromptFixer({ variant = "web" }: Props) {
     day: "",
     atLimit: false
   }));
+  const [serverBilling, setServerBilling] = useState<ServerBillingMini | null>(null);
+  const [serverBillingMode, setServerBillingMode] = useState<
+    "stub" | "stripe" | "paddle" | null
+  >(null);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [paywallReason, setPaywallReason] = useState<"limit-reached" | "manage">("manage");
   const [stacksReloadKey, setStacksReloadKey] = useState(0);
@@ -186,6 +190,41 @@ export function PromptFixer({ variant = "web" }: Props) {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  const refreshServerBilling = useCallback(async () => {
+    try {
+      const res = await fetch("/api/billing/me", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        ok: boolean;
+        plan: ServerBillingMini["plan"];
+        isPro: boolean;
+        source: ServerBillingMini["source"];
+        quota: ServerBillingMini["quota"];
+        mode?: "stub" | "stripe" | "paddle";
+      };
+      if (!data.ok) return;
+      setServerBilling({
+        plan: data.plan,
+        isPro: data.isPro,
+        source: data.source,
+        quota: data.quota
+      });
+      if (data.mode) setServerBillingMode(data.mode);
+    } catch {
+      // Server unreachable — stay on local billing.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshServerBilling();
+  }, [refreshServerBilling]);
+
+  // Effective at-limit signal: prefer the server view when we have one.
+  const effectiveAtLimit = serverBilling
+    ? serverBilling.quota.limit > 0 &&
+      serverBilling.quota.used >= serverBilling.quota.limit
+    : billing.atLimit;
 
   // ---- recorder hydration ----
   useEffect(() => {
@@ -304,7 +343,7 @@ export function PromptFixer({ variant = "web" }: Props) {
       if (busy || busyAction || busyArchitect) return;
       // Free-tier daily gate (local-only). Output transforms (override)
       // re-render an existing result and don't burn fresh budget.
-      if (!override && billing.atLimit) {
+      if (!override && effectiveAtLimit) {
         openPaywall("limit-reached");
         return;
       }
@@ -370,6 +409,7 @@ export function PromptFixer({ variant = "web" }: Props) {
           // Burn one client-side daily fix on every successful fresh
           // fix. Transforms (override) don't consume budget.
           bumpBilling();
+          void refreshServerBilling();
           const entry: HistoryEntry = {
             id: newId(),
             timestamp: Date.now(),
@@ -404,8 +444,9 @@ export function PromptFixer({ variant = "web" }: Props) {
       derivedEngine,
       clientContext,
       isLocal,
-      billing.atLimit,
+      effectiveAtLimit,
       bumpBilling,
+      refreshServerBilling,
       openPaywall,
       recordStep
     ]
@@ -413,7 +454,7 @@ export function PromptFixer({ variant = "web" }: Props) {
 
   const runArchitect = useCallback(async () => {
     if (!input.trim() || busy || busyAction || busyArchitect) return;
-    if (billing.atLimit) {
+    if (effectiveAtLimit) {
       openPaywall("limit-reached");
       return;
     }
@@ -452,6 +493,7 @@ export function PromptFixer({ variant = "web" }: Props) {
       setArchitect(data);
       setForcedTab("architect");
       bumpBilling();
+      void refreshServerBilling();
       setLog((prev) =>
         appendLog(
           prev,
@@ -478,8 +520,9 @@ export function PromptFixer({ variant = "web" }: Props) {
     settings,
     clientContext,
     isLocal,
-    billing.atLimit,
+    effectiveAtLimit,
     bumpBilling,
+    refreshServerBilling,
     openPaywall,
     recordStep
   ]);
@@ -518,7 +561,7 @@ export function PromptFixer({ variant = "web" }: Props) {
       if (!input.trim() || busy || busyAction || busyArchitect || busySkillId) return;
       // Cloud-bound skills hit the same paywall as direct fixes.
       const cloudBound = skillId === "prompt-fixer" || skillId === "architect";
-      if (cloudBound && billing.atLimit) {
+      if (cloudBound && effectiveAtLimit) {
         openPaywall("limit-reached");
         return;
       }
@@ -572,7 +615,10 @@ export function PromptFixer({ variant = "web" }: Props) {
 
         // Cloud-bound skills consume one daily fix on success; the
         // local-only Prompt Cleaner is free.
-        if (cloudBound) bumpBilling();
+        if (cloudBound) {
+          bumpBilling();
+          void refreshServerBilling();
+        }
 
         // Map per-skill output back into the existing UI state.
         if (skillId === "prompt-fixer") {
@@ -651,8 +697,9 @@ export function PromptFixer({ variant = "web" }: Props) {
       settings,
       clientContext,
       isLocal,
-      billing.atLimit,
+      effectiveAtLimit,
       bumpBilling,
+      refreshServerBilling,
       openPaywall,
       recordStep
     ]
@@ -661,7 +708,7 @@ export function PromptFixer({ variant = "web" }: Props) {
   const onRunWorkflow = useCallback(
     async (workflowId: string) => {
       if (!input.trim() || busy || busyAction || busyArchitect || busyWorkflowId) return;
-      if (billing.atLimit) {
+      if (effectiveAtLimit) {
         openPaywall("limit-reached");
         return;
       }
@@ -723,6 +770,7 @@ export function PromptFixer({ variant = "web" }: Props) {
           setForcedTab("architect");
         }
         bumpBilling();
+        void refreshServerBilling();
         setLog((prev) =>
           appendLog(
             prev,
@@ -752,8 +800,9 @@ export function PromptFixer({ variant = "web" }: Props) {
       settings,
       clientContext,
       isLocal,
-      billing.atLimit,
+      effectiveAtLimit,
       bumpBilling,
+      refreshServerBilling,
       openPaywall,
       recordStep
     ]
@@ -883,6 +932,7 @@ export function PromptFixer({ variant = "web" }: Props) {
           <div className="flex flex-wrap items-center gap-2">
             <UsageMeter
               billing={billing}
+              serverBilling={serverBilling}
               onClick={() => openPaywall("manage")}
               compact={compact}
             />
@@ -1015,17 +1065,17 @@ export function PromptFixer({ variant = "web" }: Props) {
             <button
               type="button"
               onClick={() =>
-                billing.atLimit ? openPaywall("limit-reached") : void callFix()
+                effectiveAtLimit ? openPaywall("limit-reached") : void callFix()
               }
               disabled={busy || !input.trim()}
               className={clsx(
                 "no-drag inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
-                billing.atLimit
+                effectiveAtLimit
                   ? "bg-rose-500/15 text-rose-100 ring-1 ring-rose-400/40 hover:bg-rose-500/20"
                   : "bg-accent/90 text-white shadow-glow hover:bg-accent"
               )}
               title={
-                billing.atLimit
+                effectiveAtLimit
                   ? "Daily free limit reached — click to view plans"
                   : "Run a fresh fix"
               }
@@ -1035,7 +1085,7 @@ export function PromptFixer({ variant = "web" }: Props) {
               ) : (
                 <Wand2 className="h-4 w-4" />
               )}
-              {billing.atLimit ? "Daily limit reached — Upgrade" : "Run Mission"}
+              {effectiveAtLimit ? "Daily limit reached — Upgrade" : "Run Mission"}
             </button>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -1233,6 +1283,12 @@ export function PromptFixer({ variant = "web" }: Props) {
           onTierChange(tier);
           if (tier === "pro") setPaywallOpen(false);
         }}
+        serverSnapshot={
+          serverBilling && serverBillingMode
+            ? { source: serverBilling.source, mode: serverBillingMode }
+            : null
+        }
+        onCheckoutComplete={refreshServerBilling}
         reason={paywallReason}
       />
     </div>

@@ -13,6 +13,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { fireAndForgetAlert } from "@/lib/alert-dispatcher";
+import {
+  billingErrorResponse,
+  requestExceedsSize,
+  runBillingGate,
+  type GateResult
+} from "@/lib/billing/server";
 import { isClientContext, route } from "@/lib/providers";
 import {
   getQuality,
@@ -20,12 +26,6 @@ import {
   resolveCloudModel,
   resolveOllamaModel
 } from "@/lib/quality";
-import {
-  clientKeyFromHeaders,
-  consume,
-  FREE_DAILY_LIMIT,
-  peek
-} from "@/lib/usage";
 import type {
   ArchitectPlan,
   ArchitectRequest,
@@ -37,6 +37,8 @@ import type {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const MAX_BODY_BYTES = 64 * 1024;
 
 const ARCHITECT_SYSTEM = `You are a senior systems architect translating a brief idea into a structured implementation plan.
 Be concrete, opinionated, concise. Quantify where possible. Do not invent product features the user didn't ask for.
@@ -73,16 +75,20 @@ const SCHEMA = {
 export async function POST(req: NextRequest) {
   const t0 = Date.now();
 
+  if (requestExceedsSize(req, MAX_BODY_BYTES)) {
+    return billingErrorResponse("payload_too_large", "Request body too large.", 413);
+  }
+
   let body: Partial<ArchitectRequest>;
   try {
     body = (await req.json()) as Partial<ArchitectRequest>;
   } catch {
-    return NextResponse.json({ ok: false, error: "invalid JSON body" }, { status: 400 });
+    return billingErrorResponse("invalid_json", "Invalid JSON body.", 400);
   }
 
   const input = typeof body.input === "string" ? body.input.trim() : "";
   if (!input) {
-    return NextResponse.json({ ok: false, error: "input is required" }, { status: 400 });
+    return billingErrorResponse("input_required", "input is required.", 400);
   }
 
   const modelQuality: ModelQuality = isModelQuality(body.modelQuality)
@@ -94,19 +100,34 @@ export async function POST(req: NextRequest) {
   const allowCloudFallback =
     modelQuality === "local" && body.allowCloudFallback === true;
 
-  const tier: Tier = "free";
   const requestedEngine = getQuality(modelQuality).engine;
   const routed = route(requestedEngine, clientContext, { allowCloudFallback });
   const willHitCloud = routed.resolved === "cloud";
 
+  const gate: GateResult = await runBillingGate(req, {
+    rateLimit: "cloudGenerate",
+    action: "cloud-fix",
+    consume: willHitCloud
+  });
+  if (!gate.ok) return gate.errorResponse!;
+  const tier: Tier = gate.isPro ? "pro" : "free";
+
+  const usageForPayload = gate.usage
+    ? {
+        tier,
+        used: gate.usage.used,
+        limit: gate.usage.limit,
+        remaining: gate.usage.remaining,
+        resetAt: gate.usage.resetAt
+      }
+    : undefined;
+
   // Mission Alerts wiring — closure that fires once before each return.
-  // Hard cases (e.g. provider failure → deterministic fallback) require the
-  // user opt-in here; the dispatcher itself decides what's actually alertable.
   const alertUser = typeof body.alertUser === "string" ? body.alertUser : undefined;
   const notifyOnHumanNeeded = Boolean(body.notifyOnHumanNeeded);
   const fireAlert = (payload: ArchitectResponse, systemError?: string) =>
     fireAndForgetAlert({
-      clientKey: clientKeyFromHeaders(req.headers),
+      clientKey: gate.identity.id,
       surface: "architect",
       user: alertUser,
       mission: input,
@@ -117,7 +138,6 @@ export async function POST(req: NextRequest) {
 
   // Deterministic short-circuit — return a templated skeleton.
   if (routed.resolved === "deterministic") {
-    const usage = peek(clientKeyFromHeaders(req.headers), tier);
     const payload: ArchitectResponse = {
       ok: true,
       plan: deterministicPlan(input),
@@ -126,28 +146,11 @@ export async function POST(req: NextRequest) {
       isDeterministic: true,
       notice:
         "Deterministic plan — connect a cloud key (or run Ollama) for a generated architecture.",
-      usage,
+      usage: usageForPayload,
       elapsedMs: Date.now() - t0
     };
     fireAlert(payload);
-    return NextResponse.json(payload, { status: 200 });
-  }
-
-  // Meter cloud
-  let usage = peek(clientKeyFromHeaders(req.headers), tier);
-  if (willHitCloud) {
-    const result = consume(clientKeyFromHeaders(req.headers), tier);
-    if (!result.allowed) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Daily ${tier} limit reached (${result.snapshot.limit}/day). Resets at ${result.snapshot.resetAt}.`,
-          usage: result.snapshot
-        },
-        { status: 429 }
-      );
-    }
-    usage = result.snapshot;
+    return gate.attach(NextResponse.json(payload, { status: 200 }));
   }
 
   const modelOverride = willHitCloud
@@ -175,7 +178,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (!result.ok || !result.content.trim()) {
-    const headers = rateHeaders(usage);
+    const headers = rateHeaders(gate);
     const payload: ArchitectResponse = {
       ok: true,
       plan: deterministicPlan(input),
@@ -186,16 +189,15 @@ export async function POST(req: NextRequest) {
       notice: result.error
         ? `Live plan unavailable (${result.error}). Showing a deterministic skeleton.`
         : "Live plan returned empty. Showing a deterministic skeleton.",
-      usage,
+      usage: usageForPayload,
       elapsedMs: Date.now() - t0
     };
-    // Provider failure here is an admin-worthy alert when the user opted in.
     fireAlert(payload, result.error);
-    return NextResponse.json(payload, { status: 200, headers });
+    return gate.attach(NextResponse.json(payload, { status: 200, headers }));
   }
 
   const plan = parsePlan(result.content) ?? deterministicPlan(input);
-  const headers = rateHeaders(usage);
+  const headers = rateHeaders(gate);
   const payload: ArchitectResponse = {
     ok: true,
     plan,
@@ -203,19 +205,21 @@ export async function POST(req: NextRequest) {
     model: result.model,
     latencyMs: result.latencyMs,
     isDeterministic: false,
-    usage,
+    usage: usageForPayload,
     elapsedMs: Date.now() - t0
   };
   fireAlert(payload);
-  return NextResponse.json(payload, { status: 200, headers });
+  return gate.attach(NextResponse.json(payload, { status: 200, headers }));
 }
 
-function rateHeaders(usage: { limit: number; remaining: number; resetAt: string }): Headers {
+function rateHeaders(gate: GateResult): Headers {
   const headers = new Headers();
-  headers.set("X-RateLimit-Limit", String(usage.limit));
-  headers.set("X-RateLimit-Remaining", String(usage.remaining));
-  headers.set("X-RateLimit-Reset", usage.resetAt);
-  if (FREE_DAILY_LIMIT > 0) headers.set("X-Free-Daily-Limit", String(FREE_DAILY_LIMIT));
+  headers.set("X-Plan", gate.plan);
+  if (gate.usage && gate.usage.limit > 0) {
+    headers.set("X-RateLimit-Limit", String(gate.usage.limit));
+    headers.set("X-RateLimit-Remaining", String(gate.usage.remaining));
+    headers.set("X-RateLimit-Reset", gate.usage.resetAt);
+  }
   return headers;
 }
 
