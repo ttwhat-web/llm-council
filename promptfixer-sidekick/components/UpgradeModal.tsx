@@ -64,22 +64,26 @@ export function UpgradeModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const callCheckout = async (plan: BillingTier) => {
+  const callCheckout = async (
+    plan: BillingTier | "team",
+    options: { period?: "monthly" | "annual"; founder?: boolean } = {}
+  ) => {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan })
+        body: JSON.stringify({ plan, ...options })
       });
       const data = (await res.json()) as {
         ok: boolean;
-        plan?: BillingTier;
-        mode?: string;
+        plan?: string;
+        mode?: "stripe" | "stub" | string;
         message?: string;
         code?: string;
-        nextAction?: string;
+        nextAction?: "redirect" | "reload";
+        url?: string;
       };
       if (!res.ok || !data.ok) {
         const msg = data.message || data.code || `Checkout failed (${res.status})`;
@@ -94,8 +98,16 @@ export function UpgradeModal({
         }
         return;
       }
-      // Server accepted — sync local fallback so reloads stay coherent.
-      onTierChange(plan);
+      // Real Stripe Checkout — redirect the browser to the hosted page.
+      if (data.mode === "stripe" && data.url) {
+        window.location.assign(data.url);
+        return;
+      }
+      // Stub flow — server signed the dev override cookie. Sync the
+      // client-only flag so reloads stay coherent. Local tier is binary
+      // (free/pro); team grants surface as Pro locally.
+      const localTier: BillingTier = plan === "free" ? "free" : "pro";
+      onTierChange(localTier);
       onCheckoutComplete?.();
       if (plan !== "free") onClose();
     } catch (err) {
@@ -104,6 +116,24 @@ export function UpgradeModal({
         `Server checkout failed (${(err as Error).message}). Falling back to local preview.`
       );
       onTierChange(plan === "free" ? "free" : "pro");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openPortal = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/portal", { method: "POST" });
+      const data = (await res.json()) as { ok: boolean; url?: string; message?: string };
+      if (res.ok && data.ok && data.url) {
+        window.location.assign(data.url);
+        return;
+      }
+      setError(data.message || "Customer portal is unavailable.");
+    } catch (err) {
+      setError(`Portal request failed: ${(err as Error).message}`);
     } finally {
       setBusy(false);
     }
@@ -148,13 +178,13 @@ export function UpgradeModal({
               </span>
               <h2 className="text-lg font-semibold text-white">
                 {reason === "limit-reached"
-                  ? "You've used today's free fixes"
-                  : "PromptFixer plans"}
+                  ? "You've used today's free missions"
+                  : "operator.center plans"}
               </h2>
               <p className="text-[12px] text-white/55">
                 {reason === "limit-reached"
-                  ? "The free tier ships with 10 fixes per day. Upgrade for unlimited fixes, saved stacks, recorded workflows, and exports."
-                  : "Pick the plan that matches how you work. Real billing isn't enforced yet — switching to Pro applies a server-signed local preview cookie."}
+                  ? "Free ships with 10 missions per day. Upgrade for unlimited missions, saved stacks, recorded workflows, deliverables and audit."
+                  : "Pick the plan that matches how you operate. Stripe Checkout when configured; signed local preview otherwise — both clearly labelled."}
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 {verified && (
@@ -187,15 +217,27 @@ export function UpgradeModal({
                   busy={busy}
                   onPick={() => {
                     if (plan.id === "team") {
-                      // Team has no stub flow — surface "talk to us".
-                      window.open("mailto:hello@promptfixer.app?subject=Team%20plan", "_blank");
+                      void callCheckout("team");
                       return;
                     }
-                    void callCheckout(plan.id === "pro" ? "pro" : "free");
+                    if (plan.id === "free") void callCheckout("free");
+                    else void callCheckout("pro");
                   }}
                 />
               ))}
             </div>
+
+            {verified && (
+              <button
+                type="button"
+                onClick={openPortal}
+                disabled={busy}
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/35 bg-emerald-500/[0.08] px-3 py-1.5 text-[12px] font-medium text-emerald-200 transition hover:bg-emerald-500/[0.14] disabled:opacity-50"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Manage subscription in Stripe
+              </button>
+            )}
 
             {error && (
               <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">

@@ -140,7 +140,7 @@ export interface BillingStore {
 
 // ---------- factory --------------------------------------------------------
 
-export type BillingStoreKind = "memory" | "file";
+export type BillingStoreKind = "memory" | "file" | "upstash";
 
 let CACHED_STORE: BillingStore | null = null;
 let CACHED_KIND: BillingStoreKind | null = null;
@@ -149,9 +149,16 @@ export function billingStoreKind(): BillingStoreKind {
   const explicit = (process.env.BILLING_STORE || "").toLowerCase();
   if (explicit === "memory") return "memory";
   if (explicit === "file") return "file";
-  // Default: file in dev, memory in prod (unsafe, but keeps the
-  // function pure — we won't accidentally write to a read-only fs).
-  return process.env.NODE_ENV === "production" ? "memory" : "file";
+  if (explicit === "upstash") return "upstash";
+  // Default: prefer upstash in production when configured; file in dev;
+  // memory as a last-resort fallback (loud comment in memory-store.ts).
+  if (process.env.NODE_ENV === "production") {
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      return "upstash";
+    }
+    return "memory";
+  }
+  return "file";
 }
 
 /**
@@ -163,7 +170,10 @@ export async function getBillingStore(): Promise<BillingStore> {
   const kind = billingStoreKind();
   if (CACHED_STORE && CACHED_KIND === kind) return CACHED_STORE;
 
-  if (kind === "file") {
+  if (kind === "upstash") {
+    const mod = await import("./upstash-store");
+    CACHED_STORE = mod.createUpstashStore();
+  } else if (kind === "file") {
     const mod = await import("./file-store");
     CACHED_STORE = mod.createFileStore();
   } else {

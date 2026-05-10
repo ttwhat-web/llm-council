@@ -1,57 +1,68 @@
 /**
  * POST /api/billing/checkout
  *
- * Body: { plan: "free" | "pro" | "team" | "enterprise" }
+ * Body: { plan: "free" | "pro" | "team" | "enterprise",
+ *         period?: "monthly" | "annual",
+ *         founder?: boolean }
  *
- * Today this is a stub: it responds with `{ ok: true, mode: "stub" }`
- * and — when `BILLING_PROVIDER === "stub"` AND
- * `BILLING_DEV_OVERRIDE_SECRET` is configured — sets a signed dev
- * cookie so the rest of the system treats the caller as if they were
- * subscribed. There is NO payment processing.
+ * Behaviour matrix:
  *
- * When real billing lands:
- *   - Wire `BILLING_PROVIDER === "stripe"` to call
- *     `stripe.checkout.sessions.create({...})` and return
- *     `{ ok: true, mode: "stripe", url }`.
- *   - The webhook (see ./webhook/route.ts) writes the resulting
- *     `customer_id → plan` mapping into KV.
- *   - `lib/billing/server.ts → resolvePlan` reads from that mapping
- *     ahead of the dev cookie.
+ *   STRIPE_SECRET_KEY set + matching price id:
+ *     → real `stripe.checkout.sessions.create`. Returns
+ *       `{ ok: true, mode: "stripe", url }`. The client redirects.
  *
- * Free plan is always honoured — it just clears any active dev cookie.
+ *   STRIPE_SECRET_KEY missing AND BILLING_DEV_OVERRIDE_SECRET set:
+ *     → stub: signs the dev-override cookie. Returns
+ *       `{ ok: true, mode: "stub", plan, ... }`.
+ *
+ *   Neither configured:
+ *     → 503 `checkout_unavailable` with a clear message.
+ *
+ * Free plan is always honoured: clears any active dev cookie + audit
+ * event. (Stripe never sells a free plan.)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { isPlan } from "@/lib/billing/plans";
 import {
   billingErrorResponse,
-  billingMode,
   devOverrideEnabled,
   devOverrideMutationFor,
   requestExceedsSize,
   resolveUserIdentity,
   runBillingGate
 } from "@/lib/billing/server";
-import { getBillingStore } from "@/lib/billing/store";
+import { getBillingStore, newCustomerId } from "@/lib/billing/store";
+import {
+  STRIPE_PRICE_IDS,
+  appUrl,
+  checkoutModeFor,
+  getStripe,
+  type StripePlanKey
+} from "@/lib/billing/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_BODY_BYTES = 1024;
 
+interface CheckoutBody {
+  plan?: unknown;
+  period?: "monthly" | "annual";
+  founder?: boolean;
+}
+
 export async function POST(req: NextRequest) {
   if (requestExceedsSize(req, MAX_BODY_BYTES)) {
     return billingErrorResponse("payload_too_large", "Request body too large.", 413);
   }
 
-  // Cheap rate-limit: protects the cookie-mutation endpoint from
-  // abusive loops even before payments land.
   const gate = await runBillingGate(req, { rateLimit: "billingMutation" });
   if (!gate.ok) return gate.errorResponse!;
 
-  let body: { plan?: unknown };
+  let body: CheckoutBody;
   try {
-    body = (await req.json()) as { plan?: unknown };
+    body = (await req.json()) as CheckoutBody;
   } catch {
     return gate.attach(billingErrorResponse("invalid_json", "Invalid JSON body."));
   }
@@ -60,26 +71,11 @@ export async function POST(req: NextRequest) {
     return gate.attach(billingErrorResponse("invalid_plan", "Unknown plan id."));
   }
   const requested = body.plan;
-
-  const mode = billingMode();
-
-  // Real provider wiring — explicitly NOT shipped yet. The route is
-  // shaped so adding it is one switch.
-  if (mode !== "stub") {
-    return gate.attach(
-      billingErrorResponse(
-        "billing_not_configured",
-        `Provider "${mode}" is selected but no checkout integration is wired in this build. Set BILLING_PROVIDER=stub for the dev override flow.`,
-        503
-      )
-    );
-  }
-
   const store = await getBillingStore();
+  const { identity, attachToResponse } = await resolveUserIdentity(req);
 
-  // Free plan: clear any active dev override cookie and acknowledge.
+  // Free plan: clear any active dev override cookie.
   if (requested === "free") {
-    const { identity, attachToResponse } = await resolveUserIdentity(req);
     const ops = devOverrideMutationFor(identity, "free");
     void store.appendAuditEvent({
       kind: "checkout-stub",
@@ -100,28 +96,100 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Paid plans in stub mode: only proceed if the dev override flow is
-  // explicitly enabled via BILLING_DEV_OVERRIDE_SECRET. Otherwise we
-  // refuse with a clear message — never silently grant Pro.
+  // Resolve which Stripe price to charge.
+  const priceKey = pickPriceKey(requested, body.period, body.founder);
+  if (!priceKey) {
+    return attachToResponse(
+      billingErrorResponse(
+        "invalid_plan",
+        "Enterprise / unknown plan combinations aren't sold from this endpoint."
+      )
+    );
+  }
+
+  const stripe = getStripe();
+  const priceId = STRIPE_PRICE_IDS[priceKey];
+
+  // ---------- Real Stripe path ----------
+  if (stripe && priceId) {
+    try {
+      // Make sure we have a customer record so the webhook can resolve
+      // back to this identity even before checkout.session.completed.
+      const customer = await ensureCustomer(store, identity);
+
+      const session = await stripe.checkout.sessions.create({
+        mode: checkoutModeFor(priceKey),
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${appUrl()}/app?billing=success`,
+        cancel_url: `${appUrl()}/pricing?billing=cancel`,
+        client_reference_id: identity.id,
+        customer_email: identity.email,
+        metadata: {
+          identityKey: identity.id,
+          plan: requested,
+          priceKey,
+          customerRecordId: customer.id
+        },
+        // For subscription plans, allow promotion codes; payment mode
+        // (founder lifetime) doesn't need them.
+        ...(checkoutModeFor(priceKey) === "subscription"
+          ? { allow_promotion_codes: true }
+          : {})
+      });
+
+      void store.appendAuditEvent({
+        kind: "checkout-stub",
+        identityKey: identity.id,
+        customerId: customer.id,
+        plan: requested,
+        detail: `stripe checkout session ${session.id} created (${priceKey})`
+      });
+
+      return attachToResponse(
+        NextResponse.json({
+          ok: true,
+          mode: "stripe",
+          plan: requested,
+          priceKey,
+          url: session.url,
+          sessionId: session.id,
+          nextAction: "redirect"
+        })
+      );
+    } catch (err) {
+      // Don't leak Stripe internals to the browser.
+      const detail = (err as Error).message?.slice(0, 200);
+      return attachToResponse(
+        billingErrorResponse(
+          "stripe_error",
+          `Stripe rejected the checkout request${detail ? `: ${detail}` : "."}`,
+          502
+        )
+      );
+    }
+  }
+
+  // ---------- Stub fallback ----------
   if (!devOverrideEnabled()) {
-    return gate.attach(
+    return attachToResponse(
       billingErrorResponse(
         "checkout_unavailable",
-        "Dev override is disabled (BILLING_DEV_OVERRIDE_SECRET not set). " +
-          "Configure a real provider or enable the dev override secret for local previews.",
+        stripe
+          ? `Stripe is configured but no price id is set for ${priceKey}. ` +
+              "Add the matching STRIPE_PRICE_* env var or enable the dev override."
+          : "No real billing provider is configured. Set STRIPE_SECRET_KEY (and price ids) " +
+            "or BILLING_DEV_OVERRIDE_SECRET for the local Pro Preview flow.",
         503
       )
     );
   }
 
-  const { identity, attachToResponse } = await resolveUserIdentity(req);
   const ops = devOverrideMutationFor(identity, requested);
-
   void store.appendAuditEvent({
     kind: "checkout-stub",
     identityKey: identity.id,
     plan: requested,
-    detail: "signed dev override applied"
+    detail: "signed dev override applied (stripe unavailable)"
   });
 
   return attachToResponse(
@@ -136,4 +204,34 @@ export async function POST(req: NextRequest) {
       })
     )
   );
+}
+
+// ---------- helpers --------------------------------------------------------
+
+function pickPriceKey(
+  plan: "pro" | "team" | "enterprise",
+  period: "monthly" | "annual" | undefined,
+  founder: boolean | undefined
+): StripePlanKey | null {
+  if (plan === "enterprise") return null;
+  if (founder && plan === "pro") return "founder_lifetime";
+  if (plan === "pro") return period === "annual" ? "pro_annual" : "pro_monthly";
+  if (plan === "team") return period === "annual" ? "team_annual" : "team_monthly";
+  return null;
+}
+
+async function ensureCustomer(
+  store: Awaited<ReturnType<typeof getBillingStore>>,
+  identity: { id: string; email?: string }
+) {
+  const existing = await store.getCustomerByIdentity(identity.id);
+  if (existing) return existing;
+  const now = Date.now();
+  return store.upsertCustomer({
+    id: newCustomerId(),
+    identityKey: identity.id,
+    email: identity.email,
+    createdAt: now,
+    updatedAt: now
+  });
 }

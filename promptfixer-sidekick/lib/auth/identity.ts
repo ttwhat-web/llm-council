@@ -2,52 +2,68 @@
  * Auth seam — the single function the billing layer calls to learn
  * "is this request authenticated, and if so as whom?".
  *
- * Today this is a stub:
- *   - In development with `ALLOW_DEV_USER_HEADER=true`, an
- *     `x-user-email` header is honoured.
- *   - Production NEVER trusts that header — anyone could send it.
- *   - Otherwise, returns `null`.
+ * Resolution order:
+ *   1. Clerk session (when @clerk/nextjs is configured AND the
+ *      request carries a valid session). Production identity.
+ *   2. Dev `x-user-email` header — only when
+ *      `NODE_ENV !== "production"` AND `ALLOW_DEV_USER_HEADER=true`.
+ *      Strictly for local testing.
+ *   3. null → caller is anonymous; the upstream resolver falls back
+ *      to a session cookie identity.
  *
- * Future integration is mechanical: add the relevant branch (Clerk
- * `auth()`, Auth.js `getServerSession`, JWT verifier) ahead of the dev
- * header. The rest of the system already prefers an authenticated user
- * over the dev-override cookie and the anonymous session, so flipping
- * this on is the only change needed to graduate the product to a
- * proper account model.
+ * Future Auth.js / JWT branches go in the same file ahead of the
+ * dev-header. Routes never need to change.
  */
 
 import type { NextRequest } from "next/server";
 
 export interface AuthenticatedUser {
-  /**
-   * Stable opaque identifier the rest of the system uses as
-   * `Identity.id`. Format: "email:<lowercased email>" today; will
-   * become "auth:<provider-user-id>" when a real provider lands.
-   */
+  /** Stable opaque identifier the rest of the system uses as
+   *  `Identity.id`. Format: `auth:<provider-user-id>` for real auth,
+   *  `email:<lowercased>` for the dev header. */
   id: string;
   email: string;
-  /** How the identity was established. Renders in /api/billing/me. */
-  source: "dev-header" | "clerk" | "auth-js" | "jwt";
+  source: "clerk" | "dev-header" | "auth-js" | "jwt";
 }
+
+const CLERK_ENABLED = Boolean(
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY
+);
 
 export async function resolveAuthenticatedUser(
   req: NextRequest
 ): Promise<AuthenticatedUser | null> {
-  // 1. (Future) Clerk
-  //    const { userId, sessionClaims } = auth();
-  //    if (userId) return { id: `auth:${userId}`, email: sessionClaims?.email, source: "clerk" };
+  // 1. Clerk — only attempted when keys are configured. The dynamic
+  //    import keeps Clerk out of the bundle when it isn't wired.
+  if (CLERK_ENABLED) {
+    try {
+      const { auth, currentUser } = await import("@clerk/nextjs/server");
+      const session = auth();
+      if (session?.userId) {
+        // currentUser() makes a network call; only do it when we have
+        // a session id, and tolerate failures (return id-only user).
+        let email: string | undefined;
+        try {
+          const u = await currentUser();
+          email =
+            u?.primaryEmailAddress?.emailAddress ??
+            u?.emailAddresses?.[0]?.emailAddress;
+        } catch {
+          /* fall through with no email */
+        }
+        return {
+          id: `auth:${session.userId}`,
+          email: email ?? `${session.userId}@clerk.local`,
+          source: "clerk"
+        };
+      }
+    } catch {
+      // Clerk middleware not on the request? Treat as anonymous;
+      // never fail closed.
+    }
+  }
 
-  // 2. (Future) Auth.js / NextAuth
-  //    const session = await getServerSession(authOptions);
-  //    if (session?.user?.email) return { id: `auth:${session.user.id}`, email: session.user.email, source: "auth-js" };
-
-  // 3. (Future) JWT verifier
-  //    const payload = await verifyJwt(req.headers.get("authorization"));
-  //    if (payload?.sub) return { id: `auth:${payload.sub}`, email: payload.email, source: "jwt" };
-
-  // 4. Dev-only header. Production NEVER honours this — even if
-  //    ALLOW_DEV_USER_HEADER were accidentally set in prod env, the
-  //    NODE_ENV check below shuts it down.
+  // 2. Dev-only header. Production NEVER honours this.
   if (process.env.NODE_ENV !== "production") {
     if ((process.env.ALLOW_DEV_USER_HEADER || "").toLowerCase() === "true") {
       const raw = req.headers.get("x-user-email");
@@ -58,5 +74,6 @@ export async function resolveAuthenticatedUser(
     }
   }
 
+  // 3. Anonymous — caller falls back to session cookie identity.
   return null;
 }

@@ -70,3 +70,65 @@ select {
 button {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Marketing / legal page typography */
+.prose-page {
+  max-width: 70ch;
+  color: rgba(230, 232, 238, 0.85);
+}
+.prose-page h1 {
+  font-size: 1.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #fff;
+  margin-bottom: 0.75rem;
+}
+.prose-page h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: -0.005em;
+}
+.prose-page p,
+.prose-page li {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: rgba(230, 232, 238, 0.7);
+}
+.prose-page p + p {
+  margin-top: 0.6rem;
+}
+.prose-page ul {
+  list-style: disc;
+  padding-left: 1.1rem;
+  margin: 0.6rem 0 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.prose-page code {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: rgba(124, 155, 255, 0.9);
+}
+.prose-page a {
+  color: #7c9bff;
+  text-decoration: underline;
+  text-decoration-color: rgba(124, 155, 255, 0.4);
+}
+.prose-page a:hover {
+  color: #9fb6ff;
+}
+.prose-page .lede {
+  font-size: 0.95rem;
+  color: rgba(230, 232, 238, 0.85);
+}
+.prose-page .muted {
+  font-size: 0.78rem;
+  color: rgba(230, 232, 238, 0.4);
+}

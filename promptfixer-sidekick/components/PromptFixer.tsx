@@ -911,20 +911,20 @@ export function PromptFixer({ variant = "web" }: Props) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30 shadow-glow">
-              <span className="font-mono text-[11px] tracking-wider text-accent">PF</span>
+              <span className="font-mono text-[11px] tracking-wider text-accent">[ ]</span>
             </div>
             <div className="leading-tight">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold tracking-tight text-white">
-                  PromptFixer
+                  operator<span className="text-white/40">.center</span>
                 </span>
                 <span className="rounded-md border border-accent/25 bg-accent/[0.06] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.2em] text-accent">
-                  Command Center
+                  Mission Control
                 </span>
               </div>
               {!compact && (
                 <div className="text-[11px] text-white/45">
-                  Route, supervise and deploy AI workflows.
+                  Dispatch missions. Audit telemetry. Replay the ones that worked.
                 </div>
               )}
             </div>
