@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { PromptFixer } from "@/components/PromptFixer";
 import { UserMenu } from "@/components/UserMenu";
+import { MissionToast } from "@/components/MissionToast";
 
 /**
  * Mission Control surface — operator.center / app.
@@ -36,6 +38,13 @@ export default function AppPage() {
       <div className="glass min-h-[720px] rounded-3xl">
         <PromptFixer variant="web" />
       </div>
+
+      {/* Reads ?billing=success|cancel|portal-return and toasts; clears the
+          query param via router.replace so reloads don't re-fire. Wrapped
+          in Suspense because it depends on useSearchParams. */}
+      <Suspense fallback={null}>
+        <MissionToast />
+      </Suspense>
     </main>
   );
 }

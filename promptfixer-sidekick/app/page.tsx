@@ -27,6 +27,7 @@ export default function LandingPage() {
     <MarketingShell>
       <Hero />
       <DeliverablesStrip />
+      <LiveDemoPlaceholder />
       <SkillsGrid />
       <TelemetryPanel />
       <PricingPreview />
@@ -103,7 +104,7 @@ function DeliverablesStrip() {
       <SectionHeading
         eyebrow="01 · output"
         title="One mission. Eleven deliverables."
-        sub="Every output ships in the format your tool actually wants. No copy-paste juggling."
+        sub="Every output ships in the format your tool actually wants. No copy-paste juggling. Every mission audited, every step replayable."
       />
       <div className="flex flex-wrap gap-1.5">
         {DELIVERABLES.map((d) => (
@@ -115,6 +116,34 @@ function DeliverablesStrip() {
           </span>
         ))}
       </div>
+    </section>
+  );
+}
+
+function LiveDemoPlaceholder() {
+  return (
+    <section
+      id="demo"
+      className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] p-5"
+    >
+      <div className="flex flex-col gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
+          live demo · 90s
+        </span>
+        <h2 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">
+          Watch one mission, end to end.
+        </h2>
+        <p className="max-w-[60ch] text-[13px] text-white/60">
+          From paste to permalink. Telemetry, score, safety screen, deliverable.
+          We&apos;ll embed the live demo here once the marketing capture lands —
+          for now,{" "}
+          <Link href="/app" className="text-accent underline-offset-2 hover:underline">
+            run your own mission
+          </Link>{" "}
+          on the free tier and you have your own demo.
+        </p>
+      </div>
+      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-accent/[0.08] to-transparent md:block" />
     </section>
   );
 }

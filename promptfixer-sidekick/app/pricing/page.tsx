@@ -99,6 +99,15 @@ export default function PricingPage() {
           Free is generous. Pro is fair. Team is per-seat. Enterprise is custom. No
           credits, no expiring tokens, no opaque &ldquo;AI units.&rdquo;
         </p>
+        <a
+          href="#founder-lifetime"
+          className="inline-flex w-fit items-center gap-1.5 rounded-md border border-amber-400/35 bg-amber-500/[0.08] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-amber-200 transition hover:bg-amber-500/[0.14]"
+        >
+          <span className="relative inline-block h-1.5 w-1.5 rounded-full bg-amber-300">
+            <span className="absolute inset-0 animate-ping rounded-full bg-amber-300/55" />
+          </span>
+          Founder lifetime · $99 once · capped at 100 ↓
+        </a>
       </header>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -146,7 +155,10 @@ export default function PricingPage() {
         ))}
       </section>
 
-      <section className="rounded-3xl border border-amber-500/25 bg-amber-500/[0.05] p-5 md:p-6">
+      <section
+        id="founder-lifetime"
+        className="rounded-3xl border border-amber-500/25 bg-amber-500/[0.05] p-5 md:p-6"
+      >
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-1">
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-amber-300">

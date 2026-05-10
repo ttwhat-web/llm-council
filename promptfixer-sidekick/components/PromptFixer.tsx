@@ -30,6 +30,8 @@ import { UpgradeModal } from "./UpgradeModal";
 import { SavedStacks } from "./SavedStacks";
 import { WorkflowRecorder } from "./WorkflowRecorder";
 import { EmptyStateExamples } from "./EmptyStateExamples";
+import { RecentMissions } from "./RecentMissions";
+import { track } from "@/lib/analytics";
 import {
   incrementBilling,
   loadTier,
@@ -154,6 +156,13 @@ export function PromptFixer({ variant = "web" }: Props) {
   const [recordingEnabled, setRecordingEnabled] = useState(false);
   const [recordedSteps, setRecordedSteps] = useState<RecordedStep[]>([]);
   const [recorderDrafts, setRecorderDrafts] = useState<RecordingDraft[]>([]);
+  // Phase 7 — Mission Receipts
+  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [receiptShareUrl, setReceiptShareUrl] = useState<string | null>(null);
+  const [receiptShared, setReceiptShared] = useState(false);
+  const [receiptBusy, setReceiptBusy] = useState<"save" | "share" | null>(null);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [missionReloadKey, setMissionReloadKey] = useState(0);
 
   const isLocal = settings.modelQuality === "local";
   const derivedEngine = getQuality(settings.modelQuality).engine;
@@ -300,6 +309,7 @@ export function PromptFixer({ variant = "web" }: Props) {
   const openPaywall = useCallback((reason: "limit-reached" | "manage") => {
     setPaywallReason(reason);
     setPaywallOpen(true);
+    track("upgrade_modal_opened", { reason });
   }, []);
 
   const onLoadStack = useCallback(
@@ -332,6 +342,151 @@ export function PromptFixer({ variant = "web" }: Props) {
       setLog((prev) =>
         appendLog(prev, makeLogEntry("info", "Loaded example", "example"))
       );
+    },
+    []
+  );
+
+  // ---- Mission Receipts (Phase 7) ----
+  const saveReceipt = useCallback(
+    async (visibility: "private" | "shared" = "private") => {
+      if (!result || receiptBusy) return;
+      setReceiptBusy(visibility === "shared" ? "share" : "save");
+      setReceiptError(null);
+      try {
+        const payload = {
+          input,
+          inputLength: input.length,
+          mode: result.mode,
+          modelQuality: settings.modelQuality,
+          output: result.prompt,
+          score: result.score,
+          safetyFindings: (result.safety.findings || []).map((f) => ({
+            severity: f.severity,
+            reason: f.reason
+          })),
+          safetyBlocked: Boolean(result.safety.blocked),
+          supervisor: {
+            used: result.supervisor.used,
+            resolved: result.supervisor.resolved,
+            requestedEngine: result.supervisor.requestedEngine,
+            fallbackUsed: result.supervisor.fallbackUsed,
+            model: result.supervisor.model,
+            latencyMs: result.supervisor.latencyMs
+          },
+          events: result.events,
+          elapsedMs: result.elapsedMs,
+          exportsAvailable: [
+            "claude-prompt",
+            "chatgpt-prompt",
+            "gemini-prompt",
+            "cursor-task",
+            "markdown-spec",
+            "prd",
+            "technical-plan",
+            "terminal-safe-command",
+            "jira-ticket",
+            "github-issue"
+          ],
+          visibility
+        };
+        const res = await fetch("/api/missions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = (await res.json()) as {
+          ok: boolean;
+          receipt?: { id: string; visibility: "private" | "shared" };
+          shareUrl?: string;
+          message?: string;
+        };
+        if (!res.ok || !data.ok || !data.receipt) {
+          setReceiptError(data.message || `Save failed (${res.status})`);
+          return;
+        }
+        setReceiptId(data.receipt.id);
+        setReceiptShareUrl(data.shareUrl ?? null);
+        setReceiptShared(data.receipt.visibility === "shared");
+        setMissionReloadKey((k) => k + 1);
+        track("mission_saved", { id: data.receipt.id, visibility: data.receipt.visibility });
+        if (data.receipt.visibility === "shared") {
+          track("mission_shared", { id: data.receipt.id });
+          if (data.shareUrl && navigator?.clipboard) {
+            void navigator.clipboard.writeText(data.shareUrl).catch(() => {
+              /* ignore */
+            });
+          }
+          setLog((prev) =>
+            appendLog(
+              prev,
+              makeLogEntry("ok", `Receipt shared · ${data.shareUrl}`, "receipt")
+            )
+          );
+        } else {
+          setLog((prev) =>
+            appendLog(prev, makeLogEntry("ok", "Receipt saved · private", "receipt"))
+          );
+        }
+      } catch (err) {
+        setReceiptError(`Save failed: ${(err as Error).message}`);
+      } finally {
+        setReceiptBusy(null);
+      }
+    },
+    [result, receiptBusy, input, settings.modelQuality]
+  );
+
+  const toggleReceiptVisibility = useCallback(async () => {
+    if (!receiptId || receiptBusy) return;
+    const next = receiptShared ? "private" : "shared";
+    setReceiptBusy("share");
+    setReceiptError(null);
+    try {
+      const res = await fetch(`/api/missions/${receiptId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility: next })
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        receipt?: { id: string; visibility: "private" | "shared" };
+        message?: string;
+      };
+      if (!res.ok || !data.ok || !data.receipt) {
+        setReceiptError(data.message || `Visibility change failed (${res.status})`);
+        return;
+      }
+      setReceiptShared(data.receipt.visibility === "shared");
+      setMissionReloadKey((k) => k + 1);
+      if (data.receipt.visibility === "shared") {
+        track("mission_shared", { id: data.receipt.id });
+        if (receiptShareUrl && navigator?.clipboard) {
+          void navigator.clipboard.writeText(receiptShareUrl).catch(() => {
+            /* ignore */
+          });
+        }
+      }
+    } catch (err) {
+      setReceiptError(`Visibility change failed: ${(err as Error).message}`);
+    } finally {
+      setReceiptBusy(null);
+    }
+  }, [receiptId, receiptBusy, receiptShared, receiptShareUrl]);
+
+  const copyShareLink = useCallback(
+    async (idOrUrl: string) => {
+      if (!navigator?.clipboard) return;
+      const url = idOrUrl.startsWith("http")
+        ? idOrUrl
+        : `${window.location.origin}/m/${idOrUrl}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        setLog((prev) =>
+          appendLog(prev, makeLogEntry("info", `Permalink copied · ${url}`, "receipt"))
+        );
+      } catch {
+        /* ignore */
+      }
     },
     []
   );
@@ -410,6 +565,18 @@ export function PromptFixer({ variant = "web" }: Props) {
           // fix. Transforms (override) don't consume budget.
           bumpBilling();
           void refreshServerBilling();
+          // Receipt state resets on every fresh mission so the
+          // Save/Share buttons reflect the *current* output.
+          setReceiptId(null);
+          setReceiptShareUrl(null);
+          setReceiptShared(false);
+          setReceiptError(null);
+          track("mission_run", {
+            mode: data.mode,
+            modelQuality: settings.modelQuality,
+            ms: data.elapsedMs ?? 0,
+            score: data.score?.clarity ?? 0
+          });
           const entry: HistoryEntry = {
             id: newId(),
             timestamp: Date.now(),
@@ -1153,6 +1320,12 @@ export function PromptFixer({ variant = "web" }: Props) {
             onDeleteDraft={onDeleteRecorderDraft}
             compact={compact}
           />
+
+          <RecentMissions
+            reloadKey={missionReloadKey}
+            onCopyShareUrl={(id) => void copyShareLink(id)}
+            compact={compact}
+          />
         </section>
 
         {/* ---------- COLUMN 2 — OPERATIONS PIPELINE ---------- */}
@@ -1226,6 +1399,25 @@ export function PromptFixer({ variant = "web" }: Props) {
             )}
           </AnimatePresence>
 
+          {result && (
+            <ReceiptStrip
+              receiptId={receiptId}
+              receiptShared={receiptShared}
+              receiptShareUrl={receiptShareUrl}
+              receiptBusy={receiptBusy}
+              receiptError={receiptError}
+              onSave={() => void saveReceipt("private")}
+              onShareToggle={() => {
+                if (!receiptId) return void saveReceipt("shared");
+                return void toggleReceiptVisibility();
+              }}
+              onCopyLink={() => {
+                if (receiptShareUrl) void copyShareLink(receiptShareUrl);
+                else if (receiptId) void copyShareLink(receiptId);
+              }}
+            />
+          )}
+
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin">
             {result ? (
               <motion.div
@@ -1296,6 +1488,100 @@ export function PromptFixer({ variant = "web" }: Props) {
 }
 
 // ---------- in-file helpers ----------
+
+interface ReceiptStripProps {
+  receiptId: string | null;
+  receiptShared: boolean;
+  receiptShareUrl: string | null;
+  receiptBusy: "save" | "share" | null;
+  receiptError: string | null;
+  onSave: () => void;
+  onShareToggle: () => void;
+  onCopyLink: () => void;
+}
+
+function ReceiptStrip({
+  receiptId,
+  receiptShared,
+  receiptShareUrl,
+  receiptBusy,
+  receiptError,
+  onSave,
+  onShareToggle,
+  onCopyLink
+}: ReceiptStripProps) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
+          Receipt
+        </span>
+        {receiptId ? (
+          <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
+            {receiptId.slice(2, 10)}
+          </span>
+        ) : (
+          <span className="font-mono text-[9px] uppercase tracking-wider text-white/35">
+            unsaved
+          </span>
+        )}
+        {receiptId && receiptShared && (
+          <span className="rounded-md border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald-200">
+            shared
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1.5">
+          {!receiptId && (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={receiptBusy !== null}
+              className={clsx(
+                "no-drag inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-medium text-white/85 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+              )}
+            >
+              {receiptBusy === "save" ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              Save receipt
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onShareToggle}
+            disabled={receiptBusy !== null}
+            className={clsx(
+              "no-drag inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
+              receiptShared
+                ? "border-amber-400/35 bg-amber-500/[0.08] text-amber-200 hover:bg-amber-500/[0.14]"
+                : "border-accent/30 bg-accent/[0.08] text-accent hover:bg-accent/[0.16]"
+            )}
+          >
+            {receiptBusy === "share" ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : null}
+            {receiptShared ? "Make private" : "Share receipt"}
+          </button>
+          {receiptId && (
+            <button
+              type="button"
+              onClick={onCopyLink}
+              disabled={!receiptShared}
+              className="no-drag inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-medium text-white/85 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+              title={receiptShared ? "Copy /m/<id> permalink" : "Share first to enable"}
+            >
+              Copy link
+            </button>
+          )}
+        </div>
+      </div>
+      {receiptShared && receiptShareUrl && (
+        <span className="truncate font-mono text-[10px] text-white/45">{receiptShareUrl}</span>
+      )}
+      {receiptError && (
+        <span className="text-[10px] text-amber-200">{receiptError}</span>
+      )}
+    </div>
+  );
+}
 
 function ColumnHeader({
   label,

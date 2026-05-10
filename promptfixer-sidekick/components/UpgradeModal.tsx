@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { Check, Crown, ShieldCheck, X } from "lucide-react";
 import { BILLING_PLANS, type BillingTier } from "@/lib/billing";
+import { track } from "@/lib/analytics";
 
 /**
  * Upgrade paywall + plan picker.
@@ -70,6 +71,7 @@ export function UpgradeModal({
   ) => {
     setBusy(true);
     setError(null);
+    track("checkout_started", { plan, mode: options.founder ? "founder" : "subscription" });
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
