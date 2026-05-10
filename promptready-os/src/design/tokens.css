@@ -1,0 +1,103 @@
+/* =============================================================================
+ * PromptReady OS — Design Tokens
+ * -----------------------------------------------------------------------------
+ * Single source of truth for the visual system. Tailwind reads these via
+ * `var(--pr-*)` indirection in tailwind.config.js, and primitives consume
+ * them directly. Change a token here, the whole product moves with it.
+ * =============================================================================
+ */
+
+:root {
+  /* ---------- Color · Graphite scale (matte, slightly cool) -------------- */
+  --pr-color-graphite-50: #f5f6f8;
+  --pr-color-graphite-100: #e9ebf1;
+  --pr-color-graphite-200: #d2d5de;
+  --pr-color-graphite-300: #a4a8b3;
+  --pr-color-graphite-400: #6f7380;
+  --pr-color-graphite-500: #494d59;
+  --pr-color-graphite-600: #2c3140;
+  --pr-color-graphite-700: #181c25;
+  --pr-color-graphite-800: #11141b;
+  --pr-color-graphite-900: #0b0d12;
+  --pr-color-graphite-950: #06070a;
+
+  /* ---------- Color · Accent + semantic --------------------------------- */
+  --pr-color-accent: #7c9bff;
+  --pr-color-accent-soft: #b3c4ff;
+  --pr-color-accent-glow: rgba(124, 155, 255, 0.45);
+
+  --pr-color-emerald: #34d399;
+  --pr-color-emerald-glow: rgba(52, 211, 153, 0.45);
+  --pr-color-amber: #fbbf24;
+  --pr-color-amber-glow: rgba(251, 191, 36, 0.45);
+  --pr-color-rose: #f87171;
+  --pr-color-rose-glow: rgba(248, 113, 113, 0.45);
+
+  /* ---------- Surface · Glass system ------------------------------------ */
+  --pr-surface-base: var(--pr-color-graphite-950);
+  --pr-surface-1: rgba(255, 255, 255, 0.018);
+  --pr-surface-2: rgba(255, 255, 255, 0.035);
+  --pr-surface-3: rgba(255, 255, 255, 0.06);
+  --pr-border-1: rgba(255, 255, 255, 0.06);
+  --pr-border-2: rgba(255, 255, 255, 0.10);
+  --pr-border-3: rgba(255, 255, 255, 0.14);
+
+  --pr-blur-sm: 8px;
+  --pr-blur-md: 18px;
+  --pr-blur-lg: 28px;
+
+  /* ---------- Spacing · 4-pt grid --------------------------------------- */
+  --pr-space-0: 0;
+  --pr-space-1: 4px;
+  --pr-space-2: 8px;
+  --pr-space-3: 12px;
+  --pr-space-4: 16px;
+  --pr-space-5: 20px;
+  --pr-space-6: 24px;
+  --pr-space-8: 32px;
+  --pr-space-10: 40px;
+  --pr-space-12: 48px;
+  --pr-space-16: 64px;
+
+  /* ---------- Radius ---------------------------------------------------- */
+  --pr-radius-xs: 4px;
+  --pr-radius-sm: 6px;
+  --pr-radius-md: 10px;
+  --pr-radius-lg: 14px;
+  --pr-radius-xl: 20px;
+  --pr-radius-2xl: 28px;
+  --pr-radius-pill: 999px;
+
+  /* ---------- Type ------------------------------------------------------ */
+  --pr-text-2xs: 10px;
+  --pr-text-xs: 11px;
+  --pr-text-sm: 12.5px;
+  --pr-text-base: 14px;
+  --pr-text-lg: 16px;
+  --pr-text-xl: 19px;
+  --pr-text-2xl: 24px;
+  --pr-text-3xl: 32px;
+
+  --pr-tracking-tight: -0.01em;
+  --pr-tracking-display: -0.02em;
+  --pr-tracking-wide: 0.18em;
+  --pr-tracking-widest: 0.22em;
+
+  /* ---------- Motion (Apple-grade easings) ------------------------------ */
+  --pr-easing-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --pr-easing-precise: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --pr-easing-decel: cubic-bezier(0, 0, 0.2, 1);
+
+  --pr-duration-instant: 80ms;
+  --pr-duration-fast: 140ms;
+  --pr-duration-base: 200ms;
+  --pr-duration-slow: 280ms;
+  --pr-duration-cinematic: 420ms;
+
+  /* ---------- Shadows --------------------------------------------------- */
+  --pr-shadow-glass:
+    0 24px 60px -24px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --pr-shadow-glow: 0 0 40px -8px var(--pr-color-accent-glow);
+  --pr-shadow-pop: 0 6px 18px -6px rgba(0, 0, 0, 0.55);
+}

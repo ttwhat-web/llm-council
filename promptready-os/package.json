@@ -1,0 +1,42 @@
+{
+  "name": "promptready-os",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PromptReady OS — the operating system for serious AI users.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "^6.26.0",
+    "zustand": "^4.5.4",
+    "framer-motion": "^11.3.8",
+    "lucide-react": "^0.408.0",
+    "clsx": "^2.1.1",
+    "@tauri-apps/api": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@tauri-apps/cli": "^1.6.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
