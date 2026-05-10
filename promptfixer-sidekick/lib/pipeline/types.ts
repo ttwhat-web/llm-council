@@ -12,18 +12,16 @@
  */
 
 export type StageId =
+  // Synthetic — emitted by the runtime around the real stages.
   | "input"
-  | "cleaner"
+  | "output"
+  // The six real stages of the Prompt Fixer pipeline.
   | "intent"
-  | "mode-detect"
-  | "context-expansion"
-  | "structuring"
+  | "clean"
+  | "structure"
   | "constraints"
-  | "router"
-  | "supervisor"
-  | "safety"
-  | "score"
-  | "output";
+  | "generate"
+  | "validate";
 
 export type StageStatus =
   | "idle"

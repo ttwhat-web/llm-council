@@ -3,16 +3,20 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import type { FixResponse } from "@/lib/types";
+import type { StageEvent, StageId, StageStatus } from "@/lib/pipeline/types";
 
 /**
  * Live pipeline visualization — the horizontal stage strip that runs under
- * the input area while a request is in flight. While `busy` is true a single
- * pulse walks left-to-right at a controlled cadence; when the response
- * arrives, each stage snaps to its real terminal state computed from the
- * server payload (no fake state).
+ * the input area while a request is in flight.
  *
- * Stages mirror lib/ai.ts:
- *   INPUT → CLEANER → MODE DETECT → ROUTER → SUPERVISOR → SAFETY → SCORE → OUTPUT
+ * Stages mirror lib/pipeline/prompt-fixer-stages.ts (the six typed Stages
+ * the Prompt Fixer pipeline emits real events for):
+ *
+ *   INPUT → CLEAN → INTENT → STRUCTURE → CONSTRAINTS → GENERATE → VALIDATE → OUTPUT
+ *
+ * When the response arrives with `events`, each chip reflects the real
+ * terminal status reported by that stage (no inference). The synthetic
+ * INPUT and OUTPUT bookends are derived from the run as a whole.
  */
 
 export type StageState =
@@ -24,19 +28,19 @@ export type StageState =
   | "warning";
 
 interface Stage {
-  id: string;
+  id: StageId;
   label: string;
   short: string;
 }
 
 const STAGES: Stage[] = [
   { id: "input", label: "INPUT", short: "IN" },
-  { id: "cleaner", label: "CLEANER", short: "CL" },
-  { id: "mode", label: "MODE", short: "MD" },
-  { id: "router", label: "ROUTER", short: "RT" },
-  { id: "supervisor", label: "SUPERVISOR", short: "SV" },
-  { id: "safety", label: "SAFETY", short: "SF" },
-  { id: "score", label: "SCORE", short: "SC" },
+  { id: "clean", label: "CLEAN", short: "CL" },
+  { id: "intent", label: "INTENT", short: "IT" },
+  { id: "structure", label: "STRUCTURE", short: "ST" },
+  { id: "constraints", label: "CONSTRAINTS", short: "CN" },
+  { id: "generate", label: "GENERATE", short: "GN" },
+  { id: "validate", label: "VALIDATE", short: "VL" },
   { id: "output", label: "OUTPUT", short: "OUT" }
 ];
 
@@ -50,8 +54,8 @@ interface Props {
 export function PipelineViz({ busy, result, autoMode, compact }: Props) {
   const [walk, setWalk] = useState(0);
 
-  // Walking-light cadence while we wait. Total span ~= STAGES.length * 140ms,
-  // looping if the response is slower than the animation.
+  // Walking-light cadence while we wait. Loops if the response is slower
+  // than the animation.
   useEffect(() => {
     if (!busy) {
       setWalk(0);
@@ -175,17 +179,65 @@ function computeStates(
 
   if (!result) return STAGES.map(() => "idle");
 
+  // Real events drive the chips when the pipeline reported them.
+  if (result.events && result.events.length > 0) {
+    return STAGES.map((stage) => stateFromEvents(stage.id, result));
+  }
+
+  // Fallback for callers that didn't emit events (back-compat path).
+  return inferStatesFromResult(result, autoMode);
+}
+
+function stateFromEvents(stageId: StageId, result: FixResponse): StageState {
+  if (stageId === "input") return "complete";
+  if (stageId === "output") return result.ok ? "complete" : "warning";
+
+  const events = result.events ?? [];
+  // Take the latest event for this stage — it's the terminal status.
+  let latest: StageEvent | undefined;
+  for (const e of events) if (e.stage === stageId) latest = e;
+  if (!latest) return "idle";
+  return mapStatus(latest.status);
+}
+
+function mapStatus(status: StageStatus): StageState {
+  switch (status) {
+    case "active":
+    case "scanning":
+    case "complete":
+    case "fallback":
+    case "warning":
+      return status;
+    case "idle":
+    default:
+      return "idle";
+  }
+}
+
+/**
+ * Legacy fallback: derive stage states from the FixResponse fields when
+ * the response lacks a real events stream.
+ */
+function inferStatesFromResult(result: FixResponse, autoMode: boolean): StageState[] {
   const sup = result.supervisor;
   const safetyHas = result.safety.findings.length > 0;
+  const intentState: StageState = autoMode ? "complete" : "complete";
+  const generateState: StageState = sup.error
+    ? "warning"
+    : sup.fallbackUsed
+      ? "fallback"
+      : "complete";
+  const validateState: StageState =
+    result.safety.blocked || safetyHas ? "warning" : "complete";
 
   return [
     "complete", // INPUT
-    "complete", // CLEANER (always ran)
-    autoMode ? "complete" : "idle", // MODE DETECT (only when autoMode)
-    sup.fallbackUsed ? "fallback" : "complete", // ROUTER
-    sup.error ? "warning" : sup.used ? "complete" : "idle", // SUPERVISOR
-    result.safety.blocked ? "warning" : safetyHas ? "warning" : "complete", // SAFETY
-    "complete", // SCORE
+    "complete", // CLEAN
+    intentState, // INTENT
+    "complete", // STRUCTURE
+    "complete", // CONSTRAINTS
+    generateState, // GENERATE
+    validateState, // VALIDATE
     "complete" // OUTPUT
   ];
 }

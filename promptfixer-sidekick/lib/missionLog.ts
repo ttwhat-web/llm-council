@@ -4,11 +4,14 @@
  * under the PipelineViz.
  *
  * Every entry is anchored in real data — there are no faked telemetry
- * lines. Timestamps are reconstructed from response durations so the
- * stream "scrolls" with the actual pipeline timing.
+ * lines. When the response carries a real `events[]` stream from the
+ * typed Stage<R> pipeline, we map directly off it (with real ms offsets
+ * from the run start). When it doesn't, we fall back to the legacy
+ * post-hoc synthesis that walks the FixResponse fields.
  */
 
 import type { FixResponse, LogEntry, LogKind } from "./types";
+import type { StageEvent, StageId } from "./pipeline/types";
 
 let counter = 0;
 function nid(): string {
@@ -52,6 +55,10 @@ export function logCommand(command: string): LogEntry {
 
 /**
  * Derive entries from the response payload. Returns newest-first.
+ *
+ * If the response carries `events` (the real Stage<R> pipeline stream)
+ * we use those directly so the log line for each stage shows the actual
+ * elapsed offset. Otherwise we fall back to the legacy post-hoc walk.
  */
 export function logsFromResponse(
   result: FixResponse,
@@ -60,6 +67,14 @@ export function logsFromResponse(
     startedAt: Date.now()
   }
 ): LogEntry[] {
+  if (result.events && result.events.length > 0) {
+    return logsFromStageEvents(result.events, {
+      startedAt: opts.startedAt,
+      elapsedMs: result.elapsedMs,
+      mode: result.mode
+    });
+  }
+
   const { autoMode, startedAt, cleanedRemoved } = opts;
   const entries: LogEntry[] = [];
   let cursor = startedAt;
@@ -148,6 +163,63 @@ export function logsFromResponse(
   );
 
   return entries.reverse();
+}
+
+/**
+ * Map a real StageEvent stream onto Mission Log entries, preserving
+ * elapsed offsets so the operations panel reads like a flight recorder.
+ * Returns newest-first.
+ */
+export function logsFromStageEvents(
+  events: StageEvent[],
+  opts: { startedAt: number; elapsedMs?: number; mode?: string }
+): LogEntry[] {
+  const out: LogEntry[] = [];
+  for (const e of events) {
+    if (e.status === "active") continue; // active is the chip light, not log noise
+    const ts = opts.startedAt + e.elapsedMs;
+    const kind = stageStatusToKind(e.status);
+    const label = STAGE_LABEL[e.stage] ?? e.stage;
+    const detail = e.detail ? ` · ${e.detail}` : "";
+    out.push(make(ts, kind, e.stage, `${label}${detail}`));
+  }
+  if (typeof opts.elapsedMs === "number") {
+    out.push(
+      make(
+        opts.startedAt + opts.elapsedMs,
+        "ok",
+        "output",
+        `Prompt ready · ${opts.elapsedMs}ms${opts.mode ? ` · mode ${opts.mode}` : ""}`
+      )
+    );
+  }
+  return out.reverse();
+}
+
+const STAGE_LABEL: Record<StageId, string> = {
+  input: "Input",
+  output: "Output",
+  clean: "Clean Input",
+  intent: "Detect Intent",
+  structure: "Structure Prompt",
+  constraints: "Inject Constraints",
+  generate: "Generate Mission Output",
+  validate: "Validate Execution Readiness"
+};
+
+function stageStatusToKind(status: StageEvent["status"]): LogKind {
+  switch (status) {
+    case "complete":
+      return "ok";
+    case "warning":
+    case "fallback":
+      return "warn";
+    case "scanning":
+    case "active":
+    case "idle":
+    default:
+      return "info";
+  }
 }
 
 export function makeLogEntry(kind: LogKind, message: string, tag?: string): LogEntry {

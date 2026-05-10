@@ -28,7 +28,15 @@ export interface WorkflowRunOptions {
   ctx: SkillContext & ToolCallContext;
   /** Cancel the entire run. */
   signal?: AbortSignal;
+  /**
+   * Optional run-level input. Available to nodes via
+   * `{ kind: "ref", from: "$input" }`. The reserved id "$input" cannot
+   * be used as a node id.
+   */
+  input?: unknown;
 }
+
+export const WORKFLOW_INPUT_ID = "$input";
 
 export async function runWorkflow(
   def: WorkflowDefinition,
@@ -37,6 +45,9 @@ export async function runWorkflow(
   const start = Date.now();
   const events: WorkflowEvent[] = [];
   const outputs: Record<string, unknown> = {};
+  if (options.input !== undefined) {
+    outputs[WORKFLOW_INPUT_ID] = options.input;
+  }
   const emit = (kind: WorkflowEvent["kind"], extra?: Partial<WorkflowEvent>) => {
     events.push({
       kind,

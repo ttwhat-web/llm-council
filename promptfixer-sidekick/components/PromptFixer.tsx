@@ -23,6 +23,8 @@ import { MissionAlertToggle } from "./MissionAlertToggle";
 import { ScoreBadges } from "./ScoreBadges";
 import { SafetyBadge } from "./SafetyBadge";
 import { ArchitectView } from "./ArchitectView";
+import { SkillSuggestions } from "./SkillSuggestions";
+import { SkillsExplorer } from "./SkillsExplorer";
 import { useClientContext } from "@/lib/clientContext";
 import { getQuality } from "@/lib/quality";
 import { newId, saveEntry, type HistoryEntry } from "@/lib/history";
@@ -30,10 +32,12 @@ import {
   appendLog,
   logCommand,
   logsFromResponse,
+  logsFromStageEvents,
   logTemplate,
   logUserSubmit,
   makeLogEntry
 } from "@/lib/missionLog";
+import type { SkillId } from "@/lib/skills/types";
 import type {
   ArchitectResponse,
   CleanResponse,
@@ -105,6 +109,8 @@ export function PromptFixer({ variant = "web" }: Props) {
   const [forcedTab, setForcedTab] = useState<"architect" | undefined>(undefined);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdInitialQuery, setCmdInitialQuery] = useState<string>("");
+  const [busySkillId, setBusySkillId] = useState<SkillId | null>(null);
+  const [busyWorkflowId, setBusyWorkflowId] = useState<string | null>(null);
 
   const isLocal = settings.modelQuality === "local";
   const derivedEngine = getQuality(settings.modelQuality).engine;
@@ -290,6 +296,218 @@ export function PromptFixer({ variant = "web" }: Props) {
       void callFix({ action, previousSections: result.sections });
     },
     [callFix, result]
+  );
+
+  const onRunSkill = useCallback(
+    async (skillId: SkillId) => {
+      if (!input.trim() || busy || busyAction || busyArchitect || busySkillId) return;
+      setBusySkillId(skillId);
+      setError(null);
+      const startedAt = Date.now();
+      setLog((prev) =>
+        appendLog(prev, makeLogEntry("info", `Skill — ${skillId} dispatched`, skillId))
+      );
+      try {
+        const res = await fetch("/api/skills/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            skillId,
+            input,
+            modelQuality: settings.modelQuality,
+            clientContext,
+            allowCloudFallback: isLocal ? settings.allowCloudFallback : false,
+            notifyOnHumanNeeded:
+              MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded,
+            alertUser: settings.alertUser || undefined
+          })
+        });
+        const data = (await res.json()) as {
+          ok: boolean;
+          skillId?: SkillId;
+          status?: string;
+          result?: { ok: boolean; output?: unknown; error?: string };
+          error?: string;
+        };
+        if (!res.ok || !data.ok) {
+          const msg = data.error || `Skill ${skillId} failed`;
+          setError(msg);
+          setLog((prev) => appendLog(prev, makeLogEntry("err", msg, skillId)));
+          return;
+        }
+        const inner = data.result;
+        if (!inner?.ok) {
+          const msg = inner?.error || `Skill ${skillId} failed`;
+          setError(msg);
+          setLog((prev) => appendLog(prev, makeLogEntry("err", msg, skillId)));
+          return;
+        }
+
+        // Map per-skill output back into the existing UI state.
+        if (skillId === "prompt-fixer") {
+          const fix = inner.output as FixResponse;
+          setResult(fix);
+          setArchitect(null);
+          setForcedTab(undefined);
+          if (fix.events && fix.events.length > 0) {
+            setLog((prev) =>
+              appendLog(
+                prev,
+                logsFromStageEvents(fix.events!, {
+                  startedAt,
+                  elapsedMs: fix.elapsedMs,
+                  mode: fix.mode
+                })
+              )
+            );
+          } else {
+            setLog((prev) =>
+              appendLog(
+                prev,
+                logsFromResponse(fix, { autoMode: settings.autoMode, startedAt })
+              )
+            );
+          }
+          if (typeof fix.supervisor.latencyMs === "number") {
+            setLatencyHistory((prev) => [...prev.slice(-7), fix.supervisor.latencyMs!]);
+          }
+        } else if (skillId === "architect") {
+          const arch = inner.output as ArchitectResponse;
+          setArchitect(arch);
+          setForcedTab("architect");
+          setLog((prev) =>
+            appendLog(
+              prev,
+              makeLogEntry(
+                arch.isDeterministic ? "warn" : "ok",
+                `Architect plan ready · ${arch.resolved}${arch.model ? " · " + arch.model : ""}${typeof arch.latencyMs === "number" ? " · " + arch.latencyMs + "ms" : ""}`,
+                "architect"
+              )
+            )
+          );
+        } else if (skillId === "prompt-cleaner") {
+          const cleaned = inner.output as { cleaned: string; removed: string[] };
+          setInput(cleaned.cleaned);
+          setLog((prev) =>
+            appendLog(
+              prev,
+              makeLogEntry(
+                "ok",
+                cleaned.removed.length
+                  ? `Cleaned · stripped ${cleaned.removed.join(", ")}`
+                  : "Cleaned · input already clean",
+                "cleaner"
+              )
+            )
+          );
+        }
+
+        if (MISSION_ALERTS_FLAG && settings.alertUser) {
+          setTimeout(() => setInboxReloadKey((k) => k + 1), 600);
+        }
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setBusySkillId(null);
+      }
+    },
+    [
+      input,
+      busy,
+      busyAction,
+      busyArchitect,
+      busySkillId,
+      settings,
+      clientContext,
+      isLocal
+    ]
+  );
+
+  const onRunWorkflow = useCallback(
+    async (workflowId: string) => {
+      if (!input.trim() || busy || busyAction || busyArchitect || busyWorkflowId) return;
+      setBusyWorkflowId(workflowId);
+      setError(null);
+      setLog((prev) =>
+        appendLog(prev, makeLogEntry("info", `Workflow — ${workflowId} dispatched`, "workflow"))
+      );
+      try {
+        const res = await fetch("/api/workflows/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workflowId,
+            input,
+            modelQuality: settings.modelQuality,
+            clientContext,
+            allowCloudFallback: isLocal ? settings.allowCloudFallback : false,
+            alertUser: settings.alertUser || undefined
+          })
+        });
+        const data = (await res.json()) as {
+          ok: boolean;
+          workflowId?: string;
+          result?: {
+            ok: boolean;
+            outputs: Record<string, unknown>;
+            elapsedMs: number;
+            error?: string;
+          };
+          error?: string;
+        };
+        if (!res.ok || !data.ok) {
+          const msg = data.result?.error || data.error || `Workflow ${workflowId} failed`;
+          setError(msg);
+          setLog((prev) => appendLog(prev, makeLogEntry("err", msg, "workflow")));
+          return;
+        }
+        const wfResult = data.result;
+        if (!wfResult) return;
+
+        // Wire the per-node outputs back into the UI surface that mirrors
+        // their dedicated entry points.
+        const fix = wfResult.outputs.fix as FixResponse | undefined;
+        const arch = wfResult.outputs.architect as ArchitectResponse | undefined;
+        if (fix) {
+          setResult(fix);
+          if (typeof fix.supervisor?.latencyMs === "number") {
+            setLatencyHistory((prev) => [...prev.slice(-7), fix.supervisor.latencyMs!]);
+          }
+        }
+        if (arch) {
+          setArchitect(arch);
+          setForcedTab("architect");
+        }
+        setLog((prev) =>
+          appendLog(
+            prev,
+            makeLogEntry(
+              "ok",
+              `Workflow ${workflowId} complete · ${wfResult.elapsedMs}ms`,
+              "workflow"
+            )
+          )
+        );
+
+        if (MISSION_ALERTS_FLAG && settings.alertUser) {
+          setTimeout(() => setInboxReloadKey((k) => k + 1), 600);
+        }
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setBusyWorkflowId(null);
+      }
+    },
+    [
+      input,
+      busy,
+      busyAction,
+      busyArchitect,
+      busyWorkflowId,
+      settings,
+      clientContext,
+      isLocal
+    ]
   );
 
   const reopenHistory = useCallback((entry: HistoryEntry) => {
@@ -526,6 +744,13 @@ export function PromptFixer({ variant = "web" }: Props) {
             </div>
           </div>
 
+          <SkillSuggestions
+            input={input}
+            busySkillId={busySkillId}
+            onPick={(skillId) => void onRunSkill(skillId)}
+            compact={compact}
+          />
+
           <div className="flex flex-col gap-2">
             <button
               type="button"
@@ -562,6 +787,14 @@ export function PromptFixer({ variant = "web" }: Props) {
               </button>
             </div>
           </div>
+
+          <SkillsExplorer
+            busySkillId={busySkillId}
+            onRunSkill={(skillId) => void onRunSkill(skillId)}
+            onRunWorkflow={(workflowId) => void onRunWorkflow(workflowId)}
+            workflowBusyId={busyWorkflowId}
+            compact={compact}
+          />
         </section>
 
         {/* ---------- COLUMN 2 — OPERATIONS PIPELINE ---------- */}

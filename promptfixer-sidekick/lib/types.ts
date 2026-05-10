@@ -184,6 +184,12 @@ export interface FixResponse {
   modelQuality: ModelQuality;
   action?: OutputAction;
   elapsedMs: number;
+  /**
+   * Per-stage events from the Prompt Fixer pipeline (see
+   * lib/pipeline/prompt-fixer-stages.ts). Optional for back-compat with
+   * any caller built against the previous shape.
+   */
+  events?: import("./pipeline/types").StageEvent[];
 }
 
 export interface PreviewRequest {
