@@ -25,6 +25,31 @@ import { SafetyBadge } from "./SafetyBadge";
 import { ArchitectView } from "./ArchitectView";
 import { SkillSuggestions } from "./SkillSuggestions";
 import { SkillsExplorer } from "./SkillsExplorer";
+import { UsageMeter } from "./UsageMeter";
+import { UpgradeModal } from "./UpgradeModal";
+import { SavedStacks } from "./SavedStacks";
+import { WorkflowRecorder } from "./WorkflowRecorder";
+import { EmptyStateExamples } from "./EmptyStateExamples";
+import {
+  incrementBilling,
+  loadTier,
+  readBilling,
+  saveTier,
+  type BillingSnapshot,
+  type BillingTier
+} from "@/lib/billing";
+import {
+  loadDrafts,
+  loadState as loadRecorderState,
+  makeStep,
+  persistState as persistRecorderState,
+  saveDraft as persistRecorderDraft,
+  deleteDraft as removeRecorderDraft,
+  type RecordedStep,
+  type RecordedStepKind,
+  type RecordingDraft
+} from "@/lib/recorder";
+import type { StackDraft } from "@/lib/stacks";
 import { useClientContext } from "@/lib/clientContext";
 import { getQuality } from "@/lib/quality";
 import { newId, saveEntry, type HistoryEntry } from "@/lib/history";
@@ -111,6 +136,20 @@ export function PromptFixer({ variant = "web" }: Props) {
   const [cmdInitialQuery, setCmdInitialQuery] = useState<string>("");
   const [busySkillId, setBusySkillId] = useState<SkillId | null>(null);
   const [busyWorkflowId, setBusyWorkflowId] = useState<string | null>(null);
+  const [billing, setBilling] = useState<BillingSnapshot>(() => ({
+    tier: "free",
+    used: 0,
+    limit: 10,
+    remaining: 10,
+    day: "",
+    atLimit: false
+  }));
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallReason, setPaywallReason] = useState<"limit-reached" | "manage">("manage");
+  const [stacksReloadKey, setStacksReloadKey] = useState(0);
+  const [recordingEnabled, setRecordingEnabled] = useState(false);
+  const [recordedSteps, setRecordedSteps] = useState<RecordedStep[]>([]);
+  const [recorderDrafts, setRecorderDrafts] = useState<RecordingDraft[]>([]);
 
   const isLocal = settings.modelQuality === "local";
   const derivedEngine = getQuality(settings.modelQuality).engine;
@@ -132,11 +171,143 @@ export function PromptFixer({ variant = "web" }: Props) {
     }
   }, [settings]);
 
+  // ---- billing hydration ----
+  useEffect(() => {
+    setBilling(readBilling());
+    const onStorage = (e: StorageEvent) => {
+      if (
+        e.key === "pf.billing.v1.tier" ||
+        e.key === "pf.billing.v1.usage" ||
+        e.key === null
+      ) {
+        setBilling(readBilling());
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // ---- recorder hydration ----
+  useEffect(() => {
+    const state = loadRecorderState();
+    setRecordingEnabled(state.enabled);
+    setRecordedSteps(state.steps);
+    setRecorderDrafts(loadDrafts());
+  }, []);
+  useEffect(() => {
+    persistRecorderState({
+      enabled: recordingEnabled,
+      steps: recordedSteps,
+      startedAt: recordingEnabled
+        ? recordedSteps[0]?.ts ?? Date.now()
+        : undefined
+    });
+  }, [recordingEnabled, recordedSteps]);
+
+  const recordStep = useCallback(
+    (kind: RecordedStepKind, label: string, payload?: RecordedStep["payload"]) => {
+      setRecordedSteps((prev) => {
+        // Use the freshest enabled flag from state at call time so we
+        // don't leak captures after Stop. recordingEnabled is closed
+        // over via React, so it's already up to date.
+        if (!recordingEnabled) return prev;
+        const step = makeStep(kind, label, payload);
+        return [...prev, step].slice(-60);
+      });
+    },
+    [recordingEnabled]
+  );
+
+  const onToggleRecording = useCallback(
+    (next: boolean) => {
+      setRecordingEnabled(next);
+      if (next) {
+        // Fresh tape on Record press.
+        setRecordedSteps([]);
+      }
+    },
+    []
+  );
+
+  const onSaveRecording = useCallback(
+    (name: string) => {
+      if (recordedSteps.length === 0) return;
+      const next = persistRecorderDraft(name, recordedSteps);
+      setRecorderDrafts(next);
+      setRecordedSteps([]);
+      setRecordingEnabled(false);
+    },
+    [recordedSteps]
+  );
+
+  const onClearRecording = useCallback(() => {
+    setRecordedSteps([]);
+    setRecordingEnabled(false);
+  }, []);
+
+  const onDeleteRecorderDraft = useCallback((id: string) => {
+    setRecorderDrafts(removeRecorderDraft(id));
+  }, []);
+
+  const bumpBilling = useCallback(() => {
+    setBilling(incrementBilling());
+  }, []);
+
+  const onTierChange = useCallback((tier: BillingTier) => {
+    saveTier(tier);
+    setBilling(readBilling());
+  }, []);
+
+  const openPaywall = useCallback((reason: "limit-reached" | "manage") => {
+    setPaywallReason(reason);
+    setPaywallOpen(true);
+  }, []);
+
+  const onLoadStack = useCallback(
+    (input: string, mode: Mode) => {
+      setInput(input);
+      setSettings((s) => ({ ...s, mode, autoMode: false }));
+      setLog((prev) =>
+        appendLog(prev, makeLogEntry("info", "Loaded saved stack", "stack"))
+      );
+    },
+    []
+  );
+
+  const onCopyText = useCallback((text: string) => {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    void navigator.clipboard.writeText(text).catch(() => {
+      /* ignore */
+    });
+    recordStep("copy", "Copied output to clipboard");
+  }, [recordStep]);
+
+  const onPickExample = useCallback(
+    (body: string, exampleMode: Mode | undefined, autoMode: boolean) => {
+      setInput(body);
+      setSettings((s) => ({
+        ...s,
+        autoMode,
+        ...(exampleMode ? { mode: exampleMode } : {})
+      }));
+      setLog((prev) =>
+        appendLog(prev, makeLogEntry("info", "Loaded example", "example"))
+      );
+    },
+    []
+  );
+
   // ---- API calls ----
   const callFix = useCallback(
     async (override?: { action: OutputAction; previousSections: FixResponse["sections"] }) => {
       if (!override && !input.trim()) return;
       if (busy || busyAction || busyArchitect) return;
+      // Free-tier daily gate (local-only). Output transforms (override)
+      // re-render an existing result and don't burn fresh budget.
+      if (!override && billing.atLimit) {
+        openPaywall("limit-reached");
+        return;
+      }
       if (override) setBusyAction(override.action);
       else setBusy(true);
       setError(null);
@@ -146,6 +317,11 @@ export function PromptFixer({ variant = "web" }: Props) {
         setLog((prev) => appendLog(prev, logUserSubmit(input)));
         setArchitect(null);
         setForcedTab(undefined);
+        recordStep("fix", `Fix · ${input.slice(0, 60)}${input.length > 60 ? "…" : ""}`, {
+          mode: settings.mode,
+          modelQuality: settings.modelQuality,
+          inputPreview: input.slice(0, 80)
+        });
       }
 
       try {
@@ -191,6 +367,9 @@ export function PromptFixer({ variant = "web" }: Props) {
           setLatencyHistory((prev) => [...prev.slice(-7), data.supervisor.latencyMs!]);
         }
         if (!override) {
+          // Burn one client-side daily fix on every successful fresh
+          // fix. Transforms (override) don't consume budget.
+          bumpBilling();
           const entry: HistoryEntry = {
             id: newId(),
             timestamp: Date.now(),
@@ -216,16 +395,38 @@ export function PromptFixer({ variant = "web" }: Props) {
         else setBusy(false);
       }
     },
-    [input, busy, busyAction, busyArchitect, settings, derivedEngine, clientContext, isLocal]
+    [
+      input,
+      busy,
+      busyAction,
+      busyArchitect,
+      settings,
+      derivedEngine,
+      clientContext,
+      isLocal,
+      billing.atLimit,
+      bumpBilling,
+      openPaywall,
+      recordStep
+    ]
   );
 
   const runArchitect = useCallback(async () => {
     if (!input.trim() || busy || busyAction || busyArchitect) return;
+    if (billing.atLimit) {
+      openPaywall("limit-reached");
+      return;
+    }
     setBusyArchitect(true);
     setError(null);
     setLog((prev) =>
       appendLog(prev, makeLogEntry("info", "Architect plan requested", "architect"))
     );
+    recordStep("architect", `Architect · ${input.slice(0, 60)}${input.length > 60 ? "…" : ""}`, {
+      mode: settings.mode,
+      modelQuality: settings.modelQuality,
+      inputPreview: input.slice(0, 80)
+    });
     try {
       const res = await fetch("/api/architect", {
         method: "POST",
@@ -250,6 +451,7 @@ export function PromptFixer({ variant = "web" }: Props) {
       }
       setArchitect(data);
       setForcedTab("architect");
+      bumpBilling();
       setLog((prev) =>
         appendLog(
           prev,
@@ -268,12 +470,25 @@ export function PromptFixer({ variant = "web" }: Props) {
     } finally {
       setBusyArchitect(false);
     }
-  }, [input, busy, busyAction, busyArchitect, settings, clientContext, isLocal]);
+  }, [
+    input,
+    busy,
+    busyAction,
+    busyArchitect,
+    settings,
+    clientContext,
+    isLocal,
+    billing.atLimit,
+    bumpBilling,
+    openPaywall,
+    recordStep
+  ]);
 
   const clean = useCallback(async () => {
     if (!input.trim() || busy || busyAction) return;
     setBusy(true);
     setError(null);
+    recordStep("clean", "Clean Signal");
     try {
       const res = await fetch("/api/clean", {
         method: "POST",
@@ -288,7 +503,7 @@ export function PromptFixer({ variant = "web" }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [input, busy, busyAction]);
+  }, [input, busy, busyAction, recordStep]);
 
   const onAction = useCallback(
     (action: OutputAction) => {
@@ -301,8 +516,20 @@ export function PromptFixer({ variant = "web" }: Props) {
   const onRunSkill = useCallback(
     async (skillId: SkillId) => {
       if (!input.trim() || busy || busyAction || busyArchitect || busySkillId) return;
+      // Cloud-bound skills hit the same paywall as direct fixes.
+      const cloudBound = skillId === "prompt-fixer" || skillId === "architect";
+      if (cloudBound && billing.atLimit) {
+        openPaywall("limit-reached");
+        return;
+      }
       setBusySkillId(skillId);
       setError(null);
+      recordStep("run-skill", `Skill · ${skillId}`, {
+        skillId,
+        mode: settings.mode,
+        modelQuality: settings.modelQuality,
+        inputPreview: input.slice(0, 80)
+      });
       const startedAt = Date.now();
       setLog((prev) =>
         appendLog(prev, makeLogEntry("info", `Skill — ${skillId} dispatched`, skillId))
@@ -342,6 +569,10 @@ export function PromptFixer({ variant = "web" }: Props) {
           setLog((prev) => appendLog(prev, makeLogEntry("err", msg, skillId)));
           return;
         }
+
+        // Cloud-bound skills consume one daily fix on success; the
+        // local-only Prompt Cleaner is free.
+        if (cloudBound) bumpBilling();
 
         // Map per-skill output back into the existing UI state.
         if (skillId === "prompt-fixer") {
@@ -419,15 +650,28 @@ export function PromptFixer({ variant = "web" }: Props) {
       busySkillId,
       settings,
       clientContext,
-      isLocal
+      isLocal,
+      billing.atLimit,
+      bumpBilling,
+      openPaywall,
+      recordStep
     ]
   );
 
   const onRunWorkflow = useCallback(
     async (workflowId: string) => {
       if (!input.trim() || busy || busyAction || busyArchitect || busyWorkflowId) return;
+      if (billing.atLimit) {
+        openPaywall("limit-reached");
+        return;
+      }
       setBusyWorkflowId(workflowId);
       setError(null);
+      recordStep("run-workflow", `Workflow · ${workflowId}`, {
+        workflowId,
+        modelQuality: settings.modelQuality,
+        inputPreview: input.slice(0, 80)
+      });
       setLog((prev) =>
         appendLog(prev, makeLogEntry("info", `Workflow — ${workflowId} dispatched`, "workflow"))
       );
@@ -478,6 +722,7 @@ export function PromptFixer({ variant = "web" }: Props) {
           setArchitect(arch);
           setForcedTab("architect");
         }
+        bumpBilling();
         setLog((prev) =>
           appendLog(
             prev,
@@ -506,7 +751,11 @@ export function PromptFixer({ variant = "web" }: Props) {
       busyWorkflowId,
       settings,
       clientContext,
-      isLocal
+      isLocal,
+      billing.atLimit,
+      bumpBilling,
+      openPaywall,
+      recordStep
     ]
   );
 
@@ -631,15 +880,22 @@ export function PromptFixer({ variant = "web" }: Props) {
               )}
             </div>
           </div>
-          <HeaderStatus
-            selectedEngine={derivedEngine}
-            selectedQuality={settings.modelQuality}
-            selectedMode={settings.mode}
-            clientContext={clientContext}
-            lastSupervisor={result?.supervisor}
-            lastUsage={result?.usage}
-            busy={busy || busyArchitect}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <UsageMeter
+              billing={billing}
+              onClick={() => openPaywall("manage")}
+              compact={compact}
+            />
+            <HeaderStatus
+              selectedEngine={derivedEngine}
+              selectedQuality={settings.modelQuality}
+              selectedMode={settings.mode}
+              clientContext={clientContext}
+              lastSupervisor={result?.supervisor}
+              lastUsage={result?.usage}
+              busy={busy || busyArchitect}
+            />
+          </div>
         </div>
 
         <CommandStrip
@@ -730,6 +986,10 @@ export function PromptFixer({ variant = "web" }: Props) {
             compact
           />
 
+          {!input.trim() && (
+            <EmptyStateExamples onPick={onPickExample} compact={compact} />
+          )}
+
           <div className="relative">
             <textarea
               value={input}
@@ -754,12 +1014,28 @@ export function PromptFixer({ variant = "web" }: Props) {
           <div className="flex flex-col gap-2">
             <button
               type="button"
-              onClick={() => void callFix()}
+              onClick={() =>
+                billing.atLimit ? openPaywall("limit-reached") : void callFix()
+              }
               disabled={busy || !input.trim()}
-              className="no-drag inline-flex items-center justify-center gap-2 rounded-xl bg-accent/90 px-3 py-2 text-sm font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              className={clsx(
+                "no-drag inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
+                billing.atLimit
+                  ? "bg-rose-500/15 text-rose-100 ring-1 ring-rose-400/40 hover:bg-rose-500/20"
+                  : "bg-accent/90 text-white shadow-glow hover:bg-accent"
+              )}
+              title={
+                billing.atLimit
+                  ? "Daily free limit reached — click to view plans"
+                  : "Run a fresh fix"
+              }
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-              Run Mission
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Wand2 className="h-4 w-4" />
+              )}
+              {billing.atLimit ? "Daily limit reached — Upgrade" : "Run Mission"}
             </button>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -793,6 +1069,38 @@ export function PromptFixer({ variant = "web" }: Props) {
             onRunSkill={(skillId) => void onRunSkill(skillId)}
             onRunWorkflow={(workflowId) => void onRunWorkflow(workflowId)}
             workflowBusyId={busyWorkflowId}
+            compact={compact}
+          />
+
+          <SavedStacks
+            draft={
+              result
+                ? ({
+                    title: result.sections.task
+                      ? result.sections.task.split("\n")[0]?.slice(0, 80) ||
+                        "Untitled stack"
+                      : "Untitled stack",
+                    input,
+                    optimized: result.prompt,
+                    mode: result.mode,
+                    tags: [result.mode, result.modelQuality]
+                  } satisfies StackDraft)
+                : null
+            }
+            onLoad={(s) => onLoadStack(s.input, s.mode)}
+            onCopy={onCopyText}
+            reloadKey={stacksReloadKey}
+            compact={compact}
+          />
+
+          <WorkflowRecorder
+            enabled={recordingEnabled}
+            steps={recordedSteps}
+            drafts={recorderDrafts}
+            onToggle={onToggleRecording}
+            onSave={onSaveRecording}
+            onClear={onClearRecording}
+            onDeleteDraft={onDeleteRecorderDraft}
             compact={compact}
           />
         </section>
@@ -915,6 +1223,17 @@ export function PromptFixer({ variant = "web" }: Props) {
         onClose={() => setCmdOpen(false)}
         onAction={onCommand}
         initialQuery={cmdInitialQuery}
+      />
+
+      <UpgradeModal
+        open={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        tier={billing.tier}
+        onTierChange={(tier) => {
+          onTierChange(tier);
+          if (tier === "pro") setPaywallOpen(false);
+        }}
+        reason={paywallReason}
       />
     </div>
   );
