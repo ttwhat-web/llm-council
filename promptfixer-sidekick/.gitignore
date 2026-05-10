@@ -8,3 +8,5 @@ dist
 *.log
 desktop/src-tauri/target
 desktop/src-tauri/Cargo.lock
+*.tsbuildinfo
+.eslintcache

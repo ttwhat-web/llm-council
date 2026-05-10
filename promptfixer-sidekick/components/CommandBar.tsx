@@ -6,7 +6,6 @@ import clsx from "clsx";
 import {
   Bug,
   Cog,
-  Cpu,
   Cpu as CpuIcon,
   Eye,
   GitBranch,

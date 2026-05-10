@@ -22,7 +22,7 @@ export function CompareView({ sections, compact }: Props) {
     <div className={clsx("flex flex-col gap-3", compact && "gap-2")}>
       <div className="text-[12px] text-white/65">
         The same execution-ready prompt, rendered for three different tools.
-        Pick whichever matches where you'll paste it.
+        Pick whichever matches where you&apos;ll paste it.
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {VARIANTS.map((v) => {
