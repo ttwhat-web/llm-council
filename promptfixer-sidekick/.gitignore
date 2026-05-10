@@ -10,3 +10,6 @@ desktop/src-tauri/target
 desktop/src-tauri/Cargo.lock
 *.tsbuildinfo
 .eslintcache
+
+# Mission Alerts — local user→chat link storage
+.data/

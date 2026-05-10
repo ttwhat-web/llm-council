@@ -8,14 +8,14 @@
  */
 
 const TOKEN = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
-const DEFAULT_CHAT = (process.env.TELEGRAM_ADMIN_CHAT_ID || "").trim();
+const ADMIN_CHAT = (process.env.TELEGRAM_ADMIN_CHAT_ID || "").trim();
 const SEND_TIMEOUT_MS = Number(process.env.TELEGRAM_TIMEOUT_MS || 6000);
 
 /** Max characters Telegram accepts in a single message. */
 const TELEGRAM_MAX = 4096;
 
 export interface TelegramSendOptions {
-  /** Override the admin chat id. Useful for per-user routing later. */
+  /** Override the destination chat. Falls back to the admin chat if unset. */
   chatId?: string;
   /** "HTML" by default. Telegram's HTML tag set is *very* small. */
   parseMode?: "HTML" | "Markdown" | "MarkdownV2";
@@ -23,9 +23,28 @@ export interface TelegramSendOptions {
   timeoutMs?: number;
 }
 
-/** Returns true when both the bot token and an admin chat id are configured. */
+/** True when the bot token is configured. The chat is decided per call. */
+export function hasTelegramToken(): boolean {
+  return TOKEN.length > 0;
+}
+
+/** True when the admin fallback chat is configured. */
+export function hasAdminTelegramChat(): boolean {
+  return ADMIN_CHAT.length > 0;
+}
+
+/** Read the admin chat id (the global fallback). Empty string when not set. */
+export function getAdminTelegramChatId(): string {
+  return ADMIN_CHAT;
+}
+
+/**
+ * @deprecated Use `hasTelegramToken()` plus a per-call `chatId` (user link
+ * or admin fallback). Kept for backward compatibility with callers that
+ * only need the admin path.
+ */
 export function isTelegramConfigured(): boolean {
-  return TOKEN.length > 0 && DEFAULT_CHAT.length > 0;
+  return TOKEN.length > 0 && ADMIN_CHAT.length > 0;
 }
 
 /**
@@ -36,15 +55,18 @@ export async function sendTelegramAlert(
   message: string,
   options: TelegramSendOptions = {}
 ): Promise<{ ok: boolean; reason?: string }> {
-  if (!isTelegramConfigured()) {
-    return { ok: false, reason: "not configured" };
+  if (!hasTelegramToken()) {
+    return { ok: false, reason: "no_token" };
   }
   if (!message || !message.trim()) {
     return { ok: false, reason: "empty message" };
   }
 
   const text = message.length > TELEGRAM_MAX ? message.slice(0, TELEGRAM_MAX - 2) + "…" : message;
-  const chatId = options.chatId || DEFAULT_CHAT;
+  const chatId = (options.chatId || ADMIN_CHAT).trim();
+  if (!chatId) {
+    return { ok: false, reason: "no_chat" };
+  }
   const parseMode = options.parseMode || "HTML";
 
   const ctrl = new AbortController();

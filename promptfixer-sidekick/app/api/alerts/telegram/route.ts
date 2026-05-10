@@ -28,7 +28,12 @@ import {
   type AlertSeverity,
   type AlertType
 } from "@/lib/mission-alerts";
-import { isTelegramConfigured, sendTelegramAlert } from "@/lib/telegram";
+import {
+  getAdminTelegramChatId,
+  hasTelegramToken,
+  sendTelegramAlert
+} from "@/lib/telegram";
+import { getTelegramChatIdForUser } from "@/lib/telegram-links";
 import { clientKeyFromHeaders } from "@/lib/usage";
 
 export const runtime = "nodejs";
@@ -90,9 +95,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!isTelegramConfigured()) {
+  if (!hasTelegramToken()) {
     return NextResponse.json(
-      { ok: true, sent: false, reason: "telegram_not_configured" },
+      { ok: true, sent: false, reason: "no_token" },
+      { status: 200 }
+    );
+  }
+
+  // Resolve destination: user link → admin fallback.
+  const userChatId = await getTelegramChatIdForUser(body.userEmail).catch(() => null);
+  const chatId = userChatId || getAdminTelegramChatId();
+  if (!chatId) {
+    return NextResponse.json(
+      { ok: true, sent: false, reason: "no_chat" },
       { status: 200 }
     );
   }
@@ -116,9 +131,13 @@ export async function POST(req: NextRequest) {
     user: body.userEmail
   });
 
-  const send = await sendTelegramAlert(text, { parseMode: "HTML" });
+  const send = await sendTelegramAlert(text, { chatId, parseMode: "HTML" });
   return NextResponse.json(
-    { ok: true, sent: send.ok, reason: send.ok ? undefined : send.reason },
+    {
+      ok: true,
+      sent: send.ok,
+      reason: send.ok ? (userChatId ? "sent_user" : "sent_admin") : send.reason
+    },
     { status: 200 }
   );
 }

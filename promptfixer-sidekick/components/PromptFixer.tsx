@@ -62,16 +62,23 @@ interface Settings {
    * off, the toggle renders as a Pro lock and this stays false.
    */
   notifyOnHumanNeeded: boolean;
+  /**
+   * The user identifier used for Mission Alerts linking + alert-author
+   * attribution. Free-form until auth lands; treated as opaque by the
+   * server. Persisted so the user doesn't retype it.
+   */
+  alertUser: string;
 }
 
-const STORAGE_KEY = "promptfixer.settings.v5";
+const STORAGE_KEY = "promptfixer.settings.v6";
 
 const DEFAULTS: Settings = {
   mode: "general",
   modelQuality: "fast",
   autoMode: true,
   allowCloudFallback: false,
-  notifyOnHumanNeeded: false
+  notifyOnHumanNeeded: false,
+  alertUser: ""
 };
 
 /** Public feature flag (NEXT_PUBLIC_*); read at module-load on the client. */
@@ -148,7 +155,8 @@ export function PromptFixer({ variant = "web" }: Props) {
             action: override?.action,
             previousSections: override?.previousSections,
             notifyOnHumanNeeded:
-              MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded
+              MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded,
+            alertUser: settings.alertUser || undefined
           })
         });
         const data = (await res.json()) as FixResponse & { error?: string };
@@ -215,7 +223,8 @@ export function PromptFixer({ variant = "web" }: Props) {
           clientContext,
           allowCloudFallback: isLocal ? settings.allowCloudFallback : false,
           notifyOnHumanNeeded:
-            MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded
+            MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded,
+          alertUser: settings.alertUser || undefined
         })
       });
       const data = (await res.json()) as ArchitectResponse & { error?: string };
@@ -482,8 +491,12 @@ export function PromptFixer({ variant = "web" }: Props) {
 
           <MissionAlertToggle
             unlocked={MISSION_ALERTS_FLAG}
-            enabled={MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded}
-            onChange={(notifyOnHumanNeeded) =>
+            userEmail={settings.alertUser}
+            onUserEmailChange={(alertUser) =>
+              setSettings((s) => ({ ...s, alertUser }))
+            }
+            notifyEnabled={MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded}
+            onNotifyChange={(notifyOnHumanNeeded) =>
               setSettings((s) => ({ ...s, notifyOnHumanNeeded }))
             }
             compact

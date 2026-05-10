@@ -16,7 +16,12 @@ import {
   shouldAlertHuman,
   type AlertContext
 } from "./mission-alerts";
-import { isTelegramConfigured, sendTelegramAlert } from "./telegram";
+import {
+  getAdminTelegramChatId,
+  hasTelegramToken,
+  sendTelegramAlert
+} from "./telegram";
+import { getTelegramChatIdForUser } from "./telegram-links";
 
 const ALERTS_ENABLED =
   (process.env.NEXT_PUBLIC_MISSION_ALERTS_ENABLED || "").toLowerCase() === "true";
@@ -47,15 +52,27 @@ export interface DispatchResult {
  */
 export async function dispatchAlert(input: DispatchInput): Promise<DispatchResult> {
   if (!ALERTS_ENABLED) return { triggered: false, reason: "feature_disabled" };
-  if (!isTelegramConfigured()) {
-    return { triggered: false, reason: "telegram_not_configured" };
+  if (!hasTelegramToken()) {
+    return { triggered: false, reason: "no_token" };
   }
 
   const decision = shouldAlertHuman(input);
   if (!decision) return { triggered: false };
 
-  // Bucket per client so we don't spam the admin chat with a stuck retry loop.
-  const key = `alert:${input.clientKey}:${decision.type}`;
+  // Resolve destination chat:
+  //   1. user-linked chat (if input.user provided AND linked)
+  //   2. admin fallback (TELEGRAM_ADMIN_CHAT_ID)
+  //   3. neither → silently skip
+  const userChatId = await getTelegramChatIdForUser(input.user).catch(() => null);
+  const adminChatId = getAdminTelegramChatId();
+  const chatId = userChatId || adminChatId;
+  if (!chatId) {
+    return { triggered: true, sent: false, reason: "no_chat" };
+  }
+
+  // Per-(client, alertType, chat) rate bucket so a noisy mission doesn't
+  // also spam the admin if the user is also linked.
+  const key = `alert:${input.clientKey}:${decision.type}:${chatId}`;
   if (!consumeAlertBudget(key)) {
     return { triggered: true, sent: false, reason: "rate_limited" };
   }
@@ -69,8 +86,12 @@ export async function dispatchAlert(input: DispatchInput): Promise<DispatchResul
     user: input.user
   });
 
-  const send = await sendTelegramAlert(message, { parseMode: "HTML" });
-  return { triggered: true, sent: send.ok, reason: send.reason };
+  const send = await sendTelegramAlert(message, { chatId, parseMode: "HTML" });
+  return {
+    triggered: true,
+    sent: send.ok,
+    reason: send.ok ? (userChatId ? "sent_user" : "sent_admin") : send.reason
+  };
 }
 
 /**
