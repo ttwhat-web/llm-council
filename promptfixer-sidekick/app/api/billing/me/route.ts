@@ -18,8 +18,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const { identity, attachToResponse } = resolveUserIdentity(req);
-  const snapshot = readBillingSnapshot(req, identity);
+  const { identity, attachToResponse } = await resolveUserIdentity(req);
+  const snapshot = await readBillingSnapshot(req, identity);
 
   // Don't leak the full opaque session id — return enough for the UI
   // to render but keep the cookie-issuance value private.

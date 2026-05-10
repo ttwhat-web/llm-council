@@ -32,6 +32,7 @@ import {
   resolveUserIdentity,
   runBillingGate
 } from "@/lib/billing/server";
+import { getBillingStore } from "@/lib/billing/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,10 +75,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const store = await getBillingStore();
+
   // Free plan: clear any active dev override cookie and acknowledge.
   if (requested === "free") {
-    const { identity, attachToResponse } = resolveUserIdentity(req);
+    const { identity, attachToResponse } = await resolveUserIdentity(req);
     const ops = devOverrideMutationFor(identity, "free");
+    void store.appendAuditEvent({
+      kind: "checkout-stub",
+      identityKey: identity.id,
+      plan: "free",
+      detail: "dev override cleared"
+    });
     return attachToResponse(
       ops.clear(
         NextResponse.json({
@@ -105,8 +114,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { identity, attachToResponse } = resolveUserIdentity(req);
+  const { identity, attachToResponse } = await resolveUserIdentity(req);
   const ops = devOverrideMutationFor(identity, requested);
+
+  void store.appendAuditEvent({
+    kind: "checkout-stub",
+    identityKey: identity.id,
+    plan: requested,
+    detail: "signed dev override applied"
+  });
 
   return attachToResponse(
     ops.apply(
