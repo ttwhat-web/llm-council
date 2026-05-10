@@ -12,6 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { fireAndForgetAlert } from "@/lib/alert-dispatcher";
 import { isClientContext, route } from "@/lib/providers";
 import {
   getQuality,
@@ -98,6 +99,22 @@ export async function POST(req: NextRequest) {
   const routed = route(requestedEngine, clientContext, { allowCloudFallback });
   const willHitCloud = routed.resolved === "cloud";
 
+  // Mission Alerts wiring — closure that fires once before each return.
+  // Hard cases (e.g. provider failure → deterministic fallback) require the
+  // user opt-in here; the dispatcher itself decides what's actually alertable.
+  const alertUser = typeof body.alertUser === "string" ? body.alertUser : undefined;
+  const notifyOnHumanNeeded = Boolean(body.notifyOnHumanNeeded);
+  const fireAlert = (payload: ArchitectResponse, systemError?: string) =>
+    fireAndForgetAlert({
+      clientKey: clientKeyFromHeaders(req.headers),
+      surface: "architect",
+      user: alertUser,
+      mission: input,
+      architect: payload,
+      systemError,
+      notifyOnHumanNeeded
+    });
+
   // Deterministic short-circuit — return a templated skeleton.
   if (routed.resolved === "deterministic") {
     const usage = peek(clientKeyFromHeaders(req.headers), tier);
@@ -112,6 +129,7 @@ export async function POST(req: NextRequest) {
       usage,
       elapsedMs: Date.now() - t0
     };
+    fireAlert(payload);
     return NextResponse.json(payload, { status: 200 });
   }
 
@@ -171,6 +189,8 @@ export async function POST(req: NextRequest) {
       usage,
       elapsedMs: Date.now() - t0
     };
+    // Provider failure here is an admin-worthy alert when the user opted in.
+    fireAlert(payload, result.error);
     return NextResponse.json(payload, { status: 200, headers });
   }
 
@@ -186,6 +206,7 @@ export async function POST(req: NextRequest) {
     usage,
     elapsedMs: Date.now() - t0
   };
+  fireAlert(payload);
   return NextResponse.json(payload, { status: 200, headers });
 }
 

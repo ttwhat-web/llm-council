@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isOutputAction } from "@/lib/actions";
 import { fixPrompt } from "@/lib/ai";
+import { fireAndForgetAlert } from "@/lib/alert-dispatcher";
 import { isMode } from "@/lib/modes";
 import { isClientContext, isEngine, route } from "@/lib/providers";
 import { getQuality, isModelQuality } from "@/lib/quality";
@@ -101,6 +102,19 @@ export async function POST(req: NextRequest) {
     },
     { tier, usage }
   );
+
+  // Mission Alerts — non-blocking. Fires only when both the feature flag
+  // AND the bot are configured AND `shouldAlertHuman` decides it should.
+  // Hard cases (safety blocked) fire admin-only; soft cases require the
+  // user opt-in via `notifyOnHumanNeeded`.
+  fireAndForgetAlert({
+    clientKey: clientKeyFromHeaders(req.headers),
+    surface: `fix · ${response.mode}`,
+    user: typeof body.alertUser === "string" ? body.alertUser : undefined,
+    mission: input || "(transform)",
+    fix: response,
+    notifyOnHumanNeeded: Boolean(body.notifyOnHumanNeeded)
+  });
 
   const headers = new Headers();
   headers.set("X-RateLimit-Limit", String(usage.limit));

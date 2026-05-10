@@ -38,11 +38,13 @@ const PLANS: Plan[] = [
     highlight: true,
     features: [
       "Unlimited prompt fixes",
-      "Smart + Code models",
+      "Smart + Code models · priority routing",
+      "Telegram Mission Alerts",
       "Diff view",
-      "Templates + history",
+      "Mission Templates · Mission Archive",
       "Prompt variants",
-      "Cursor / Claude optimised outputs",
+      "Advanced Architect Mode",
+      "Cursor / Claude / Gemini optimised outputs",
       "Local Ollama support",
       "AI compare mode"
     ],

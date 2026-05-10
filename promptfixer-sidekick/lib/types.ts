@@ -109,6 +109,17 @@ export interface FixRequest {
    */
   action?: OutputAction;
   previousSections?: PromptSections;
+  /**
+   * Mission Alerts opt-in (Pro feature). When true AND the server is
+   * configured with TELEGRAM_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID, the route
+   * fires a Telegram notification on "soft" failure cases (low confidence,
+   * supervisor errors, safety findings that need confirmation). Hard
+   * failures (safety blocked, system errors) always alert when the bot is
+   * configured, independent of this flag.
+   */
+  notifyOnHumanNeeded?: boolean;
+  /** Optional user identifier surfaced in alert messages. Free-form. */
+  alertUser?: string;
 }
 
 export interface ScoreCard {
@@ -253,6 +264,9 @@ export interface ArchitectRequest {
   modelQuality?: ModelQuality;
   clientContext?: ClientContext;
   allowCloudFallback?: boolean;
+  /** See FixRequest.notifyOnHumanNeeded. */
+  notifyOnHumanNeeded?: boolean;
+  alertUser?: string;
 }
 
 export interface ArchitectResponse {

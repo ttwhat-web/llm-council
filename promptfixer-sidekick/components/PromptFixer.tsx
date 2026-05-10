@@ -18,6 +18,7 @@ import { HeaderStatus } from "./HeaderStatus";
 import { AgentActions } from "./AgentActions";
 import { LivePreview } from "./LivePreview";
 import { MissionLog } from "./MissionLog";
+import { MissionAlertToggle } from "./MissionAlertToggle";
 import { ScoreBadges } from "./ScoreBadges";
 import { SafetyBadge } from "./SafetyBadge";
 import { ArchitectView } from "./ArchitectView";
@@ -56,16 +57,26 @@ interface Settings {
    * default — Local mode never silently falls through to cloud.
    */
   allowCloudFallback: boolean;
+  /**
+   * User opt-in for Mission Alerts (Pro). When the public feature flag is
+   * off, the toggle renders as a Pro lock and this stays false.
+   */
+  notifyOnHumanNeeded: boolean;
 }
 
-const STORAGE_KEY = "promptfixer.settings.v4";
+const STORAGE_KEY = "promptfixer.settings.v5";
 
 const DEFAULTS: Settings = {
   mode: "general",
   modelQuality: "fast",
   autoMode: true,
-  allowCloudFallback: false
+  allowCloudFallback: false,
+  notifyOnHumanNeeded: false
 };
+
+/** Public feature flag (NEXT_PUBLIC_*); read at module-load on the client. */
+const MISSION_ALERTS_FLAG =
+  (process.env.NEXT_PUBLIC_MISSION_ALERTS_ENABLED || "").toLowerCase() === "true";
 
 export function PromptFixer({ variant = "web" }: Props) {
   const compact = variant === "floating";
@@ -135,7 +146,9 @@ export function PromptFixer({ variant = "web" }: Props) {
             allowCloudFallback: isLocal ? settings.allowCloudFallback : false,
             modelQuality: settings.modelQuality,
             action: override?.action,
-            previousSections: override?.previousSections
+            previousSections: override?.previousSections,
+            notifyOnHumanNeeded:
+              MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded
           })
         });
         const data = (await res.json()) as FixResponse & { error?: string };
@@ -200,7 +213,9 @@ export function PromptFixer({ variant = "web" }: Props) {
           input,
           modelQuality: settings.modelQuality,
           clientContext,
-          allowCloudFallback: isLocal ? settings.allowCloudFallback : false
+          allowCloudFallback: isLocal ? settings.allowCloudFallback : false,
+          notifyOnHumanNeeded:
+            MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded
         })
       });
       const data = (await res.json()) as ArchitectResponse & { error?: string };
@@ -464,6 +479,15 @@ export function PromptFixer({ variant = "web" }: Props) {
               }
             />
           )}
+
+          <MissionAlertToggle
+            unlocked={MISSION_ALERTS_FLAG}
+            enabled={MISSION_ALERTS_FLAG && settings.notifyOnHumanNeeded}
+            onChange={(notifyOnHumanNeeded) =>
+              setSettings((s) => ({ ...s, notifyOnHumanNeeded }))
+            }
+            compact
+          />
 
           <div className="relative">
             <textarea
