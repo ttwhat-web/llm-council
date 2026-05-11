@@ -205,6 +205,22 @@ export function AdminPaymentsClient() {
                         <dt className="text-white/45">tx hash</dt>
                         <dd className="break-all font-mono text-[11px] text-emerald-200">
                           {p.crypto.txHash}
+                          {(() => {
+                            const url = explorerUrlFor(
+                              p.crypto?.network,
+                              p.crypto?.txHash
+                            );
+                            return url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-2 inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-[10px] font-medium text-accent transition hover:bg-white/[0.08]"
+                              >
+                                open in explorer ↗
+                              </a>
+                            ) : null;
+                          })()}
                         </dd>
                       </>
                     )}
@@ -258,6 +274,28 @@ export function AdminPaymentsClient() {
       )}
     </article>
   );
+}
+
+/**
+ * Block-explorer URL per supported network. The actual templates are
+ * read at runtime so deployments can override via env if a network
+ * moves explorers — defaults below cover the launch set.
+ */
+function explorerUrlFor(network: string | undefined, txHash: string | undefined): string | null {
+  if (!network || !txHash) return null;
+  switch (network) {
+    case "btc":
+      return `https://mempool.space/tx/${txHash}`;
+    case "usdt-trc20":
+      return `https://tronscan.org/#/transaction/${txHash}`;
+    case "usdt-erc20":
+    case "usdc-erc20":
+      return `https://etherscan.io/tx/${txHash}`;
+    case "sol":
+      return `https://solscan.io/tx/${txHash}`;
+    default:
+      return null;
+  }
 }
 
 function StatusPill({ status }: { status: PaymentStatus }) {

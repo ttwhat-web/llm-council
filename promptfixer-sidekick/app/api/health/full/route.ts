@@ -17,6 +17,7 @@ import { missionStoreKind } from "@/lib/missions/store";
 import { paymentStoreKind } from "@/lib/payments/store";
 import { cryptoConfig } from "@/lib/payments/crypto";
 import { countFounderSeats } from "@/lib/billing/founder";
+import { emailProviderSnapshot } from "@/lib/email";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,6 +86,13 @@ export async function GET() {
     admin: adminEnvSnapshot()
   } satisfies Record<string, unknown>;
 
+  const stores = {
+    billing: billingStoreKind(),
+    mission: missionStoreKind(),
+    payment: paymentStoreKind()
+  };
+  const email = emailProviderSnapshot();
+
   const warnings: string[] = [];
   if (process.env.NODE_ENV === "production") {
     if (!env.appUrl) warnings.push("NEXT_PUBLIC_APP_URL is required in production.");
@@ -96,10 +104,41 @@ export async function GET() {
       );
     if (env.stripe.secret && !env.stripe.webhook)
       warnings.push("STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set.");
-    if (!env.upstash.url || !env.upstash.token)
+    if (env.lemonSqueezy.apiKey && !env.lemonSqueezy.webhook)
       warnings.push(
-        "Upstash credentials missing — BillingStore / MissionStore / PaymentStore will fall back to in-memory."
+        "LEMON_SQUEEZY_WEBHOOK_SECRET is required when LEMON_SQUEEZY_API_KEY is set."
       );
+
+    // Per-store production diagnostics. The fallback semantics are:
+    //   no Upstash → memory (loses everything on deploy)
+    //   *_STORE=file → tries to write under .promptfixer (ephemeral on
+    //                  serverless platforms like Vercel)
+    if (!env.upstash.url || !env.upstash.token) {
+      warnings.push(
+        "Upstash credentials missing — billing, mission, and payment stores will fall back to in-memory."
+      );
+    }
+    for (const [name, kind] of [
+      ["BillingStore", stores.billing],
+      ["MissionStore", stores.mission],
+      ["PaymentStore", stores.payment]
+    ] as const) {
+      if (kind === "memory") {
+        warnings.push(`${name} resolves to memory in production — data is lost on every deploy.`);
+      } else if (kind === "file") {
+        warnings.push(
+          `${name} resolves to file in production — fine for a single VPS, ephemeral on serverless.`
+        );
+      }
+    }
+
+    if (!email.enabled) {
+      warnings.push(
+        "Email provider is no-op in production — RESEND_API_KEY + EMAIL_FROM required to send transactional mail."
+      );
+    } else if (email.from === "missing") {
+      warnings.push("EMAIL_FROM is not set; transactional mail will fail.");
+    }
     if (env.allowDevUserHeader)
       warnings.push(
         "ALLOW_DEV_USER_HEADER=true in production is unsafe — disable before launch."
@@ -116,11 +155,8 @@ export async function GET() {
     nodeEnv: process.env.NODE_ENV || "development",
     billingProvider,
     paymentProvider,
-    stores: {
-      billing: billingStoreKind(),
-      mission: missionStoreKind(),
-      payment: paymentStoreKind()
-    },
+    stores,
+    email,
     providers,
     crypto: {
       enabled: crypto.enabled,

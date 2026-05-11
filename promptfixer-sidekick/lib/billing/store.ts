@@ -45,7 +45,8 @@ export type SubscriptionSource =
   | "dev-stub"
   | "debug-grant"
   | "stripe"
-  | "paddle";
+  | "paddle"
+  | "lemon_squeezy";
 
 export interface Subscription {
   /** Stable opaque key. Format: "pf_sub_<uuid>". */

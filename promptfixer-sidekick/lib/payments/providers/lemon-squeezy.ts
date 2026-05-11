@@ -1,16 +1,27 @@
 /**
  * Lemon Squeezy `PaymentProvider`.
  *
- * Merchant-of-record. The recommended Turkey-friendly default for
- * card-based subscriptions while we establish a Stripe-supported
- * international entity. Lemon Squeezy supports lifetime SKUs natively,
- * so it's the natural home for the founder lifetime.
+ * Phase 9: real checkout. Merchant-of-record default for operator.center
+ * pre-international-entity (Turkey-friendly, native lifetime SKU).
  *
- * Phase-8 ships the abstraction stub: `info()` reports enabled when env
- * vars are present; `createCheckout` returns a 503 until the Lemon
- * Squeezy SDK is wired.
+ * The provider calls `POST /v1/checkouts` against the Lemon REST API
+ * (no SDK dep) and returns the hosted-checkout URL. Lifecycle events
+ * land at `/api/payments/lemon-squeezy/webhook`, which verifies the
+ * `X-Signature` HMAC, normalises event names, and upserts via
+ * BillingStore.
+ *
+ * Custom data carried along on every checkout:
+ *   identityKey     stable `Identity.id` so the webhook can resolve back
+ *   plan            our internal PaymentPlanKey
+ *   founder         "true" when the plan is founder_lifetime — surfaced
+ *                   in the welcome email
+ *   reference       short user-visible reference (OC-XXXXXX)
  */
 
+import {
+  newPaymentReference
+} from "../store";
+import { countFounderSeats } from "../../billing/founder";
 import type {
   CreateCheckoutInput,
   PaymentCheckoutResult,
@@ -20,6 +31,7 @@ import type {
 } from "../types";
 
 const PROVIDER_ID = "lemon_squeezy";
+const API_BASE = "https://api.lemonsqueezy.com/v1";
 
 interface LemonEnv {
   apiKey: string;
@@ -47,6 +59,10 @@ function configuredPlans(env: LemonEnv): PaymentPlanKey[] {
   return (Object.entries(env.variants) as Array<[PaymentPlanKey, string | undefined]>)
     .filter(([, v]) => Boolean(v))
     .map(([k]) => k);
+}
+
+function appUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3030").replace(/\/$/, "");
 }
 
 export function createLemonSqueezyProvider(): PaymentProvider {
@@ -79,22 +95,105 @@ export function createLemonSqueezyProvider(): PaymentProvider {
           message: "Lemon Squeezy isn't configured on this deployment."
         };
       }
-      void input;
-      // TODO(payments-lemon):
-      // 1. POST /v1/checkouts with the right variant id + custom data
-      //    carrying identityKey.
-      // 2. Return the redirect URL (data.attributes.url).
-      // 3. Register a webhook handler under
-      //    /api/payments/lemon-squeezy/webhook verifying the
-      //    `X-Signature` HMAC, then upsert through BillingStore on
-      //    `order_created` and `subscription_*` events.
-      return {
-        ok: false,
-        code: "lemon_not_implemented",
-        message:
-          "Lemon Squeezy checkout integration is stubbed in Phase 8. " +
-          "Wire the @lemonsqueezy/lemonsqueezy.js SDK here and a webhook handler."
+      const variantId = env.variants[input.plan];
+      if (!variantId) {
+        return {
+          ok: false,
+          code: "lemon_variant_missing",
+          message: `Lemon Squeezy variant for ${input.plan} is not configured.`
+        };
+      }
+      if (input.plan === "founder_lifetime") {
+        const seats = await countFounderSeats();
+        if (seats.soldOut) {
+          return {
+            ok: false,
+            code: "founder_sold_out",
+            message: "Founder lifetime is fully claimed."
+          };
+        }
+      }
+
+      const reference = newPaymentReference();
+
+      const checkoutBody = {
+        data: {
+          type: "checkouts",
+          attributes: {
+            checkout_data: {
+              email: input.email,
+              custom: {
+                identityKey: input.identityKey,
+                plan: input.plan,
+                founder: input.plan === "founder_lifetime" ? "true" : "false",
+                reference
+              }
+            },
+            checkout_options: {
+              embed: false,
+              media: false,
+              logo: true,
+              dark: true
+            },
+            product_options: {
+              redirect_url:
+                input.successUrl || `${appUrl()}/app?billing=success&ref=${reference}`,
+              receipt_link_url:
+                input.successUrl || `${appUrl()}/app?billing=success&ref=${reference}`,
+              receipt_thank_you_note: "Welcome aboard, operator."
+            }
+          },
+          relationships: {
+            store: { data: { type: "stores", id: env.storeId } },
+            variant: { data: { type: "variants", id: variantId } }
+          }
+        }
       };
+
+      try {
+        const res = await fetch(`${API_BASE}/checkouts`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.apiKey}`,
+            Accept: "application/vnd.api+json",
+            "Content-Type": "application/vnd.api+json"
+          },
+          body: JSON.stringify(checkoutBody)
+        });
+        if (!res.ok) {
+          // Provider body can include useful hints but we don't echo it
+          // to the browser — surface only the status.
+          return {
+            ok: false,
+            code: "lemon_error",
+            message: `Lemon Squeezy rejected checkout (HTTP ${res.status}).`
+          };
+        }
+        const data = (await res.json()) as {
+          data?: { id?: string; attributes?: { url?: string } };
+        };
+        const url = data.data?.attributes?.url;
+        if (!url) {
+          return {
+            ok: false,
+            code: "lemon_no_url",
+            message: "Lemon Squeezy didn't return a checkout URL."
+          };
+        }
+        return {
+          ok: true,
+          provider: PROVIDER_ID,
+          mode: "lemon_squeezy_checkout",
+          paymentId: data.data?.id,
+          redirectUrl: url
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          code: "lemon_error",
+          message: `Lemon Squeezy request failed: ${(err as Error).name || "error"}`
+        };
+      }
     }
   };
 }

@@ -24,6 +24,9 @@ import {
 import { getBillingStore } from "@/lib/billing/store";
 import { getPaymentStore, isPaymentId } from "@/lib/payments/store";
 import { redactSecrets } from "@/lib/missions/redact";
+import { sendEmail } from "@/lib/email";
+import { cryptoSubmittedTemplate } from "@/lib/email/templates";
+import { getNetwork } from "@/lib/payments/crypto";
 import { toPublicPayment } from "@/lib/payments/types";
 
 export const runtime = "nodejs";
@@ -136,6 +139,21 @@ export async function POST(req: NextRequest) {
       txHash
     }
   });
+
+  // Acknowledgement email — fire and forget. Noop provider when Resend
+  // isn't configured, so this is safe in every environment.
+  if (updated.email) {
+    const network = updated.crypto?.network
+      ? getNetwork(updated.crypto.network)
+      : null;
+    const tpl = cryptoSubmittedTemplate({
+      reference: updated.reference,
+      plan: updated.plan,
+      networkLabel: network?.label || updated.crypto?.network || updated.provider,
+      txHash
+    });
+    void sendEmail({ to: updated.email, ...tpl });
+  }
 
   return attachToResponse(
     NextResponse.json({ ok: true, payment: toPublicPayment(updated) })

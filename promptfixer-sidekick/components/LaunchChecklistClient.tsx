@@ -27,6 +27,7 @@ interface HealthResponse {
   billingProvider: string;
   paymentProvider: string;
   stores: { billing: string; mission: string; payment: string };
+  email: { provider: "noop" | "resend"; enabled: boolean; from: string; support: string };
   providers: Array<{ id: string; enabled: boolean; plans: string[] }>;
   crypto: { enabled: boolean; networks: Array<{ id: string; enabled: boolean }> };
   founder: { cap: number; claimed: number; remaining: number; soldOut: boolean };
@@ -77,6 +78,7 @@ export function LaunchChecklistClient() {
   }
 
   const stripeProvider = health.providers.find((p) => p.id === "stripe");
+  const lemonProvider = health.providers.find((p) => p.id === "lemon_squeezy");
   const items: Array<[string, boolean, string?]> = [
     ["Domain (NEXT_PUBLIC_APP_URL)", health.env.appUrl],
     [
@@ -105,9 +107,16 @@ export function LaunchChecklistClient() {
       "PADDLE_API_KEY"
     ],
     [
-      "Lemon Squeezy keys (MoR alternative)",
-      health.env.lemonSqueezy.apiKey && health.env.lemonSqueezy.storeId,
-      "LEMON_SQUEEZY_API_KEY + STORE_ID"
+      "Lemon Squeezy keys (MoR default)",
+      health.env.lemonSqueezy.apiKey &&
+        health.env.lemonSqueezy.storeId &&
+        health.env.lemonSqueezy.webhook,
+      "LEMON_SQUEEZY_API_KEY + STORE_ID + WEBHOOK_SECRET"
+    ],
+    [
+      "Lemon Squeezy variants",
+      (lemonProvider?.plans.length ?? 0) > 0,
+      `${lemonProvider?.plans.length ?? 0} variant${lemonProvider?.plans.length === 1 ? "" : "s"} configured (need at least pro_monthly)`
     ],
     [
       "Crypto receiving addresses",
@@ -115,8 +124,34 @@ export function LaunchChecklistClient() {
       "ENABLE_CRYPTO_PAYMENTS + one CRYPTO_*_ADDRESS"
     ],
     [
-      "Upstash (durable BillingStore + MissionStore + PaymentStore)",
+      "Upstash credentials",
       health.env.upstash.url && health.env.upstash.token
+    ],
+    [
+      "BillingStore resolves to a durable backend",
+      health.stores.billing === "upstash"
+        ? true
+        : health.stores.billing === "file" && health.nodeEnv !== "production",
+      `current=${health.stores.billing}`
+    ],
+    [
+      "MissionStore resolves to a durable backend",
+      health.stores.mission === "upstash"
+        ? true
+        : health.stores.mission === "file" && health.nodeEnv !== "production",
+      `current=${health.stores.mission}`
+    ],
+    [
+      "PaymentStore resolves to a durable backend",
+      health.stores.payment === "upstash"
+        ? true
+        : health.stores.payment === "file" && health.nodeEnv !== "production",
+      `current=${health.stores.payment}`
+    ],
+    [
+      "Resend transactional email",
+      health.email.provider === "resend" && health.email.enabled,
+      "RESEND_API_KEY + EMAIL_FROM (+ optional SUPPORT_EMAIL)"
     ],
     [
       "PostHog analytics key",
@@ -129,9 +164,9 @@ export function LaunchChecklistClient() {
       "ENABLE_ADMIN_ROUTES + ADMIN_EMAILS"
     ],
     [
-      "Founder lifetime tested end-to-end",
+      "Founder lifetime cap tested end-to-end",
       false,
-      "Run /app, click founder lifetime, complete a stub or live checkout"
+      "Run /app → founder checkout (stub or live) → admin verify → email lands"
     ],
     [
       "Mission receipt share tested",
@@ -142,11 +177,6 @@ export function LaunchChecklistClient() {
       "Privacy + terms reviewed by counsel",
       false,
       "Update /privacy and /terms with counsel-reviewed copy"
-    ],
-    [
-      "Email sending configured",
-      false,
-      "Resend / Postmark / SendGrid for welcome + dunning"
     ]
   ];
 

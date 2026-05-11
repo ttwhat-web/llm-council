@@ -12,6 +12,8 @@ import { requireAdmin } from "@/lib/admin";
 import { getBillingStore, newCustomerId, newSubscriptionId } from "@/lib/billing/store";
 import { getPaymentStore, isPaymentId } from "@/lib/payments/store";
 import { countFounderSeats } from "@/lib/billing/founder";
+import { sendEmail } from "@/lib/email";
+import { paymentVerifiedTemplate } from "@/lib/email/templates";
 import { toPublicPayment } from "@/lib/payments/types";
 import type { Subscription } from "@/lib/billing/store";
 
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
         : verifiedRecord.provider === "paddle"
           ? "paddle"
           : verifiedRecord.provider === "lemon_squeezy"
-            ? "stripe" // closest BillingSource we model today
+            ? "lemon_squeezy"
             : "debug-grant",
     externalId: verifiedRecord.id,
     currentPeriodEnd: periodEnd,
@@ -133,6 +135,16 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
     detail: `admin verified ${verifiedRecord.provider} payment ${verifiedRecord.reference}`,
     meta: { paymentId: verifiedRecord.id, by: gate.identityEmail }
   });
+
+  // Activation email — fire and forget. Noop unless Resend is configured.
+  if (verifiedRecord.email) {
+    const tpl = paymentVerifiedTemplate({
+      reference: verifiedRecord.reference,
+      plan: verifiedRecord.plan,
+      isFounder: verifiedRecord.plan === "founder_lifetime"
+    });
+    void sendEmail({ to: verifiedRecord.email, ...tpl });
+  }
 
   return NextResponse.json({
     ok: true,

@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { getBillingStore } from "@/lib/billing/store";
 import { getPaymentStore, isPaymentId } from "@/lib/payments/store";
+import { sendEmail } from "@/lib/email";
+import { paymentRejectedTemplate } from "@/lib/email/templates";
 import { toPublicPayment } from "@/lib/payments/types";
 
 export const runtime = "nodejs";
@@ -67,6 +69,16 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
     detail: `admin rejected ${record.provider} payment ${record.reference}${reason ? ` — ${reason}` : ""}`,
     meta: { paymentId: record.id, by: gate.identityEmail }
   });
+
+  // Rejection email — fire and forget. Noop unless Resend is configured.
+  if (record.email) {
+    const tpl = paymentRejectedTemplate({
+      reference: record.reference,
+      plan: record.plan,
+      reason
+    });
+    void sendEmail({ to: record.email, ...tpl });
+  }
 
   return NextResponse.json({ ok: true, payment: updated ? toPublicPayment(updated) : null });
 }

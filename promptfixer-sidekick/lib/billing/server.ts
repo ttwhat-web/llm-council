@@ -298,6 +298,7 @@ function subscriptionSource(s: Subscription["source"]): BillingSource {
   switch (s) {
     case "stripe":
     case "paddle":
+    case "lemon_squeezy":
     case "auth":
       return "auth";
     case "dev-stub":
