@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { Check, Crown, ShieldCheck, X } from "lucide-react";
 import { BILLING_PLANS, type BillingTier } from "@/lib/billing";
 import { track } from "@/lib/analytics";
+import { PaymentsPicker } from "./PaymentsPicker";
 
 /**
  * Upgrade paywall + plan picker.
@@ -240,6 +241,11 @@ export function UpgradeModal({
                 Manage subscription in Stripe
               </button>
             )}
+
+            {/* Phase-8 multi-provider surface — Paddle / Lemon Squeezy /
+                crypto / local bank, dispatched via /api/payments/checkout.
+                Stripe stays on the existing plan cards above. */}
+            <PaymentsPicker plan="pro_monthly" />
 
             {error && (
               <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
