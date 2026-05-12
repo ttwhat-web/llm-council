@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import AnnouncementBar from '@/components/AnnouncementBar';
 import Footer from '@/components/Footer';
 import Navbar from '@/components/Navbar';
 import './globals.css';
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr">
       <body>
+        <AnnouncementBar />
         <Navbar />
         <main>{children}</main>
         <Footer />
