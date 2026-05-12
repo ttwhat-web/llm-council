@@ -11,6 +11,7 @@ import {
   Workflow
 } from "lucide-react";
 import { MarketingShell } from "@/components/MarketingShell";
+import { FounderCounter } from "@/components/FounderCounter";
 
 /**
  * operator.center landing — `/`.
@@ -65,9 +66,15 @@ function Hero() {
           Start free
           <ArrowRight className="h-4 w-4" />
         </Link>
+        <Link
+          href="/pricing"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white/85 transition hover:bg-white/[0.08]"
+        >
+          View pricing
+        </Link>
         <a
           href="#demo"
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white/85 transition hover:bg-white/[0.08]"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm font-medium text-white/65 transition hover:bg-white/[0.06]"
         >
           <PlayCircle className="h-4 w-4 text-accent/80" />
           Watch a 90s mission
@@ -76,6 +83,7 @@ function Hero() {
           No credit card. 10 free missions / day.
         </span>
       </div>
+      <FounderCounter variant="cta" />
     </section>
   );
 }

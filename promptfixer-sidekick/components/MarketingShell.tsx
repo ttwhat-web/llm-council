@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LaunchBadge } from "./LaunchBadge";
 import { UserMenu } from "./UserMenu";
 
 /**
@@ -21,6 +22,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
           <span className="font-mono text-[12px] tracking-tight text-white">
             operator<span className="text-white/40">.center</span>
           </span>
+          <LaunchBadge compact />
         </Link>
         <nav className="flex items-center gap-3 md:gap-5">
           <Link

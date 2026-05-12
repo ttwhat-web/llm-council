@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { listProviderInfo } from "@/lib/payments/registry";
 import { countFounderSeats } from "@/lib/billing/founder";
 import { cryptoConfig } from "@/lib/payments/crypto";
+import { founderLaunchEnabled } from "@/lib/launchMode";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,19 +24,22 @@ export async function GET() {
   const providers = listProviderInfo();
   const seats = await countFounderSeats();
   const crypto = cryptoConfig();
+  const founderEnabled = founderLaunchEnabled();
 
-  // Soldout founder lifetime: strip it from each provider's plan list
-  // and surface a clean unavailableReason on the front end.
-  const founderSoldOut = seats.soldOut;
+  // Strip founder_lifetime from every provider's plans list when the
+  // SKU is disabled by env (private beta phase) OR the cap is hit.
+  const founderShouldHide = !founderEnabled || seats.soldOut;
   const sanitized = providers.map((p) => ({
     ...p,
-    plans: founderSoldOut ? p.plans.filter((x) => x !== "founder_lifetime") : p.plans
+    plans: founderShouldHide
+      ? p.plans.filter((x) => x !== "founder_lifetime")
+      : p.plans
   }));
 
   return NextResponse.json({
     ok: true,
     providers: sanitized,
-    founder: seats,
+    founder: { ...seats, enabled: founderEnabled },
     crypto: {
       enabled: crypto.enabled,
       networks: crypto.networks

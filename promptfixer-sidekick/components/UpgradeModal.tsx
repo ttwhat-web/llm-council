@@ -7,6 +7,7 @@ import { Check, Crown, ShieldCheck, X } from "lucide-react";
 import { BILLING_PLANS, type BillingTier } from "@/lib/billing";
 import { track } from "@/lib/analytics";
 import { PaymentsPicker } from "./PaymentsPicker";
+import { FounderCounter } from "./FounderCounter";
 
 /**
  * Upgrade paywall + plan picker.
@@ -205,6 +206,7 @@ export function UpgradeModal({
                     mode: {serverSnapshot.mode}
                   </span>
                 )}
+                <FounderCounter variant="badge" />
               </div>
             </header>
 

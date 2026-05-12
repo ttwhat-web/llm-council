@@ -1,4 +1,5 @@
 import { MarketingShell } from "@/components/MarketingShell";
+import { LegalPlaceholderBanner } from "@/components/LegalPlaceholderBanner";
 
 export const metadata = {
   title: "Terms · operator.center",
@@ -9,10 +10,10 @@ export default function TermsPage() {
   return (
     <MarketingShell>
       <article className="prose-page">
+        <LegalPlaceholderBanner flag="LEGAL_TERMS_REVIEWED" document="terms of service" />
         <h1>Terms of service</h1>
         <p className="muted">
-          Placeholder copy. Replace with counsel-reviewed Terms before public
-          launch.
+          Counsel-reviewed copy replaces this section before public launch.
         </p>
 
         <h2>Use of the service</h2>

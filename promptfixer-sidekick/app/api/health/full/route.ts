@@ -18,6 +18,8 @@ import { paymentStoreKind } from "@/lib/payments/store";
 import { cryptoConfig } from "@/lib/payments/crypto";
 import { countFounderSeats } from "@/lib/billing/founder";
 import { emailProviderSnapshot } from "@/lib/email";
+import { evaluateEnv } from "@/lib/env";
+import { launchModeSnapshot } from "@/lib/launchMode";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -149,10 +151,27 @@ export async function GET() {
       );
   }
 
+  // Classified env diagnostics (Phase 10). The launch checklist UI
+  // renders these as blockers / warnings / passed; the response keeps
+  // the legacy `warnings: string[]` for any tooling that still parses
+  // the old shape.
+  const diag = evaluateEnv();
+  const launch = launchModeSnapshot();
+
   return NextResponse.json({
     ok: true,
     version: process.env.npm_package_version || "0.0.0",
     nodeEnv: process.env.NODE_ENV || "development",
+    launch,
+    status: diag.status,
+    diagnostics: {
+      status: diag.status,
+      mode: diag.mode,
+      blockers: diag.blockers,
+      warnings: diag.warnings,
+      passed: diag.passed,
+      checks: diag.checks
+    },
     billingProvider,
     paymentProvider,
     stores,

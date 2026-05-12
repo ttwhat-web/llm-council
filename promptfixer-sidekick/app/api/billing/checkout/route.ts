@@ -40,6 +40,7 @@ import {
   getStripe,
   type StripePlanKey
 } from "@/lib/billing/stripe";
+import { founderLaunchEnabled } from "@/lib/launchMode";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +93,16 @@ export async function POST(req: NextRequest) {
           message: "Dev override cleared.",
           nextAction: "reload"
         })
+      )
+    );
+  }
+
+  if (body.founder && !founderLaunchEnabled()) {
+    return attachToResponse(
+      billingErrorResponse(
+        "founder_launch_disabled",
+        "Founder lifetime is not available right now.",
+        410
       )
     );
   }

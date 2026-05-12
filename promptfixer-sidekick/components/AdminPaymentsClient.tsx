@@ -24,6 +24,7 @@ interface PageState {
   error: string | null;
   payments: PaymentRecord[];
   founder: FounderSnapshot | null;
+  adminEmail: string | null;
   forbidden: { reason?: string } | null;
 }
 
@@ -32,6 +33,7 @@ const INITIAL: PageState = {
   error: null,
   payments: [],
   founder: null,
+  adminEmail: null,
   forbidden: null
 };
 
@@ -55,6 +57,7 @@ export function AdminPaymentsClient() {
         ok: boolean;
         payments: PaymentRecord[];
         founder: FounderSnapshot;
+        admin?: { email?: string };
       };
       if (!data.ok) {
         setState({ ...INITIAL, error: "Admin endpoint returned an error." });
@@ -65,6 +68,7 @@ export function AdminPaymentsClient() {
         error: null,
         payments: data.payments ?? [],
         founder: data.founder,
+        adminEmail: data.admin?.email ?? null,
         forbidden: null
       });
     } catch (err) {
@@ -116,7 +120,15 @@ export function AdminPaymentsClient() {
   return (
     <article className="prose-page" style={{ maxWidth: "min(72rem, 100%)" }}>
       <header className="flex items-center justify-between gap-3">
-        <h1 style={{ marginBottom: 0 }}>Payments queue</h1>
+        <div className="flex flex-col gap-1">
+          <h1 style={{ marginBottom: 0 }}>Payments queue</h1>
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+            signed in as ·{" "}
+            <span className="text-emerald-200">
+              {state.adminEmail || "anonymous (dev)"}
+            </span>
+          </span>
+        </div>
         <button
           type="button"
           onClick={() => void refresh()}

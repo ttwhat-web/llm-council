@@ -26,6 +26,7 @@ import {
 } from "@/lib/billing/server";
 import { getProvider } from "@/lib/payments/registry";
 import { isPaymentPlanKey, isPaymentProviderId } from "@/lib/payments/types";
+import { founderLaunchEnabled } from "@/lib/launchMode";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +78,15 @@ export async function POST(req: NextRequest) {
         "provider_disabled",
         info.unavailableReason || `Provider ${body.provider} is not available.`,
         503
+      )
+    );
+  }
+  if (body.plan === "founder_lifetime" && !founderLaunchEnabled()) {
+    return gate.attach(
+      billingErrorResponse(
+        "founder_launch_disabled",
+        "Founder lifetime is not available right now.",
+        410
       )
     );
   }

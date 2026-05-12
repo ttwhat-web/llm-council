@@ -1,4 +1,5 @@
 import { MarketingShell } from "@/components/MarketingShell";
+import { LegalPlaceholderBanner } from "@/components/LegalPlaceholderBanner";
 
 export const metadata = {
   title: "Privacy · operator.center",
@@ -9,10 +10,11 @@ export default function PrivacyPage() {
   return (
     <MarketingShell>
       <article className="prose-page">
+        <LegalPlaceholderBanner flag="LEGAL_PRIVACY_REVIEWED" document="privacy notice" />
         <h1>Privacy notice</h1>
         <p className="muted">
-          Placeholder copy. Replaced with counsel-reviewed text before public
-          launch. Use this page as the structural map.
+          Counsel-reviewed copy replaces this section before public launch. Use
+          this page as the structural map.
         </p>
 
         <h2>What we collect</h2>

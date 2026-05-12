@@ -31,6 +31,7 @@ import { SavedStacks } from "./SavedStacks";
 import { WorkflowRecorder } from "./WorkflowRecorder";
 import { EmptyStateExamples } from "./EmptyStateExamples";
 import { RecentMissions } from "./RecentMissions";
+import { LaunchBadge } from "./LaunchBadge";
 import { track } from "@/lib/analytics";
 import {
   incrementBilling,
@@ -1088,6 +1089,7 @@ export function PromptFixer({ variant = "web" }: Props) {
                 <span className="rounded-md border border-accent/25 bg-accent/[0.06] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.2em] text-accent">
                   Mission Control
                 </span>
+                <LaunchBadge compact />
               </div>
               {!compact && (
                 <div className="text-[11px] text-white/45">
