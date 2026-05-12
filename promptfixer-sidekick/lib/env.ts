@@ -175,9 +175,97 @@ function paymentChecks(ctx: BuildCtx): EnvCheck[] {
       passed: !envEqual("ENABLE_CRYPTO_PAYMENTS", "true") || cryptoConfig().enabled,
       hint: "ENABLE_CRYPTO_PAYMENTS=true requires at least one CRYPTO_*_ADDRESS.",
       appliesIn: ["dev", "private_beta", "public"]
-    }
+    },
+    ...localLinkChecks()
   ];
   return checks;
+}
+
+/**
+ * Local link providers (Shopier / iyzico / PayTR / manual link).
+ *
+ * Each is "configured" only when both the enable flag is true AND the
+ * default URL env points at a hosted link. Callback secret is a
+ * separate, softer check — operators may launch with manual verify only.
+ */
+function localLinkChecks(): EnvCheck[] {
+  const out: EnvCheck[] = [];
+  for (const { id, label, enableEnv, urlEnv, secretEnv } of [
+    {
+      id: "shopier",
+      label: "Shopier",
+      enableEnv: "SHOPIER_ENABLED",
+      urlEnv: "SHOPIER_DEFAULT_PAYMENT_URL",
+      secretEnv: "SHOPIER_CALLBACK_SECRET"
+    },
+    {
+      id: "iyzico",
+      label: "iyzico Link",
+      enableEnv: "IYZICO_LINK_ENABLED",
+      urlEnv: "IYZICO_DEFAULT_PAYMENT_URL",
+      secretEnv: "IYZICO_CALLBACK_SECRET"
+    },
+    {
+      id: "paytr",
+      label: "PayTR Link",
+      enableEnv: "PAYTR_LINK_ENABLED",
+      urlEnv: "PAYTR_DEFAULT_PAYMENT_URL",
+      secretEnv: "PAYTR_CALLBACK_SECRET"
+    },
+    {
+      id: "manual_link",
+      label: "Manual payment link",
+      enableEnv: "MANUAL_PAYMENT_LINK_ENABLED",
+      urlEnv: "MANUAL_PAYMENT_URL",
+      secretEnv: ""
+    }
+  ] as const) {
+    const enabled = envEqual(enableEnv, "true");
+    const urlSet = envPresent(urlEnv);
+    out.push({
+      id: `local-${id}-configured`,
+      label: `${label} configured (when enabled)`,
+      level: "warning",
+      passed: !enabled || urlSet,
+      hint: `${enableEnv}=true requires ${urlEnv} to point at the hosted link.`,
+      appliesIn: ["dev", "private_beta", "public"]
+    });
+    if (secretEnv) {
+      out.push({
+        id: `local-${id}-callback`,
+        label: `${label} callback secret (auto-grant)`,
+        level: "warning",
+        passed: !enabled || !urlSet || envPresent(secretEnv),
+        hint: `Set ${secretEnv} to auto-grant on signed callbacks. Without it, every payment requires admin verification.`,
+        appliesIn: ["private_beta", "public"]
+      });
+    }
+  }
+  // At least one local provider configured when PAYMENT_PROVIDER selects one.
+  const paymentProvider = (process.env.PAYMENT_PROVIDER || "").toLowerCase();
+  if (
+    paymentProvider === "shopier" ||
+    paymentProvider === "iyzico" ||
+    paymentProvider === "paytr" ||
+    paymentProvider === "manual_payment_link" ||
+    paymentProvider === "local_manual"
+  ) {
+    const any =
+      (envEqual("SHOPIER_ENABLED", "true") && envPresent("SHOPIER_DEFAULT_PAYMENT_URL")) ||
+      (envEqual("IYZICO_LINK_ENABLED", "true") && envPresent("IYZICO_DEFAULT_PAYMENT_URL")) ||
+      (envEqual("PAYTR_LINK_ENABLED", "true") && envPresent("PAYTR_DEFAULT_PAYMENT_URL")) ||
+      (envEqual("MANUAL_PAYMENT_LINK_ENABLED", "true") && envPresent("MANUAL_PAYMENT_URL")) ||
+      (envEqual("ENABLE_LOCAL_MANUAL_PAYMENTS", "true") && envPresent("LOCAL_BANK_INSTRUCTIONS"));
+    out.push({
+      id: "local-any-configured",
+      label: "At least one local payment link configured",
+      level: "blocker",
+      passed: any,
+      hint: `PAYMENT_PROVIDER=${paymentProvider} requires at least one local-link provider's URL configured.`,
+      appliesIn: ["private_beta", "public"]
+    });
+  }
+  return out;
 }
 
 function storeChecks(ctx: BuildCtx): EnvCheck[] {

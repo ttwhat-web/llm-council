@@ -118,7 +118,15 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
           ? "paddle"
           : verifiedRecord.provider === "lemon_squeezy"
             ? "lemon_squeezy"
-            : "debug-grant",
+            : verifiedRecord.provider === "shopier"
+              ? "shopier"
+              : verifiedRecord.provider === "iyzico"
+                ? "iyzico"
+                : verifiedRecord.provider === "paytr"
+                  ? "paytr"
+                  : verifiedRecord.provider === "manual_payment_link"
+                    ? "manual_payment_link"
+                    : "debug-grant",
     externalId: verifiedRecord.id,
     currentPeriodEnd: periodEnd,
     createdAt: now,

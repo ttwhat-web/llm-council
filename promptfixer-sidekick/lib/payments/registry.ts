@@ -8,9 +8,13 @@
  */
 
 import { createCryptoManualProvider } from "./providers/crypto-manual";
+import { createIyzicoProvider } from "./providers/iyzico";
 import { createLemonSqueezyProvider } from "./providers/lemon-squeezy";
 import { createLocalManualProvider } from "./providers/local-manual";
+import { createManualLinkProvider } from "./providers/manual-link";
 import { createPaddleProvider } from "./providers/paddle";
+import { createPaytrProvider } from "./providers/paytr";
+import { createShopierProvider } from "./providers/shopier";
 import { createStripeProvider } from "./providers/stripe";
 import { createStubProvider } from "./providers/stub";
 import type {
@@ -26,6 +30,10 @@ function buildRegistry(): PaymentProvider[] {
     createStripeProvider(),
     createPaddleProvider(),
     createLemonSqueezyProvider(),
+    createShopierProvider(),
+    createIyzicoProvider(),
+    createPaytrProvider(),
+    createManualLinkProvider(),
     createCryptoManualProvider(),
     createLocalManualProvider(),
     createStubProvider()

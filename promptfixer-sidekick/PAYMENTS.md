@@ -162,9 +162,135 @@ identical to crypto manual: generate a pending record + reference, show
 free-form instructions, user submits a confirmation note via the same
 `/api/payments/crypto/submit` endpoint, admin verifies.
 
-To wire a deep integration (Shopier / iyzico / PayTR) later, drop a new
-provider into `lib/payments/providers/`, push it into the registry, and
-the routes + UI need no changes.
+---
+
+## 7a. Local payment link providers (Phase 11)
+
+operator.center ships four Turkey-first hosted-link providers:
+
+| Provider              | Enable flag                    | Default URL env                 | Callback route                            |
+| --------------------- | ------------------------------ | ------------------------------- | ----------------------------------------- |
+| Shopier               | `SHOPIER_ENABLED`              | `SHOPIER_DEFAULT_PAYMENT_URL`   | `/api/payments/shopier/callback`          |
+| iyzico Link / Fastlink| `IYZICO_LINK_ENABLED`          | `IYZICO_DEFAULT_PAYMENT_URL`    | `/api/payments/iyzico/callback`           |
+| PayTR Link            | `PAYTR_LINK_ENABLED`           | `PAYTR_DEFAULT_PAYMENT_URL`     | `/api/payments/paytr/callback`            |
+| Generic manual link   | `MANUAL_PAYMENT_LINK_ENABLED`  | `MANUAL_PAYMENT_URL`            | none — always manual verification         |
+
+**Customer flow (all four):**
+
+1. Customer opens UpgradeModal → PaymentsPicker → chooses one of the
+   local-link cards.
+2. `POST /api/payments/checkout` returns `{ redirectUrl, paymentId,
+   manualInstructions }`. A `PaymentRecord{status:"pending"}` is
+   created with a short reference `OC-XXXXXX`.
+3. The browser navigates to the hosted link. The customer pays on the
+   provider's page.
+4. Optional: customer submits an order id / receipt via
+   `POST /api/payments/crypto/submit` (already accepts these
+   providers).
+5. Either:
+   - **Signed callback path** — Provider POSTs `/api/payments/<provider>/callback`.
+     The handler verifies HMAC against `*_CALLBACK_SECRET`. Status
+     `paid` + signature valid → auto-grant via BillingStore.
+   - **Manual path** — Without a callback secret OR for unsigned
+     events, the record sits in `submitted` and an admin verifies in
+     `/admin/payments`.
+
+**Hard rules:**
+- **Never auto-grant on unsigned callbacks.** Even a "paid" body
+  without a verified signature flips the record to `submitted` only;
+  an admin still has to confirm. See
+  `lib/payments/callbackHandler.ts`.
+- The provider-specific parsers in
+  `app/api/payments/<provider>/callback/route.ts` are stubs — they
+  accept a loose `{ ref, status }` shape until the operator wires the
+  real Shopier / iyzico / PayTR field names.
+- Founder cap is re-checked at checkout AND at signed-callback
+  auto-grant time to prevent race-condition overshoot.
+
+### Shopier setup
+
+1. Set `SHOPIER_ENABLED=true`.
+2. In the Shopier dashboard, create a "Payment Page" product and copy
+   its hosted URL into `SHOPIER_DEFAULT_PAYMENT_URL`.
+3. Optional: generate a webhook signing secret via Shopier's
+   notification settings and set `SHOPIER_CALLBACK_SECRET` — only this
+   unlocks auto-grant. Otherwise every payment routes through
+   `/admin/payments`.
+4. Real API link minting (`POST api_pay4.php`) is TODO inside
+   `lib/payments/providers/shopier.ts`. Operators can override
+   `buildRedirectUrl` to mint a signed URL per checkout instead of
+   using a single static link.
+
+### iyzico Link / Fastlink setup
+
+1. Set `IYZICO_LINK_ENABLED=true`.
+2. In the iyzico Merchant Panel, create an iyzilink product (or
+   Fastlink) and paste the hosted URL into
+   `IYZICO_DEFAULT_PAYMENT_URL`.
+3. `IYZICO_API_KEY` + `IYZICO_SECRET_KEY` + `IYZICO_BASE_URL` are
+   reserved for the API-driven link minting path (TODO inside
+   `providers/iyzico.ts`).
+4. Set `IYZICO_CALLBACK_SECRET` once you wire a webhook in the iyzico
+   panel; without it, payments wait for admin verification.
+
+### PayTR Link setup
+
+1. Set `PAYTR_LINK_ENABLED=true` and `PAYTR_DEFAULT_PAYMENT_URL` to
+   the hosted Link product URL from the PayTR panel.
+2. `PAYTR_MERCHANT_ID` + `PAYTR_MERCHANT_KEY` + `PAYTR_MERCHANT_SALT`
+   are reserved for the `link/send` API integration (TODO).
+3. PayTR's real callback signs `merchant_oid + merchant_salt +
+   status + total_amount` keyed with `merchant_key`. Replace the
+   generic HMAC check in the callback route with that exact algorithm
+   before flipping `PAYTR_CALLBACK_SECRET=true`. Without it, manual
+   verify only.
+
+### Generic manual payment link
+
+For anything else — a Buy-Me-A-Coffee URL, a personal Stripe Payment
+Link, a bank-supplied portal, a one-off invoice — flip
+`MANUAL_PAYMENT_LINK_ENABLED=true` and set `MANUAL_PAYMENT_URL` plus
+`MANUAL_PAYMENT_INSTRUCTIONS`. There is no callback route; every
+record requires admin verification via `/admin/payments`.
+
+### Stripe Link clarification
+
+**Link is NOT a separate provider.** Link by Stripe is an accelerated
+checkout layer inside Stripe Checkout: it autofills saved payment
+details after email or SMS verification on Stripe's hosted page.
+
+- Wire it by enabling Link in your Stripe dashboard +
+  `STRIPE_LINK_ENABLED=true` in env.
+- When both Stripe and Link are configured, the PaymentsPicker /
+  plan-card labels read **"Card / Link by Stripe"** and the
+  description mentions autofill.
+- Without Stripe configured, this flag is ignored and Link is hidden.
+- Link does NOT replace Shopier / iyzico / PayTR / crypto-manual
+  flows. It only changes the surface of the existing Stripe provider.
+
+### Turkey-friendly launch strategy
+
+Recommended order for a Turkey-operated launch (no Stripe entity):
+
+1. **Lemon Squeezy** (Phase 9, real) for cards globally — MoR handles
+   VAT/EU MOSS, lifetime SKU native.
+2. **Shopier / iyzico / PayTR** for Turkish card customers who prefer
+   a local processor and installments. Start with one provider; add
+   more once the verify queue is comfortable.
+3. **Crypto manual** for founder-lifetime sales and high-trust
+   customers.
+4. **Manual payment link** for one-off cases (B2B invoices, bank
+   portal).
+5. **Local bank transfer** (`local_manual`) for IBAN-first Turkish
+   customers.
+6. **Stripe** stays off until/unless an international entity is in
+   place — but the abstraction is already wired so flipping it on is
+   a one-env-block move.
+
+To go live with local providers only: set `PAYMENT_PROVIDER` to any of
+the local ids (`shopier` / `iyzico` / `paytr` / `manual_payment_link` /
+`local_manual`); `/launch` then upgrades "at least one local payment
+link configured" to a blocker.
 
 ---
 

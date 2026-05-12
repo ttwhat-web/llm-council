@@ -46,7 +46,11 @@ export type SubscriptionSource =
   | "debug-grant"
   | "stripe"
   | "paddle"
-  | "lemon_squeezy";
+  | "lemon_squeezy"
+  | "shopier"
+  | "iyzico"
+  | "paytr"
+  | "manual_payment_link";
 
 export interface Subscription {
   /** Stable opaque key. Format: "pf_sub_<uuid>". */

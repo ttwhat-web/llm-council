@@ -1,17 +1,21 @@
 /**
- * Provider-neutral payments abstraction — Phase 8.
+ * Provider-neutral payments abstraction — Phase 8 + Phase 11.
  *
  * operator.center accepts payment through multiple providers:
  *
- *   stripe            — card subscriptions where Stripe is allowed
- *   paddle            — merchant-of-record (global / TR-friendly fallback)
- *   lemon_squeezy     — merchant-of-record (TR-friendly default)
- *   crypto_manual     — BTC / USDT / USDC / SOL via on-chain transfer +
- *                       human verification
- *   local_manual      — Turkish-market local payment flows
- *                       (Shopier / iyzico / PayTR / bank transfer)
- *                       reserved seat; not implemented yet
- *   stub              — dev override, no charge
+ *   stripe              — card subscriptions where Stripe is allowed
+ *                         (optional Link by Stripe accelerated checkout
+ *                          surfaces as a capability of this provider)
+ *   paddle              — merchant-of-record (global / TR-friendly fallback)
+ *   lemon_squeezy       — merchant-of-record (TR-friendly default)
+ *   shopier             — Turkey-first hosted payment link / form
+ *   iyzico              — Turkey-first hosted payment link (Link / Fastlink)
+ *   paytr               — Turkey-first hosted payment link
+ *   manual_payment_link — generic static payment URL (any local provider)
+ *   crypto_manual       — BTC / USDT / USDC / SOL via on-chain transfer +
+ *                         human verification
+ *   local_manual        — Turkish bank-transfer / IBAN manual flow
+ *   stub                — dev override, no charge
  *
  * The existing `/api/billing/checkout` keeps working for Stripe — this
  * abstraction layers on top through `/api/payments/checkout` and routes
@@ -22,6 +26,10 @@ export type PaymentProviderId =
   | "stripe"
   | "paddle"
   | "lemon_squeezy"
+  | "shopier"
+  | "iyzico"
+  | "paytr"
+  | "manual_payment_link"
   | "crypto_manual"
   | "local_manual"
   | "stub";
@@ -30,6 +38,10 @@ export type PaymentMode =
   | "stripe_checkout"
   | "paddle_checkout"
   | "lemon_squeezy_checkout"
+  | "shopier_payment_link"
+  | "iyzico_payment_link"
+  | "paytr_payment_link"
+  | "manual_payment_link"
   | "crypto_manual_invoice"
   | "local_bank_transfer_manual"
   | "stub_dev_override";
@@ -49,6 +61,16 @@ export type PaymentPlanKey =
   | "team_annual"
   | "founder_lifetime";
 
+/**
+ * Optional capabilities a provider can advertise alongside its base
+ * info. Today only `stripeLink` is meaningful — Link by Stripe is an
+ * accelerated checkout layer *inside* Stripe, not a separate provider.
+ */
+export interface ProviderCapabilities {
+  /** Stripe Link autofill enabled (STRIPE_LINK_ENABLED=true + Stripe configured). */
+  stripeLink?: boolean;
+}
+
 export interface ProviderInfo {
   id: PaymentProviderId;
   label: string;
@@ -59,10 +81,12 @@ export interface ProviderInfo {
   plans: PaymentPlanKey[];
   /** Modes the UI should expect (redirect / manual / dev). */
   modes: PaymentMode[];
-  /** True for manual flows (crypto / local bank). */
+  /** True for manual flows (crypto / local bank / local link without callback). */
   manualVerification: boolean;
   /** Disabled when sold out or otherwise unavailable, with a reason. */
   unavailableReason?: string;
+  /** Optional capability flags (e.g. Stripe Link). */
+  capabilities?: ProviderCapabilities;
 }
 
 export interface ManualInstructions {
@@ -165,9 +189,26 @@ export function isPaymentProviderId(value: unknown): value is PaymentProviderId 
     value === "stripe" ||
     value === "paddle" ||
     value === "lemon_squeezy" ||
+    value === "shopier" ||
+    value === "iyzico" ||
+    value === "paytr" ||
+    value === "manual_payment_link" ||
     value === "crypto_manual" ||
     value === "local_manual" ||
     value === "stub"
+  );
+}
+
+/** True for providers whose payments require an admin verify before
+ *  the plan is granted (no auto-grant on unsigned events). */
+export function isManualVerificationProvider(id: PaymentProviderId): boolean {
+  return (
+    id === "crypto_manual" ||
+    id === "local_manual" ||
+    id === "shopier" ||
+    id === "iyzico" ||
+    id === "paytr" ||
+    id === "manual_payment_link"
   );
 }
 

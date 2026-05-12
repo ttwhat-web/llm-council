@@ -82,7 +82,15 @@ export async function POST(req: NextRequest) {
     // Don't leak the existence of other identities' payments.
     return attachToResponse(billingErrorResponse("not_found", "Payment not found.", 404));
   }
-  if (record.provider !== "crypto_manual" && record.provider !== "local_manual") {
+  const acceptedManualProviders: ReadonlyArray<typeof record.provider> = [
+    "crypto_manual",
+    "local_manual",
+    "shopier",
+    "iyzico",
+    "paytr",
+    "manual_payment_link"
+  ];
+  if (!acceptedManualProviders.includes(record.provider)) {
     return attachToResponse(
       billingErrorResponse(
         "wrong_provider",

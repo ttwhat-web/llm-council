@@ -198,6 +198,12 @@ export function PaymentsPicker({ plan }: Props) {
                 <span className="text-[13px] font-semibold text-white">{p.label}</span>
               </div>
               <p className="text-[11px] text-white/55">{p.description}</p>
+              {p.enabled && p.manualVerification && (
+                <p className="text-[10px] leading-relaxed text-amber-200/85">
+                  Payment may require manual verification. Access is granted after
+                  payment confirmation.
+                </p>
+              )}
               {!p.enabled && p.unavailableReason && (
                 <p className="text-[10px] text-amber-200">{p.unavailableReason}</p>
               )}
@@ -256,10 +262,14 @@ function iconFor(id: PaymentProviderId) {
     case "crypto_manual":
       return Bitcoin;
     case "local_manual":
+    case "manual_payment_link":
       return Landmark;
     case "paddle":
     case "lemon_squeezy":
     case "stripe":
+    case "shopier":
+    case "iyzico":
+    case "paytr":
       return CreditCard;
     default:
       return CreditCard;

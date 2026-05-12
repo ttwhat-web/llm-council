@@ -46,23 +46,35 @@ function configuredPlans(): PaymentPlanKey[] {
   return out;
 }
 
+function stripeLinkEnabled(): boolean {
+  return (process.env.STRIPE_LINK_ENABLED || "").toLowerCase() === "true";
+}
+
 export function createStripeProvider(): PaymentProvider {
   return {
     id: PROVIDER_ID,
     info(): ProviderInfo {
       const enabled = Boolean(getStripe());
       const plans = enabled ? configuredPlans() : [];
+      // Link by Stripe is an accelerated checkout capability INSIDE
+      // Stripe, not a standalone provider. We surface it as a label
+      // change + a flag the UI can read; the underlying mode is still
+      // `stripe_checkout` and the redirect target is the same.
+      const linkOn = enabled && stripeLinkEnabled();
       return {
         id: PROVIDER_ID,
-        label: "Card · Stripe",
-        description: "Visa / Mastercard / Amex via Stripe Checkout. Hosted page.",
+        label: linkOn ? "Card / Link by Stripe" : "Card · Stripe",
+        description: linkOn
+          ? "Visa / Mastercard / Amex via Stripe Checkout. Link autofills saved payment details after email or SMS verification."
+          : "Visa / Mastercard / Amex via Stripe Checkout. Hosted page.",
         enabled,
         plans,
         modes: ["stripe_checkout"],
         manualVerification: false,
         unavailableReason: enabled
           ? undefined
-          : "STRIPE_SECRET_KEY is not configured."
+          : "STRIPE_SECRET_KEY is not configured.",
+        capabilities: { stripeLink: linkOn }
       };
     },
     async createCheckout(input: CreateCheckoutInput): Promise<PaymentCheckoutResult> {

@@ -299,6 +299,10 @@ function subscriptionSource(s: Subscription["source"]): BillingSource {
     case "stripe":
     case "paddle":
     case "lemon_squeezy":
+    case "shopier":
+    case "iyzico":
+    case "paytr":
+    case "manual_payment_link":
     case "auth":
       return "auth";
     case "dev-stub":
