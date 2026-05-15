@@ -3,9 +3,9 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "operator.center · AI Command Center",
+  title: "operator.center · Mission Control for AI Workflows",
   description:
-    "The AI command center for shipping work, not prompting. Turn messy prompts, screenshots, logs and ideas into named, replayable, audited missions — across every model.",
+    "Mission Control for AI Workflows. You stop pasting. You dispatch. Turn messy prompts, screenshots, logs and ideas into named, replayable, audited missions across every model.",
   applicationName: "operator.center"
 };
 

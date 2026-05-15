@@ -48,13 +48,13 @@ function Hero() {
         <span className="relative inline-block h-1.5 w-1.5 rounded-full bg-accent">
           <span className="absolute inset-0 animate-ping rounded-full bg-accent/55" />
         </span>
-        Operate, don&apos;t prompt.
+        Mission Control for AI Workflows
       </div>
       <h1 className="max-w-[18ch] text-4xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
-        The AI command center for shipping work, not prompting.
+        You stop pasting. You dispatch.
       </h1>
       <p className="max-w-[58ch] text-[15px] leading-relaxed text-white/65 md:text-base">
-        Turn messy prompts, screenshots, logs and ideas into{" "}
+        Operator.Center turns messy prompts, screenshots, logs and ideas into{" "}
         <span className="text-white">named, replayable, audited</span> missions.
         Across every model. With a kill switch.
       </p>

@@ -32,6 +32,7 @@ import { WorkflowRecorder } from "./WorkflowRecorder";
 import { EmptyStateExamples } from "./EmptyStateExamples";
 import { RecentMissions } from "./RecentMissions";
 import { LaunchBadge } from "./LaunchBadge";
+import { MissionReceipt } from "./MissionReceipt";
 import { track } from "@/lib/analytics";
 import {
   incrementBilling,
@@ -56,6 +57,12 @@ import type { StackDraft } from "@/lib/stacks";
 import { useClientContext } from "@/lib/clientContext";
 import { getQuality } from "@/lib/quality";
 import { newId, saveEntry, type HistoryEntry } from "@/lib/history";
+import {
+  newReceiptId,
+  previewOf,
+  saveReceipt as saveLocalReceipt,
+  type ReceiptEntry
+} from "@/lib/receipts";
 import {
   appendLog,
   logCommand,
@@ -157,13 +164,17 @@ export function PromptFixer({ variant = "web" }: Props) {
   const [recordingEnabled, setRecordingEnabled] = useState(false);
   const [recordedSteps, setRecordedSteps] = useState<RecordedStep[]>([]);
   const [recorderDrafts, setRecorderDrafts] = useState<RecordingDraft[]>([]);
-  // Phase 7 — Mission Receipts
+  // Phase 7 — Mission Receipts (server-side, opt-in share)
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [receiptShareUrl, setReceiptShareUrl] = useState<string | null>(null);
   const [receiptShared, setReceiptShared] = useState(false);
   const [receiptBusy, setReceiptBusy] = useState<"save" | "share" | null>(null);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [missionReloadKey, setMissionReloadKey] = useState(0);
+  // Phase 1 (Operator.Center) — local receipt for the Mission Receipt
+  // panel + Library page. Auto-saved on every successful mission, never
+  // sent to the server.
+  const [localReceipt, setLocalReceipt] = useState<ReceiptEntry | null>(null);
 
   const isLocal = settings.modelQuality === "local";
   const derivedEngine = getQuality(settings.modelQuality).engine;
@@ -572,6 +583,7 @@ export function PromptFixer({ variant = "web" }: Props) {
           setReceiptShareUrl(null);
           setReceiptShared(false);
           setReceiptError(null);
+          setLocalReceipt(null);
           track("mission_run", {
             mode: data.mode,
             modelQuality: settings.modelQuality,
@@ -590,6 +602,31 @@ export function PromptFixer({ variant = "web" }: Props) {
           };
           saveEntry(entry);
           setHistoryKey((k) => k + 1);
+
+          // Phase 1 — local receipt for the Library page. Compact +
+          // shaped by `lib/receipts.ts`. Pulls every field from the
+          // real response.
+          const localId = newReceiptId();
+          const receipt: ReceiptEntry = {
+            id: localId,
+            createdAt: Date.now(),
+            inputPreview: previewOf(input),
+            outputPreview: previewOf(data.prompt),
+            mode: data.mode,
+            quality: settings.modelQuality,
+            provider: data.supervisor.resolved,
+            model: data.supervisor.model,
+            latencyMs: data.supervisor.latencyMs,
+            elapsedMs: data.elapsedMs,
+            score: data.score,
+            safety: {
+              blocked: Boolean(data.safety?.blocked),
+              findings: data.safety?.findings?.length ?? 0
+            },
+            fallbackUsed: Boolean(data.supervisor.fallbackUsed)
+          };
+          saveLocalReceipt(receipt);
+          setLocalReceipt(receipt);
         }
         // Inbox refresh — gives the fire-and-forget dispatcher a moment
         // to land its write before the GET. The poll catches it either way.
@@ -1400,6 +1437,15 @@ export function PromptFixer({ variant = "web" }: Props) {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {result && (
+            <MissionReceipt
+              result={result}
+              receiptId={localReceipt?.id ?? null}
+              createdAt={localReceipt?.createdAt}
+              compact={compact}
+            />
+          )}
 
           {result && (
             <ReceiptStrip
