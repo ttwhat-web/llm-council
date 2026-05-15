@@ -39,6 +39,7 @@ export const seedProducts: Product[] = [
     status: 'in_stock',
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     variantLabel: 'TESTER',
+    featured: true,
   },
   {
     id: 'p_nishane_hacivat',
@@ -70,6 +71,72 @@ export const seedProducts: Product[] = [
     status: 'in_stock',
     createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
     variantLabel: 'BOXED',
+    featured: true,
+  },
+  // ── dekant ────────────────────────────────────────────────────────────
+  {
+    id: 'p_dekant_naxos',
+    brand: 'Xerjoff',
+    name: 'Naxos · Dekant',
+    category: 'dekant',
+    price: 450,                    // = dekantSizes[0].price (3ml)
+    sizeMl: 15,                    // largest available size for catalog display
+    remainingMl: 15,
+    city: 'İstanbul',
+    batchCode: 'XJ24N03-D',
+    description:
+      'Xerjoff Naxos dekantı. Orijinal şişeden kontrollü ortamda ' +
+      '3 / 5 / 10 / 15 ml seçenekleri ile hazırlanır.',
+    status: 'in_stock',
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    dekantSizes: [
+      { ml: 3,  price: 450 },
+      { ml: 5,  price: 700 },
+      { ml: 10, price: 1300 },
+      { ml: 15, price: 1800 },
+    ],
+  },
+  {
+    id: 'p_dekant_lv_ombre',
+    brand: 'Louis Vuitton',
+    name: 'Ombre Nomade · Dekant',
+    category: 'dekant',
+    price: 500,
+    sizeMl: 15,
+    remainingMl: 15,
+    city: 'İstanbul',
+    batchCode: 'LV23B044-D',
+    description:
+      'Louis Vuitton Ombre Nomade dekantı. Sınırlı stok — küratör seçimi.',
+    status: 'in_stock',
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    dekantSizes: [
+      { ml: 3,  price: 500 },
+      { ml: 5,  price: 800 },
+      { ml: 10, price: 1500 },
+      { ml: 15, price: 2100 },
+    ],
+    featured: true,
+  },
+  {
+    id: 'p_dekant_clive',
+    brand: 'Clive Christian',
+    name: 'Hedonistic · Dekant',
+    category: 'dekant',
+    price: 680,
+    sizeMl: 10,
+    remainingMl: 10,
+    city: 'İstanbul',
+    batchCode: 'CC24A11-D',
+    description:
+      'Clive Christian Hedonistic dekantı. Yoğun parfüm — küçük ml yeterlidir.',
+    status: 'in_stock',
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    dekantSizes: [
+      { ml: 3,  price: 680 },
+      { ml: 5,  price: 1050 },
+      { ml: 10, price: 1950 },
+    ],
   },
   // ── splits ────────────────────────────────────────────────────────────
   {

@@ -45,7 +45,7 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button
               type="button"
               className="btn btn-outline"
@@ -57,6 +57,9 @@ export default function AdminPage() {
             >
               SEED'E DÖN
             </button>
+            <Link href="/admin/import" className="btn btn-outline">
+              ⇣ DIŞ SİTEDEN İÇE AKTAR
+            </Link>
             <Link href="/admin/products/new" className="btn btn-gold">
               + YENİ ÜRÜN
             </Link>
@@ -84,9 +87,9 @@ export default function AdminPage() {
                 <Th>KATEGORİ</Th>
                 <Th align="right">FİYAT</Th>
                 <Th>ML</Th>
-                <Th>ŞEHİR</Th>
                 <Th>BATCH</Th>
                 <Th>STOK</Th>
+                <Th>KAYNAK</Th>
                 <Th align="right">EKLENME</Th>
                 <Th align="right"></Th>
               </tr>
@@ -142,7 +145,6 @@ export default function AdminPage() {
                       : formatTl(p.price)}
                   </Td>
                   <Td>{p.remainingMl}/{p.sizeMl}</Td>
-                  <Td>{p.city}</Td>
                   <Td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>
                     {p.batchCode}
                   </Td>
@@ -162,6 +164,36 @@ export default function AdminPage() {
                     >
                       {STOCK_LABEL[p.status]}
                     </span>
+                  </Td>
+                  <Td>
+                    {p.source === 'external' ? (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          letterSpacing: 1.4,
+                          fontWeight: 800,
+                          color: 'var(--gold-dark)',
+                          background: 'rgba(200,162,74,0.12)',
+                          border: '1px solid rgba(200,162,74,0.4)',
+                          padding: '3px 8px',
+                          borderRadius: 999,
+                        }}
+                        title={p.externalSourceName ?? 'external'}
+                      >
+                        ⇣ {(p.externalSourceName ?? 'external').toUpperCase()}
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          letterSpacing: 1.4,
+                          fontWeight: 700,
+                          color: 'var(--ink-3)',
+                        }}
+                      >
+                        MANUEL
+                      </span>
+                    )}
                   </Td>
                   <Td align="right" style={{ color: 'var(--ink-3)', fontSize: 12 }}>
                     {new Date(p.createdAt).toLocaleString('tr-TR', {
