@@ -40,6 +40,21 @@ If `EXPO_PUBLIC_DERINSPLIT_URL` is empty the app shows a clear in-app
 JS bundle at build time, so EAS production builds pick up whatever you
 set without an extra config layer.
 
+## File layout
+
+```
+App.tsx                                 ← orchestrator: SafeArea + StatusBar + URL guard
+src/
+├── config.ts                           ← env vars, brand tokens, isAllowedOrigin()
+├── components/
+│   └── DerinSplitWebView.tsx           ← WebView + lifecycle (load / error / refresh / back)
+└── screens/
+    ├── LoadingScreen.tsx               ← gold emblem + shimmer wordmark + spinner
+    ├── OfflineScreen.tsx               ← "BAĞLANTI YOK" + "TEKRAR DENE"
+    └── MissingUrlScreen.tsx            ← env-var-not-set guard
+assets/                                 ← icon / adaptive-icon / splash / favicon
+```
+
 ## What the shell does
 
 - **Fullscreen WebView** loading `EXPO_PUBLIC_DERINSPLIT_URL`
