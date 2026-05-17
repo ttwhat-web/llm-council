@@ -1,38 +1,39 @@
 import Link from "next/link";
 import {
+  Activity,
+  Apple,
   ArrowRight,
-  CheckCircle2,
-  CircuitBoard,
+  Brain,
   Cpu,
-  GitBranch,
-  PlayCircle,
-  ScanLine,
-  ShieldCheck,
+  Github,
+  HardDrive,
+  Lock,
+  Monitor,
+  Terminal as TerminalIcon,
   Workflow
 } from "lucide-react";
 import { MarketingShell } from "@/components/MarketingShell";
 import { FounderCounter } from "@/components/FounderCounter";
 
 /**
- * operator.center landing — `/`.
+ * operator.center landing — Phase 11 marketing/download site.
  *
- * Strict brand vocabulary: mission · dispatch · operator · runtime ·
- * telemetry · audit · recorder · skill · workflow · stack.
- * No "chatbot", no "ask AI anything", no "AI assistant".
+ * The web is the brochure. The product is PromptReady OS — a
+ * downloadable Mission Control desktop app. /app remains a developer
+ * preview of the same engine; the primary CTA points at Download.
  *
- * Mission Control lives at /app and stays anonymous-friendly.
+ * Strict vocabulary: mission · dispatch · brain · operator · telemetry ·
+ * receipt · runtime. No emoji, no "AI-powered" filler.
  */
 
 export default function LandingPage() {
   return (
     <MarketingShell>
       <Hero />
-      <DeliverablesStrip />
-      <LiveDemoPlaceholder />
-      <SkillsGrid />
-      <TelemetryPanel />
-      <PricingPreview />
-      <Faq />
+      <DownloadGrid />
+      <ProductSections />
+      <PreviewPanel />
+      <PricingTeaser />
     </MarketingShell>
   );
 }
@@ -48,145 +49,235 @@ function Hero() {
         <span className="relative inline-block h-1.5 w-1.5 rounded-full bg-accent">
           <span className="absolute inset-0 animate-ping rounded-full bg-accent/55" />
         </span>
-        Mission Control for AI Workflows
+        Operator.Center · Mission Control for AI Workflows
       </div>
       <h1 className="max-w-[18ch] text-4xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
-        You stop pasting. You dispatch.
+        Build your own AI Brain.
       </h1>
       <p className="max-w-[58ch] text-[15px] leading-relaxed text-white/65 md:text-base">
-        Operator.Center turns messy prompts, screenshots, logs and ideas into{" "}
-        <span className="text-white">named, replayable, audited</span> missions.
-        Across every model. With a kill switch.
+        PromptReady OS is the downloadable desktop app for operators who
+        dispatch missions, route across local + cloud models, and keep their
+        brain on their machine. No paste-loops, no chat clutter, no key
+        required to open it.
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/app"
+        <a
+          href="#download"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent/90 px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:bg-accent"
         >
-          Start free
+          Download PromptReady OS
           <ArrowRight className="h-4 w-4" />
-        </Link>
-        <Link
-          href="/pricing"
+        </a>
+        <a
+          href="#preview"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white/85 transition hover:bg-white/[0.08]"
         >
-          View pricing
-        </Link>
-        <a
-          href="#demo"
+          Watch demo
+        </a>
+        <Link
+          href="/docs"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm font-medium text-white/65 transition hover:bg-white/[0.06]"
         >
-          <PlayCircle className="h-4 w-4 text-accent/80" />
-          Watch a 90s mission
-        </a>
+          View docs
+        </Link>
         <span className="text-[11px] text-white/40">
-          No credit card. 10 free missions / day.
+          Local-first. Works without an account or API key.
         </span>
       </div>
       <FounderCounter variant="cta" />
+      <p className="text-[11px] text-white/35">
+        Want a preview without installing?{" "}
+        <Link href="/app" className="text-accent/85 hover:text-accent hover:underline">
+          Open the web preview of Mission Control →
+        </Link>
+      </p>
     </section>
   );
 }
 
 // ============================================================================
-// Deliverables strip
+// Download cards
 // ============================================================================
 
-const DELIVERABLES = [
-  "Cursor Task",
-  "Claude Prompt",
-  "ChatGPT Prompt",
-  "Gemini Prompt",
-  "Markdown Spec",
-  "Technical Plan",
-  "PRD",
-  "Linear-ready Issue",
-  "GitHub Issue",
-  "Jira Ticket",
-  "Terminal Safe Command"
+interface DownloadCard {
+  os: string;
+  arch?: string;
+  Icon: typeof Apple;
+  status: "available" | "coming-soon" | "source";
+  hint?: string;
+  href?: string;
+}
+
+const DOWNLOADS: DownloadCard[] = [
+  {
+    os: "macOS",
+    arch: "Apple Silicon (M1+)",
+    Icon: Apple,
+    status: "coming-soon",
+    hint: "Installer not signed yet · join the founder wave for early access."
+  },
+  {
+    os: "macOS",
+    arch: "Intel",
+    Icon: Apple,
+    status: "coming-soon",
+    hint: "Installer not signed yet · same Tauri build as Apple Silicon."
+  },
+  {
+    os: "Windows",
+    arch: "x86_64",
+    Icon: Monitor,
+    status: "coming-soon",
+    hint: "MSI installer in QA."
+  },
+  {
+    os: "Linux",
+    arch: "AppImage · deb",
+    Icon: Monitor,
+    status: "coming-soon",
+    hint: "AppImage / .deb in QA."
+  },
+  {
+    os: "Docker",
+    arch: "self-host runtime",
+    Icon: HardDrive,
+    status: "coming-soon",
+    hint: "operator/center:latest image planned for the Operator tier."
+  },
+  {
+    os: "Source",
+    arch: "build from GitHub",
+    Icon: Github,
+    status: "source",
+    hint: "Clone the repo and run `npm run tauri:dev` inside promptready-os/.",
+    href: "https://github.com/ttwhat-web/llm-council"
+  }
 ];
 
-function DeliverablesStrip() {
+function DownloadGrid() {
   return (
-    <section id="deliverables" className="flex flex-col gap-4">
+    <section id="download" className="flex flex-col gap-4">
       <SectionHeading
-        eyebrow="01 · output"
-        title="One mission. Eleven deliverables."
-        sub="Every output ships in the format your tool actually wants. No copy-paste juggling. Every mission audited, every step replayable."
+        eyebrow="01 · download"
+        title="Run it on your machine."
+        sub="Every installer below ships the same engine — local-first, BYOK-ready, with Ollama as the default route. Honest status: nothing here pretends to be available before it is."
       />
-      <div className="flex flex-wrap gap-1.5">
-        {DELIVERABLES.map((d) => (
-          <span
-            key={d}
-            className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-white/75"
-          >
-            {d}
-          </span>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {DOWNLOADS.map((card, i) => (
+          <DownloadTile key={`${card.os}-${card.arch ?? i}`} card={card} />
         ))}
       </div>
     </section>
   );
 }
 
-function LiveDemoPlaceholder() {
-  return (
-    <section
-      id="demo"
-      className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02] p-5"
+function DownloadTile({ card }: { card: DownloadCard }) {
+  const disabled = card.status === "coming-soon";
+  const body = (
+    <article
+      className={`flex h-full flex-col gap-2 rounded-2xl border bg-white/[0.02] p-4 transition ${
+        disabled
+          ? "border-white/8"
+          : "border-white/10 hover:border-accent/35 hover:bg-white/[0.04]"
+      }`}
     >
-      <div className="flex flex-col gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
-          live demo · 90s
+      <header className="flex items-center gap-2">
+        <card.Icon className="h-4 w-4 text-accent" />
+        <span className="text-[13px] font-semibold text-white">{card.os}</span>
+        {card.arch && (
+          <span className="rounded border border-white/10 bg-white/[0.04] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-white/55">
+            {card.arch}
+          </span>
+        )}
+        <span
+          className={`ml-auto rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] ${
+            card.status === "available"
+              ? "border-emerald-400/40 bg-emerald-500/[0.08] text-emerald-200"
+              : card.status === "source"
+                ? "border-accent/30 bg-accent/[0.06] text-accent"
+                : "border-white/10 bg-white/[0.04] text-white/55"
+          }`}
+        >
+          {card.status === "available"
+            ? "ready"
+            : card.status === "source"
+              ? "source"
+              : "coming soon"}
         </span>
-        <h2 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">
-          Watch one mission, end to end.
-        </h2>
-        <p className="max-w-[60ch] text-[13px] text-white/60">
-          From paste to permalink. Telemetry, score, safety screen, deliverable.
-          We&apos;ll embed the live demo here once the marketing capture lands —
-          for now,{" "}
-          <Link href="/app" className="text-accent underline-offset-2 hover:underline">
-            run your own mission
-          </Link>{" "}
-          on the free tier and you have your own demo.
-        </p>
-      </div>
-      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-accent/[0.08] to-transparent md:block" />
-    </section>
+      </header>
+      {card.hint && <p className="text-[11.5px] text-white/55">{card.hint}</p>}
+    </article>
   );
+  if (card.href) {
+    return (
+      <a href={card.href} target="_blank" rel="noreferrer" className="block">
+        {body}
+      </a>
+    );
+  }
+  return body;
 }
 
 // ============================================================================
-// Skills grid
+// Product sections
 // ============================================================================
 
-const SKILLS = [
-  { Icon: Workflow, name: "Prompt Fixer", blurb: "Six typed stages: Clean → Intent → Structure → Constraints → Generate → Validate." },
-  { Icon: CircuitBoard, name: "Architect", blurb: "Idea → architecture, stack, file tree, deployment checklist, risks." },
-  { Icon: ScanLine, name: "Prompt Cleaner", blurb: "Deterministic noise stripper. Smart-quotes, zero-width, paste artefacts." },
-  { Icon: GitBranch, name: "Saved Workflows", blurb: "Compose shipped skills into one tap. Replay across days and machines." },
-  { Icon: Cpu, name: "Model Router", blurb: "Anthropic · OpenAI · Ollama · deterministic. Explicit cost / quality knob." },
-  { Icon: ShieldCheck, name: "Safety + Score", blurb: "Every output graded on clarity, specificity, safety, model-fit. Dangerous outputs blocked." }
+const PRODUCT_SECTIONS = [
+  {
+    Icon: Workflow,
+    name: "Mission Control",
+    blurb:
+      "Three-column HUD: brief → live operations pipeline → deliverables. Six typed stages, real telemetry, no fake spinners."
+  },
+  {
+    Icon: Cpu,
+    name: "Local AI via Ollama",
+    blurb:
+      "Unlimited local missions against gemma · qwen-coder · hermes · mistral. The router refuses to fall back to cloud unless you opt in."
+  },
+  {
+    Icon: Brain,
+    name: "Memory / Brain",
+    blurb:
+      "Start with manual notes. Obsidian vault + GitHub + Gmail + Drive connectors land per-platform. Indexed on-device first."
+  },
+  {
+    Icon: TerminalIcon,
+    name: "Intelligence Terminal",
+    blurb:
+      "Dense multi-panel terminal: watchlist, market feed, repo feed, research feed, alerts. Honest about which panels are live."
+  },
+  {
+    Icon: Github,
+    name: "GitHub · Gmail · Obsidian",
+    blurb:
+      "Connectors land one at a time. Operator picks per-source what's indexed. Nothing leaves the machine unless you flip it on."
+  },
+  {
+    Icon: Lock,
+    name: "Local-first privacy",
+    blurb:
+      "Receipts, stacks, drafts, brain notes, watchlist live in your machine. Cloud providers are accelerators, never the gate."
+  }
 ];
 
-function SkillsGrid() {
+function ProductSections() {
   return (
-    <section id="skills" className="flex flex-col gap-5">
+    <section className="flex flex-col gap-5">
       <SectionHeading
-        eyebrow="02 · runtime"
-        title="A growing skill library. One runtime."
-        sub="Skills are typed capabilities the runtime composes. Workflows chain them. Tools call out. Memory holds state."
+        eyebrow="02 · what's inside"
+        title="One desktop app. Six operator surfaces."
       />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {SKILLS.map((s) => (
-          <div
+        {PRODUCT_SECTIONS.map((s) => (
+          <article
             key={s.name}
             className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-4 transition hover:border-accent/30"
           >
             <s.Icon className="h-4 w-4 text-accent" />
             <div className="text-[13px] font-semibold text-white">{s.name}</div>
             <p className="text-[12px] leading-relaxed text-white/55">{s.blurb}</p>
-          </div>
+          </article>
         ))}
       </div>
     </section>
@@ -194,217 +285,228 @@ function SkillsGrid() {
 }
 
 // ============================================================================
-// Telemetry panel
+// Cinematic preview panel
 // ============================================================================
 
-function TelemetryPanel() {
+function PreviewPanel() {
   return (
-    <section id="telemetry" className="flex flex-col gap-5">
+    <section id="preview" className="flex flex-col gap-5">
       <SectionHeading
-        eyebrow="03 · telemetry"
-        title="Every mission audited. Every step replayable."
-        sub="The Operations Pipeline streams real per-stage events. Receipts include provider, model, latency, score, safety findings."
+        eyebrow="03 · preview"
+        title="Mission Control · static preview"
+        sub="Layout only. No live data is rendered below — when you install PromptReady OS, every value comes from real telemetry."
       />
-      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 text-[10px] font-mono uppercase tracking-[0.2em] text-white/45">
-          <span>operations pipeline</span>
-          <span className="text-emerald-300">running · 412ms</span>
+      <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]">
+        <div className="flex items-center justify-between border-b border-white/5 px-4 py-2">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
+              promptready os · mission control
+            </span>
+            <span className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
+              static preview
+            </span>
+          </div>
+          <span className="font-mono text-[9px] uppercase tracking-wider text-white/35">
+            no live data
+          </span>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-8">
-          {["INPUT", "CLEAN", "INTENT", "STRUCTURE", "CONSTRAINTS", "GENERATE", "VALIDATE", "OUTPUT"].map((s, i) => (
-            <div
-              key={s}
-              className={`flex flex-col items-center gap-1 rounded-lg p-2 ${
-                i <= 5 ? "" : i === 6 ? "bg-accent/[0.07]" : ""
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  i <= 5
-                    ? "bg-emerald-400 shadow-[0_0_6px_1px_rgba(52,211,153,0.5)]"
-                    : i === 6
-                      ? "bg-accent shadow-[0_0_8px_2px_rgba(124,155,255,0.6)]"
-                      : "bg-white/15"
-                }`}
-              />
-              <span
-                className={`font-mono text-[9px] uppercase tracking-[0.1em] ${
-                  i <= 5 ? "text-white/75" : i === 6 ? "text-accent" : "text-white/30"
-                }`}
-              >
-                {s}
+
+        <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-[260px_minmax(0,1fr)_280px]">
+          {/* col 1 — brief */}
+          <aside className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.012] p-3">
+            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
+              mission brief
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/[0.025] px-2 py-1.5 text-[11.5px] text-white/55">
+              Paste a messy prompt, an error log, a product idea…
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {["claude", "cursor", "dev", "terminal"].map((t) => (
+                <span
+                  key={t}
+                  className="rounded border border-white/10 bg-white/[0.04] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-white/55"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+            <div className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent/85 px-2.5 py-1 text-[11px] font-semibold text-white">
+              Dispatch Mission
+            </div>
+          </aside>
+
+          {/* col 2 — operations */}
+          <section className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.012] p-3">
+            <div className="flex items-center justify-between">
+              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
+                operations pipeline
+              </div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-white/35">
+                idle
               </span>
             </div>
-          ))}
+            <div className="grid grid-cols-8 gap-1">
+              {["IN", "CL", "IT", "ST", "CN", "GN", "VL", "OUT"].map((s, i) => (
+                <div key={s} className="flex flex-col items-center gap-1 p-1.5">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      i === 0 ? "bg-emerald-400/80" : "bg-white/15"
+                    }`}
+                  />
+                  <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-white/45">
+                    {s}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <ul className="mt-1 flex flex-col divide-y divide-white/5 text-[10.5px]">
+              {[
+                ["info", "input", "Awaiting brief"],
+                ["info", "router", "Ollama reachable · cloud absent"],
+                ["info", "safety", "Screen armed"]
+              ].map(([k, tag, msg], i) => (
+                <li key={i} className="flex items-center gap-2 py-1">
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
+                    {String(k)}
+                  </span>
+                  <span className="rounded border border-white/10 bg-white/[0.04] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-white/45">
+                    {tag}
+                  </span>
+                  <span className="text-white/65">{msg}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {/* col 3 — deliverables */}
+          <aside className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.012] p-3">
+            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
+              deliverables
+            </div>
+            <div className="rounded-md border border-dashed border-white/10 bg-white/[0.012] p-3 text-center text-[11.5px] text-white/45">
+              Awaiting mission. Cursor Task · Claude Prompt · Linear Issue ·
+              Terminal Safe Command and 7 more deliverables ship per run.
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1 text-[9px]">
+              {["mode=auto", "quality=fast", "route=ollama", "0ms"].map((t) => (
+                <span
+                  key={t}
+                  className="rounded border border-white/10 bg-white/[0.04] px-1 py-px font-mono uppercase tracking-wider text-white/40"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          </aside>
         </div>
-        <ul className="mt-4 flex flex-col divide-y divide-white/5 text-[11px]">
-          {[
-            ["ok", "clean", "Stripped smart-quotes, zero-width chars · 12ms"],
-            ["ok", "intent", "auto → claude · 18ms"],
-            ["ok", "structure", "5 constraints drafted · 24ms"],
-            ["ok", "generate", "route=cloud · model=claude-sonnet-4-6 · 287ms"],
-            ["ok", "validate", "clarity=88 · spec=82 · fit=91 · safety:0"]
-          ].map(([kind, tag, msg], i) => (
-            <li key={i} className="flex items-center gap-2 py-1">
-              <span
-                className={`font-mono text-[9px] uppercase tracking-wider ${
-                  kind === "ok" ? "text-emerald-300/80" : "text-white/40"
-                }`}
-              >
-                {String(kind).toUpperCase()}
-              </span>
-              <span className="rounded border border-white/10 bg-white/[0.03] px-1 py-px font-mono text-[9px] uppercase text-white/55">
-                {tag}
-              </span>
-              <span className="text-white/75">{msg}</span>
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );
 }
 
 // ============================================================================
-// Pricing preview
+// Pricing teaser
 // ============================================================================
 
-function PricingPreview() {
+function PricingTeaser() {
   return (
-    <section id="pricing-preview" className="flex flex-col gap-5">
+    <section id="pricing" className="flex flex-col gap-5">
       <SectionHeading
-        eyebrow="04 · access"
-        title="Pricing that respects the operator."
-        sub="Free until you hit the wall. Pro at $19. Team at $39 / seat. Founder Lifetime at $99 — first 100 only."
+        eyebrow="04 · pricing"
+        title="Free is generous. Operator is real."
+        sub="Local rules engine is unlimited at every tier. Cloud routes + Memory connectors + Intelligence Terminal unlock as you go up. No card to start."
       />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <PlanCard
+        <TeaserCard
           name="Free"
           price="$0"
-          highlights={["10 daily missions", "5 saved stacks", "1 recording draft"]}
-          cta="Start free"
-          href="/app"
+          highlights={[
+            "Local rules engine — unlimited",
+            "10 cloud missions / day once connected",
+            "Operations Archive — local"
+          ]}
         />
-        <PlanCard
+        <TeaserCard
           name="Pro"
           price="$19 / mo"
-          highlights={[
-            "Unlimited missions",
-            "Unlimited stacks + recordings",
-            "All eleven deliverables",
-            "Mission alerts (Telegram)"
-          ]}
-          cta="See plans"
-          href="/pricing"
           highlight
-        />
-        <PlanCard
-          name="Founder Lifetime"
-          price="$99 once"
           highlights={[
-            "Pro for life",
-            "Capped at first 100 founders",
-            "First in line for the operator API"
+            "Unlimited cloud missions",
+            "Architect mode + advanced exports",
+            "Memory connectors (rolling out)",
+            "Local Ollama profiles"
           ]}
-          cta="Claim a slot"
-          href="/pricing"
         />
+        <TeaserCard
+          name="Operator"
+          price="$39 / seat / mo"
+          highlights={[
+            "Everything in Pro",
+            "Intelligence Terminal workspace",
+            "Agent actions · scheduled missions",
+            "Repo + market intelligence"
+          ]}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-3 pt-2">
+        <Link
+          href="/pricing"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12px] font-medium text-white/85 transition hover:bg-white/[0.08]"
+        >
+          See full pricing
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+        <Link
+          href="/security"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-1.5 text-[12px] font-medium text-white/65 transition hover:bg-white/[0.06]"
+        >
+          Security posture
+        </Link>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-white/35">
+          billing not wired in this view
+        </span>
       </div>
     </section>
   );
 }
 
-function PlanCard({
+function TeaserCard({
   name,
   price,
   highlights,
-  cta,
-  href,
   highlight
 }: {
   name: string;
   price: string;
   highlights: string[];
-  cta: string;
-  href: string;
   highlight?: boolean;
 }) {
   return (
-    <div
-      className={`flex flex-col gap-3 rounded-2xl border bg-white/[0.02] p-5 transition ${
-        highlight ? "border-accent/40 shadow-glow" : "border-white/8"
+    <article
+      className={`flex flex-col gap-2 rounded-2xl border bg-white/[0.02] p-4 transition ${
+        highlight ? "border-accent/40 shadow-glow" : "border-white/8 hover:border-white/14"
       }`}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-white">{name}</span>
+      <header className="flex items-baseline justify-between">
+        <span className="text-[13px] font-semibold text-white">{name}</span>
         <span className="font-mono text-[12px] text-white/65">{price}</span>
-      </div>
-      <ul className="flex flex-col gap-1.5 text-[12px] text-white/75">
+      </header>
+      <ul className="flex flex-col gap-1.5">
         {highlights.map((h) => (
-          <li key={h} className="flex items-start gap-2">
-            <CheckCircle2 className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${highlight ? "text-accent" : "text-white/55"}`} />
+          <li key={h} className="flex items-start gap-2 text-[12px] text-white/75">
+            <Activity
+              className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${highlight ? "text-accent" : "text-white/45"}`}
+            />
             <span>{h}</span>
           </li>
         ))}
       </ul>
-      <Link
-        href={href}
-        className={`mt-2 inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold transition ${
-          highlight
-            ? "bg-accent/90 text-white shadow-glow hover:bg-accent"
-            : "border border-white/10 bg-white/[0.03] text-white/85 hover:bg-white/[0.06]"
-        }`}
-      >
-        {cta}
-        <ArrowRight className="h-3.5 w-3.5" />
-      </Link>
-    </div>
+    </article>
   );
 }
 
 // ============================================================================
-// FAQ
-// ============================================================================
-
-function Faq() {
-  const items: Array<[string, string]> = [
-    [
-      "Is this another ChatGPT?",
-      "No. ChatGPT is a chat surface; operator.center is an execution layer. We dispatch missions to the model that fits, run a typed pipeline, score the output and ship it as a named deliverable. There's no conversation buffer to lose."
-    ],
-    [
-      "Where does my data go?",
-      "By default: through your selected cloud provider (Anthropic / OpenAI) and back. With Local mode (Ollama) it never leaves your machine. With BYOK on Pro+, the cloud spend rides on your keys, not ours."
-    ],
-    [
-      "Can I bring my own API keys?",
-      "Yes — Pro and Team support BYOK at a 20% discount. Enterprise gets dedicated provider routing, on-prem runtime and audit log streaming."
-    ],
-    [
-      "Can I self-host?",
-      "Enterprise can. The runtime is a single Next bundle and a Postgres / Redis pair. The Tauri shell already runs the engine offline."
-    ]
-  ];
-  return (
-    <section className="flex flex-col gap-5">
-      <SectionHeading eyebrow="05 · faq" title="Honest answers." />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {items.map(([q, a]) => (
-          <div
-            key={q}
-            className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-4"
-          >
-            <div className="text-[13px] font-semibold text-white">{q}</div>
-            <p className="text-[12px] leading-relaxed text-white/65">{a}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// ============================================================================
-// Shared
+// Section heading atom
 // ============================================================================
 
 function SectionHeading({
@@ -428,3 +530,4 @@ function SectionHeading({
     </div>
   );
 }
+
