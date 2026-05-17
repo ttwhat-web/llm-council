@@ -1,0 +1,1059 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import clsx from "clsx";
+import {
+  Brain,
+  Database,
+  Download,
+  Eye,
+  FileText,
+  Github,
+  Maximize2,
+  Minimize2,
+  Phone,
+  Rocket,
+  Workflow,
+  X,
+  ZoomIn,
+  ZoomOut
+} from "lucide-react";
+import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
+import { useBrainStore } from "@/store/brain";
+import { useMissionStore, type MissionReceipt } from "@/store/mission";
+
+/**
+ * Mission Atlas · Phase 14.
+ *
+ * A blueprint-wall view of the operator's entire AI system. Eight
+ * sections orbit the Brain Core; every cell reads real local store
+ * state. Clicking a cell opens a side panel with detail · status ·
+ * what's real · what's planned · next action.
+ *
+ * Honest: no fake metrics, no fake live data. Every section either
+ * shows real counts or labels itself "planned" / "offline" / "empty".
+ *
+ * The "Blueprint Export" button serializes the current Atlas to
+ * Markdown and downloads it.
+ */
+
+type SectionId =
+  | "brain-core"
+  | "mission-system"
+  | "memory-layer"
+  | "repo-layer"
+  | "workflow-layer"
+  | "intelligence-layer"
+  | "delivery-layer"
+  | "mobile-companion";
+
+interface SectionPosition {
+  row: number;
+  col: number;
+}
+
+interface SectionData {
+  id: SectionId;
+  title: string;
+  eyebrow: string;
+  Icon: typeof Brain;
+  position: SectionPosition;
+  pills: Array<{ label: string; value: string; tone?: "ok" | "warn" | "muted" }>;
+  status: { label: string; tone: "ok" | "warn" | "muted" };
+  real: string[];
+  planned: string[];
+  nextAction: string;
+  missionLink?: string;
+}
+
+// 3×3 grid with Brain Core in the dead center.
+const LAYOUT: Record<SectionId, SectionPosition> = {
+  "mission-system": { row: 1, col: 1 },
+  "memory-layer": { row: 1, col: 2 },
+  "repo-layer": { row: 1, col: 3 },
+  "workflow-layer": { row: 2, col: 1 },
+  "brain-core": { row: 2, col: 2 },
+  "intelligence-layer": { row: 2, col: 3 },
+  "delivery-layer": { row: 3, col: 1 },
+  "mobile-companion": { row: 3, col: 2 }
+};
+
+const CELL_W = 360;
+const CELL_H = 220;
+const GAP = 36;
+const CANVAS_W = CELL_W * 3 + GAP * 2 + 40;
+const CANVAS_H = CELL_H * 3 + GAP * 2 + 40;
+
+export default function AtlasPage() {
+  const identity = useBrainStore((s) => s.identity);
+  const sources = useBrainStore((s) => s.memorySources);
+  const engines = useBrainStore((s) => s.engines);
+  const missionCount = useBrainStore((s) => s.missionCount);
+  const demo = useBrainStore((s) => s.demo);
+  const current = useMissionStore((s) => s.current);
+  const history = useMissionStore((s) => s.history);
+
+  const pins = useMemo(readIntelTerminalPins, [history]);
+  const alerts = useMemo(readIntelAlerts, [history]);
+
+  const totalDeliverables = useMemo(
+    () => history.reduce((n, m) => n + (m.deliverables?.length ?? 0), 0),
+    [history]
+  );
+
+  const githubSources = sources.filter((s) => s.kind === "github");
+  const repoContextHistory = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          history
+            .map((m) => m.repoContext)
+            .filter((r): r is string => !!r)
+        )
+      ),
+    [history]
+  );
+
+  const [selected, setSelected] = useState<SectionId | null>(null);
+  const [zoom, setZoom] = useState(1);
+
+  const sections = useMemo<SectionData[]>(
+    () =>
+      buildSections({
+        identity,
+        sources,
+        engines,
+        missionCount,
+        current,
+        history,
+        pins,
+        alerts,
+        totalDeliverables,
+        githubSources,
+        repoContextHistory
+      }),
+    [
+      identity,
+      sources,
+      engines,
+      missionCount,
+      current,
+      history,
+      pins,
+      alerts,
+      totalDeliverables,
+      githubSources,
+      repoContextHistory
+    ]
+  );
+
+  const onExport = () => {
+    const md = buildBlueprintMarkdown({
+      identity,
+      demo,
+      sources,
+      engines,
+      missionCount,
+      historyCount: history.length,
+      recent: history.slice(0, 8),
+      pins,
+      alerts,
+      totalDeliverables,
+      sections
+    });
+    download(`mission-atlas-${stamp()}.md`, md);
+  };
+
+  return (
+    <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-4 px-5 py-5 md:px-7 md:py-7">
+      <SurfaceHeader
+        eyebrow="atlas · living business map"
+        title="Mission Atlas"
+        sub="Living map of your AI business brain. Brain core, mission system, memory, repos, workflows, intelligence, delivery, and the planned mobile companion — on one blueprint wall."
+        right={
+          <div className="flex items-center gap-2">
+            {demo && (
+              <span className="rounded-md border border-accent/30 bg-accent/[0.08] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent">
+                demo data
+              </span>
+            )}
+            <ZoomControls zoom={zoom} onZoom={setZoom} />
+            <button
+              type="button"
+              onClick={onExport}
+              className="no-drag inline-flex items-center gap-1.5 rounded-md bg-accent/90 px-2.5 py-1.5 text-[12px] font-semibold text-white shadow-glow transition hover:bg-accent"
+            >
+              <Download className="h-3.5 w-3.5" /> Export blueprint
+            </button>
+          </div>
+        }
+      />
+
+      {/* ============== Canvas ============== */}
+      <div className="relative overflow-auto rounded-3xl border border-white/10 bg-graphite-950 shadow-glass">
+        {/* blueprint grid */}
+        <div
+          className="atlas-grid relative"
+          style={{
+            width: CANVAS_W,
+            height: CANVAS_H,
+            transform: `scale(${zoom})`,
+            transformOrigin: "top left",
+            // pad scroll area so scaled canvas still fits its container
+            margin: 0
+          }}
+        >
+          {/* connecting blueprint lines, SVG overlay */}
+          <ConnectingLines sections={sections} selected={selected} />
+
+          {sections.map((s) => (
+            <SectionCard
+              key={s.id}
+              section={s}
+              selected={selected === s.id}
+              onSelect={() => setSelected(s.id)}
+            />
+          ))}
+        </div>
+
+        {/* mini-map */}
+        <MiniMap selected={selected} sections={sections} />
+      </div>
+
+      {selected && (
+        <DetailPanel
+          section={sections.find((s) => s.id === selected)!}
+          onClose={() => setSelected(null)}
+        />
+      )}
+
+      <style>{atlasCss}</style>
+    </div>
+  );
+}
+
+// ============================================================================
+// Section cards
+// ============================================================================
+
+function SectionCard({
+  section,
+  selected,
+  onSelect
+}: {
+  section: SectionData;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const isCore = section.id === "brain-core";
+  const { x, y } = positionOf(section.position);
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={clsx(
+        "atlas-card group absolute flex flex-col gap-2 rounded-2xl border p-3 text-left transition",
+        isCore
+          ? "border-accent/40 bg-accent/[0.06] shadow-glow"
+          : selected
+            ? "border-accent/40 bg-white/[0.04] shadow-glow"
+            : "border-white/10 bg-white/[0.018] hover:border-accent/25 hover:bg-white/[0.03]"
+      )}
+      style={{ left: x, top: y, width: CELL_W, height: CELL_H }}
+    >
+      {/* corner brackets */}
+      <CornerBrackets active={isCore || selected} />
+
+      <header className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <section.Icon className={isCore ? "h-4 w-4 text-accent" : "h-3.5 w-3.5 text-accent"} />
+          <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+            {section.eyebrow}
+          </span>
+        </div>
+        <StatusPill tone={section.status.tone} label={section.status.label} />
+      </header>
+
+      <div className="flex items-baseline justify-between gap-2">
+        <span
+          className={clsx(
+            "font-semibold text-white",
+            isCore ? "text-[18px]" : "text-[15px]"
+          )}
+        >
+          {section.title}
+        </span>
+      </div>
+
+      <ul className="grid grid-cols-2 gap-1.5">
+        {section.pills.map((p) => (
+          <li
+            key={p.label}
+            className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1"
+          >
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
+              {p.label}
+            </span>
+            <span
+              className={clsx(
+                "font-mono text-[10.5px]",
+                p.tone === "muted"
+                  ? "text-white/50"
+                  : p.tone === "warn"
+                    ? "text-amber-200/85"
+                    : "text-white/85"
+              )}
+            >
+              {p.value}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <footer className="mt-auto flex items-center justify-between font-mono text-[9.5px] uppercase tracking-wider text-white/40">
+        <span>click for detail</span>
+        <span className="text-white/30">·</span>
+        <span className="text-white/55">{section.nextAction}</span>
+      </footer>
+    </button>
+  );
+}
+
+function CornerBrackets({ active }: { active: boolean }) {
+  const cls = clsx(
+    "absolute h-3 w-3 border-accent transition",
+    active ? "opacity-100" : "opacity-50 group-hover:opacity-100"
+  );
+  return (
+    <>
+      <span className={`${cls} -left-px -top-px border-l border-t`} />
+      <span className={`${cls} -right-px -top-px border-r border-t`} />
+      <span className={`${cls} -left-px -bottom-px border-l border-b`} />
+      <span className={`${cls} -right-px -bottom-px border-r border-b`} />
+    </>
+  );
+}
+
+function StatusPill({ tone, label }: { tone: "ok" | "warn" | "muted"; label: string }) {
+  const cls = {
+    ok: "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200",
+    warn: "border-amber-400/35 bg-amber-500/[0.08] text-amber-200",
+    muted: "border-white/10 bg-white/[0.03] text-white/55"
+  }[tone];
+  return (
+    <span
+      className={clsx(
+        "rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider",
+        cls
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+// ============================================================================
+// Connecting lines (SVG overlay)
+// ============================================================================
+
+function ConnectingLines({
+  sections,
+  selected
+}: {
+  sections: SectionData[];
+  selected: SectionId | null;
+}) {
+  const core = sections.find((s) => s.id === "brain-core")!;
+  const { x: cx, y: cy } = centerOf(core.position);
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0"
+      width={CANVAS_W}
+      height={CANVAS_H}
+    >
+      {sections
+        .filter((s) => s.id !== "brain-core")
+        .map((s) => {
+          const { x, y } = centerOf(s.position);
+          const live = s.status.tone === "ok";
+          const sel = selected === s.id;
+          return (
+            <line
+              key={s.id}
+              x1={cx}
+              y1={cy}
+              x2={x}
+              y2={y}
+              stroke={live || sel ? "var(--pr-color-accent)" : "rgba(255,255,255,0.12)"}
+              strokeOpacity={sel ? 0.7 : live ? 0.35 : 0.4}
+              strokeDasharray={live || sel ? undefined : "4 5"}
+              strokeWidth={sel ? 1.25 : 0.75}
+            />
+          );
+        })}
+    </svg>
+  );
+}
+
+// ============================================================================
+// Mini-map
+// ============================================================================
+
+function MiniMap({
+  sections,
+  selected
+}: {
+  sections: SectionData[];
+  selected: SectionId | null;
+}) {
+  const w = 120;
+  const h = 84;
+  const sx = w / CANVAS_W;
+  const sy = h / CANVAS_H;
+  return (
+    <div className="pointer-events-none absolute bottom-3 right-3 flex flex-col items-end gap-1">
+      <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">mini-map</span>
+      <div
+        className="relative rounded-md border border-white/10 bg-graphite-900/80 p-1"
+        style={{ width: w + 8, height: h + 8 }}
+      >
+        <svg width={w} height={h}>
+          {sections.map((s) => {
+            const { x, y } = positionOf(s.position);
+            return (
+              <rect
+                key={s.id}
+                x={x * sx + 1}
+                y={y * sy + 1}
+                width={Math.max(2, CELL_W * sx - 2)}
+                height={Math.max(2, CELL_H * sy - 2)}
+                rx={1.5}
+                fill={
+                  s.id === "brain-core"
+                    ? "var(--pr-color-accent)"
+                    : selected === s.id
+                      ? "var(--pr-color-accent-soft)"
+                      : s.status.tone === "ok"
+                        ? "rgba(255,255,255,0.35)"
+                        : "rgba(255,255,255,0.12)"
+                }
+                opacity={s.id === "brain-core" ? 0.75 : 0.6}
+              />
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Zoom controls
+// ============================================================================
+
+function ZoomControls({
+  zoom,
+  onZoom
+}: {
+  zoom: number;
+  onZoom: (z: number) => void;
+}) {
+  const step = (delta: number) => {
+    const next = Math.min(1.4, Math.max(0.6, +(zoom + delta).toFixed(2)));
+    onZoom(next);
+  };
+  return (
+    <div className="inline-flex items-center gap-0.5 rounded-md border border-white/10 bg-white/[0.03] p-0.5 font-mono text-[10px] uppercase tracking-wider text-white/65">
+      <button
+        type="button"
+        title="Zoom out"
+        onClick={() => step(-0.1)}
+        className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-white/[0.06]"
+      >
+        <ZoomOut className="h-3 w-3" />
+      </button>
+      <button
+        type="button"
+        title="Reset zoom"
+        onClick={() => onZoom(1)}
+        className="px-1.5"
+      >
+        {Math.round(zoom * 100)}%
+      </button>
+      <button
+        type="button"
+        title="Zoom in"
+        onClick={() => step(0.1)}
+        className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-white/[0.06]"
+      >
+        <ZoomIn className="h-3 w-3" />
+      </button>
+      <button
+        type="button"
+        title="Fit"
+        onClick={() => onZoom(0.85)}
+        className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-white/[0.06]"
+      >
+        <Maximize2 className="h-3 w-3" />
+      </button>
+      <button
+        type="button"
+        title="100%"
+        onClick={() => onZoom(1)}
+        className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-white/[0.06]"
+      >
+        <Minimize2 className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+// ============================================================================
+// Detail panel
+// ============================================================================
+
+function DetailPanel({
+  section,
+  onClose
+}: {
+  section: SectionData;
+  onClose: () => void;
+}) {
+  return (
+    <aside className="fixed right-5 top-24 z-40 flex w-[360px] flex-col gap-3 rounded-2xl border border-accent/25 bg-graphite-900/95 p-4 shadow-glass backdrop-blur md:right-7">
+      <header className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+            {section.eyebrow}
+          </span>
+          <h3 className="text-[15px] font-semibold text-white">{section.title}</h3>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 text-white/55 hover:bg-white/[0.06] hover:text-white"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </header>
+
+      <StatusPill tone={section.status.tone} label={section.status.label} />
+
+      <div className="grid grid-cols-2 gap-1.5">
+        {section.pills.map((p) => (
+          <div
+            key={p.label}
+            className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1"
+          >
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
+              {p.label}
+            </span>
+            <span className="font-mono text-[10.5px] text-white/85">{p.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <DetailBlock title="What's real" items={section.real} tone="ok" />
+      <DetailBlock title="What's planned" items={section.planned} tone="muted" />
+
+      <div className="rounded-md border border-accent/25 bg-accent/[0.06] p-2.5">
+        <div className="font-mono text-[9px] uppercase tracking-wider text-accent">
+          next action
+        </div>
+        <p className="mt-0.5 text-[11.5px] text-white/85">{section.nextAction}</p>
+      </div>
+
+      {section.missionLink && (
+        <a
+          href={section.missionLink}
+          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11.5px] font-medium text-white/85 hover:bg-white/[0.06]"
+        >
+          {section.missionLink.replace(/^\//, "open /")} →
+        </a>
+      )}
+    </aside>
+  );
+}
+
+function DetailBlock({
+  title,
+  items,
+  tone
+}: {
+  title: string;
+  items: string[];
+  tone: "ok" | "muted";
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <div
+        className={clsx(
+          "mb-1 font-mono text-[9.5px] uppercase tracking-[0.22em]",
+          tone === "ok" ? "text-emerald-300/85" : "text-white/45"
+        )}
+      >
+        {title}
+      </div>
+      <ul className="flex flex-col gap-1 text-[11.5px] text-white/70">
+        {items.map((i) => (
+          <li key={i} className="flex items-start gap-1.5">
+            <span
+              className={clsx(
+                "mt-1.5 h-1 w-1 shrink-0 rounded-full",
+                tone === "ok" ? "bg-emerald-400" : "bg-white/35"
+              )}
+            />
+            <span>{i}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ============================================================================
+// Build section data from stores
+// ============================================================================
+
+interface BuildArgs {
+  identity: ReturnType<typeof useBrainStore.getState>["identity"];
+  sources: ReturnType<typeof useBrainStore.getState>["memorySources"];
+  engines: ReturnType<typeof useBrainStore.getState>["engines"];
+  missionCount: number;
+  current: MissionReceipt | null;
+  history: MissionReceipt[];
+  pins: ReturnType<typeof readIntelTerminalPins>;
+  alerts: string[];
+  totalDeliverables: number;
+  githubSources: ReturnType<typeof useBrainStore.getState>["memorySources"];
+  repoContextHistory: string[];
+}
+
+function buildSections(a: BuildArgs): SectionData[] {
+  const out: SectionData[] = [];
+
+  // 1. Brain Core
+  out.push({
+    id: "brain-core",
+    title: a.identity?.name ?? "No brain yet",
+    eyebrow: "core · brain",
+    Icon: Brain,
+    position: LAYOUT["brain-core"],
+    pills: [
+      { label: "mode", value: a.identity?.mode ?? "—" },
+      { label: "engines", value: String(a.engines.length) },
+      { label: "sources", value: String(a.sources.length) },
+      { label: "missions", value: String(a.missionCount) }
+    ],
+    status: a.identity
+      ? { tone: "ok", label: "local · ready" }
+      : { tone: "muted", label: "no brain" },
+    real: a.identity
+      ? [
+          "Identity stored locally",
+          "Deterministic engine always-on",
+          ...(a.engines.length > 0
+            ? [`${a.engines.length} engine${a.engines.length === 1 ? "" : "s"} selected`]
+            : []),
+          ...(a.sources.length > 0
+            ? [`${a.sources.length} memory source${a.sources.length === 1 ? "" : "s"} attached`]
+            : [])
+        ]
+      : ["Nothing yet — open the bootstrap to begin."],
+    planned: ["Tauri keychain persistence", "Cloud-sync brain (opt-in)"],
+    nextAction: a.identity
+      ? "Dispatch a mission to grow the brain."
+      : "Bootstrap a brain from the welcome flow.",
+    missionLink: "/"
+  });
+
+  // 2. Mission System
+  const activeStage = a.current?.stage ?? "idle";
+  out.push({
+    id: "mission-system",
+    title: "Mission System",
+    eyebrow: "01 · mission system",
+    Icon: Rocket,
+    position: LAYOUT["mission-system"],
+    pills: [
+      { label: "active", value: a.current ? "running" : "idle" },
+      { label: "stage", value: activeStage },
+      { label: "receipts", value: String(a.history.length) },
+      { label: "shipped", value: String(a.totalDeliverables) }
+    ],
+    status: a.current
+      ? { tone: "ok", label: "in flight" }
+      : a.history.length > 0
+        ? { tone: "ok", label: "ready" }
+        : { tone: "muted", label: "idle" },
+    real: [
+      "Deterministic engine dispatches missions locally",
+      "Eight typed stages stream into the execution graph",
+      `${a.history.length} receipt${a.history.length === 1 ? "" : "s"} archived`,
+      `${a.totalDeliverables} deliverable${a.totalDeliverables === 1 ? "" : "s"} produced`
+    ],
+    planned: ["Ollama routing", "Cloud routing (BYOK)", "Streamed token execution"],
+    nextAction: "Open Mission Control · dispatch a brief.",
+    missionLink: "/"
+  });
+
+  // 3. Memory Layer
+  out.push({
+    id: "memory-layer",
+    title: "Memory Layer",
+    eyebrow: "02 · memory layer",
+    Icon: Database,
+    position: LAYOUT["memory-layer"],
+    pills: [
+      { label: "sources", value: String(a.sources.length) },
+      { label: "notes", value: "manual" },
+      { label: "vaults", value: String(a.sources.filter((s) => s.kind === "obsidian").length) },
+      { label: "files", value: String(a.sources.filter((s) => s.kind === "local-folder").length) }
+    ],
+    status:
+      a.sources.length > 0
+        ? { tone: "ok", label: `${a.sources.length} connected` }
+        : { tone: "muted", label: "empty" },
+    real:
+      a.sources.length > 0
+        ? a.sources.map(
+            (s) => `${s.label} · ${s.state}`
+          )
+        : ["No memory connected yet."],
+    planned: [
+      "Brain Notes persistence",
+      "Obsidian / Drive / Gmail / Local indexers"
+    ],
+    nextAction: "Open /memory to capture a brain note.",
+    missionLink: "/memory"
+  });
+
+  // 4. Repo Layer
+  const githubLabels = a.githubSources.map((s) => s.label);
+  out.push({
+    id: "repo-layer",
+    title: "Repo Layer",
+    eyebrow: "03 · repo layer",
+    Icon: Github,
+    position: LAYOUT["repo-layer"],
+    pills: [
+      { label: "repos", value: String(a.githubSources.length) },
+      { label: "attached", value: String(a.repoContextHistory.length) },
+      { label: "indexed", value: "0", tone: "muted" },
+      { label: "branches", value: "—", tone: "muted" }
+    ],
+    status:
+      a.githubSources.length > 0
+        ? { tone: "ok", label: "manual" }
+        : { tone: "muted", label: "no repos" },
+    real:
+      a.githubSources.length > 0
+        ? githubLabels.slice(0, 5)
+        : ["No repos attached yet."],
+    planned: [
+      "GitHub repo indexer",
+      "PR / issue write-back",
+      "Branch + diff context"
+    ],
+    nextAction: "Attach a repo from Mission Control's Repo Context card.",
+    missionLink: "/"
+  });
+
+  // 5. Workflow Layer
+  out.push({
+    id: "workflow-layer",
+    title: "Workflow Layer",
+    eyebrow: "04 · workflow layer",
+    Icon: Workflow,
+    position: LAYOUT["workflow-layer"],
+    pills: [
+      { label: "workflows", value: "0", tone: "muted" },
+      { label: "agents", value: "0", tone: "muted" },
+      { label: "approvals", value: "0", tone: "muted" },
+      { label: "triggers", value: "0", tone: "muted" }
+    ],
+    status: { tone: "muted", label: "planned" },
+    real: ["Blueprints listed under /workflows"],
+    planned: [
+      "Multi-mission chain runtime",
+      "Agent runtime (Inbox · Repo · Research)",
+      "Schedules + triggers",
+      "Phone-side approval gates"
+    ],
+    nextAction: "Browse planned blueprints under /workflows.",
+    missionLink: "/workflows"
+  });
+
+  // 6. Intelligence Layer
+  const pinTotal = Object.values(a.pins).reduce((acc, arr) => acc + arr.length, 0);
+  out.push({
+    id: "intelligence-layer",
+    title: "Intelligence Layer",
+    eyebrow: "05 · intelligence layer",
+    Icon: Eye,
+    position: LAYOUT["intelligence-layer"],
+    pills: [
+      { label: "pins", value: String(pinTotal) },
+      { label: "alerts", value: String(a.alerts.length) },
+      { label: "feeds", value: "offline", tone: "warn" },
+      { label: "tabs", value: "6" }
+    ],
+    status:
+      pinTotal > 0
+        ? { tone: "ok", label: `${pinTotal} watch card${pinTotal === 1 ? "" : "s"}` }
+        : { tone: "muted", label: "feeds offline" },
+    real:
+      pinTotal > 0
+        ? [`${pinTotal} card${pinTotal === 1 ? "" : "s"} pinned across 6 tabs`]
+        : ["Six tabs · all feeds offline · pin manual cards to scaffold."],
+    planned: [
+      "Public crypto price feed",
+      "Market / FX provider integrations",
+      "GitHub repo feed (Brain link)",
+      "RSS / arXiv / HN research feed"
+    ],
+    nextAction: "Open /terminal · pin a card or arm an alert.",
+    missionLink: "/terminal"
+  });
+
+  // 7. Delivery Layer
+  const formats = a.history.flatMap((m) => m.deliverables.map((d) => d.label));
+  const uniqueFormats = Array.from(new Set(formats));
+  out.push({
+    id: "delivery-layer",
+    title: "Delivery Layer",
+    eyebrow: "06 · delivery layer",
+    Icon: FileText,
+    position: LAYOUT["delivery-layer"],
+    pills: [
+      { label: "total", value: String(a.totalDeliverables) },
+      { label: "formats", value: String(uniqueFormats.length || 8) },
+      { label: "exports", value: "copy / download" },
+      { label: "receipts", value: String(a.history.length) }
+    ],
+    status:
+      a.totalDeliverables > 0
+        ? { tone: "ok", label: "ready" }
+        : { tone: "muted", label: "empty" },
+    real:
+      uniqueFormats.length > 0
+        ? uniqueFormats.slice(0, 6)
+        : ["Clean Brief · Cursor Task · Claude / ChatGPT prompts · Linear · GitHub · Terminal · Summary"],
+    planned: [
+      "PDF + share-link receipts",
+      "Per-format share to Slack / Linear",
+      "Read-only public deliverable URLs (opt-in)"
+    ],
+    nextAction: "Dispatch a mission · expand each deliverable to copy / download.",
+    missionLink: "/library"
+  });
+
+  // 8. Mobile Companion
+  out.push({
+    id: "mobile-companion",
+    title: "Mobile Companion",
+    eyebrow: "07 · mobile companion",
+    Icon: Phone,
+    position: LAYOUT["mobile-companion"],
+    pills: [
+      { label: "paired", value: "0", tone: "muted" },
+      { label: "captures", value: "0", tone: "muted" },
+      { label: "approvals", value: "0", tone: "muted" },
+      { label: "secure", value: "QR + token", tone: "warn" }
+    ],
+    status: { tone: "muted", label: "planned" },
+    real: ["Documented in Settings + landing + docs."],
+    planned: [
+      "Capture: voice · screenshot · share-sheet",
+      "Approve: cloud spend · repo writes · shell commands",
+      "View: receipts · deliverables · flight recorder",
+      "Dispatch: ask my brain · send to desktop"
+    ],
+    nextAction: "Open /settings → Mobile Companion card to read the spec.",
+    missionLink: "/settings"
+  });
+
+  return out;
+}
+
+// ============================================================================
+// IntelTerminal pin reader (matches the IntelligenceTerminalPage shape)
+// ============================================================================
+
+type PinnedCard = { id: string; text: string; tab: string };
+type Pinned = Record<string, PinnedCard[]>;
+
+function readIntelTerminalPins(): Pinned {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem("promptready-os.intel-terminal");
+    if (!raw) return {};
+    return JSON.parse(raw) as Pinned;
+  } catch {
+    return {};
+  }
+}
+
+function readIntelAlerts(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem("promptready-os.intel-terminal.alerts");
+    if (!raw) return [];
+    return JSON.parse(raw) as string[];
+  } catch {
+    return [];
+  }
+}
+
+// ============================================================================
+// Blueprint markdown export
+// ============================================================================
+
+interface ExportArgs {
+  identity: ReturnType<typeof useBrainStore.getState>["identity"];
+  demo: boolean;
+  sources: ReturnType<typeof useBrainStore.getState>["memorySources"];
+  engines: ReturnType<typeof useBrainStore.getState>["engines"];
+  missionCount: number;
+  historyCount: number;
+  recent: MissionReceipt[];
+  pins: Pinned;
+  alerts: string[];
+  totalDeliverables: number;
+  sections: SectionData[];
+}
+
+function buildBlueprintMarkdown(a: ExportArgs): string {
+  const lines: string[] = [];
+  lines.push(`# Mission Atlas — Blueprint Export`);
+  lines.push("");
+  lines.push(`*Generated ${new Date().toISOString()}*`);
+  if (a.demo) lines.push(`*Demo data: yes (labelled)*`);
+  lines.push("");
+
+  lines.push(`## Brain identity`);
+  if (a.identity) {
+    lines.push(`- **Name:** ${a.identity.name}`);
+    lines.push(`- **Mode:** ${a.identity.mode}`);
+    lines.push(`- **Created:** ${new Date(a.identity.createdAt).toISOString()}`);
+  } else {
+    lines.push(`- *No brain bootstrapped yet.*`);
+  }
+  lines.push("");
+
+  lines.push(`## Engines (${a.engines.length})`);
+  if (a.engines.length === 0) lines.push(`- *none*`);
+  for (const e of a.engines) lines.push(`- ${e.label} · ${e.state}`);
+  lines.push("");
+
+  lines.push(`## Memory sources (${a.sources.length})`);
+  if (a.sources.length === 0) lines.push(`- *none*`);
+  for (const s of a.sources) lines.push(`- ${s.label} · ${s.kind} · ${s.state}`);
+  lines.push("");
+
+  const repos = a.sources.filter((s) => s.kind === "github");
+  lines.push(`## Repo contexts (${repos.length})`);
+  if (repos.length === 0) lines.push(`- *none attached*`);
+  for (const r of repos) lines.push(`- ${r.label} — manual · not indexed yet`);
+  lines.push("");
+
+  lines.push(`## Missions`);
+  lines.push(`- **Total dispatched:** ${a.missionCount}`);
+  lines.push(`- **Archived receipts:** ${a.historyCount}`);
+  lines.push(`- **Deliverables produced:** ${a.totalDeliverables}`);
+  lines.push("");
+
+  if (a.recent.length > 0) {
+    lines.push(`### Recent receipts`);
+    for (const m of a.recent) {
+      const ts = new Date(m.startedAt).toISOString();
+      const brief = m.brief.replace(/\n+/g, " · ").slice(0, 90);
+      lines.push(
+        `- \`${m.id}\` · ${ts} · mode=${m.mode} · stage=${m.stage}${m.score ? ` · score=${m.score}/100` : ""}`
+      );
+      lines.push(`  > ${brief}`);
+    }
+    lines.push("");
+  }
+
+  const pinTotal = Object.values(a.pins).reduce((acc, arr) => acc + arr.length, 0);
+  lines.push(`## Intelligence Terminal pins (${pinTotal})`);
+  if (pinTotal === 0) lines.push(`- *none pinned · all feeds offline*`);
+  for (const [tab, cards] of Object.entries(a.pins)) {
+    if (cards.length === 0) continue;
+    lines.push(`- **${tab}:** ${cards.map((c) => c.text).join(" · ")}`);
+  }
+  lines.push("");
+
+  lines.push(`## Alerts (${a.alerts.length})`);
+  if (a.alerts.length === 0) lines.push(`- *no rules armed*`);
+  for (const r of a.alerts) lines.push(`- ${r}`);
+  lines.push("");
+
+  lines.push(`## Offline / planned`);
+  for (const s of a.sections.filter((x) => x.status.tone === "muted")) {
+    lines.push(`- **${s.title}** · ${s.status.label}`);
+  }
+  lines.push("");
+
+  lines.push(`## Next actions`);
+  for (const s of a.sections) {
+    lines.push(`- **${s.title}** → ${s.nextAction}`);
+  }
+  lines.push("");
+
+  lines.push(`---`);
+  lines.push(`*Atlas is local-first · this file was generated entirely from your machine's state.*`);
+  return lines.join("\n");
+}
+
+function download(filename: string, content: string) {
+  if (typeof window === "undefined") return;
+  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function stamp() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+
+// ============================================================================
+// helpers
+// ============================================================================
+
+function positionOf(p: SectionPosition) {
+  return {
+    x: 20 + (p.col - 1) * (CELL_W + GAP),
+    y: 20 + (p.row - 1) * (CELL_H + GAP)
+  };
+}
+
+function centerOf(p: SectionPosition) {
+  const { x, y } = positionOf(p);
+  return { x: x + CELL_W / 2, y: y + CELL_H / 2 };
+}
+
+// Subtle blueprint grid background. Scoped to the atlas canvas only.
+const atlasCss = `
+.atlas-grid {
+  background-image:
+    linear-gradient(rgba(124,155,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,155,255,0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+}
+.atlas-card {
+  backdrop-filter: blur(6px);
+}
+`;
+

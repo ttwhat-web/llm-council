@@ -9,6 +9,7 @@ import {
   Brain,
   Cpu,
   Library,
+  Map as MapIcon,
   Settings as SettingsIcon,
   Terminal as TerminalIcon,
   Workflow
@@ -45,6 +46,7 @@ const NAV: NavItem[] = [
   { to: "/terminal", label: "Terminal", Icon: TerminalIcon },
   { to: "/workflows", label: "Workflows", Icon: Archive },
   { to: "/brain", label: "Brain", Icon: Brain },
+  { to: "/atlas", label: "Mission Atlas", Icon: MapIcon },
   { to: "/settings", label: "Settings", Icon: SettingsIcon }
 ];
 

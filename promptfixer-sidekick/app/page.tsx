@@ -5,10 +5,16 @@ import {
   ArrowRight,
   Brain,
   Cpu,
+  Database,
+  Eye,
+  FileText,
   Github,
   HardDrive,
   Lock,
+  Map as MapIcon,
   Monitor,
+  Phone,
+  Rocket,
   Terminal as TerminalIcon,
   Workflow
 } from "lucide-react";
@@ -32,6 +38,7 @@ export default function LandingPage() {
       <Hero />
       <DownloadGrid />
       <ProductSections />
+      <MissionAtlasSection />
       <ValuePropsSection />
       <MobileCompanionSection />
       <RoadmapSection />
@@ -284,6 +291,113 @@ function ProductSections() {
 }
 
 // ============================================================================
+// Mission Atlas preview
+// ============================================================================
+
+const ATLAS_CELLS = [
+  { Icon: Rocket, label: "Mission System", status: "live" },
+  { Icon: Database, label: "Memory Layer", status: "configured" },
+  { Icon: Github, label: "Repo Layer", status: "manual" },
+  { Icon: Workflow, label: "Workflow Layer", status: "planned" },
+  { Icon: Brain, label: "Brain Core", status: "core" },
+  { Icon: Eye, label: "Intelligence", status: "offline" },
+  { Icon: FileText, label: "Delivery", status: "ready" },
+  { Icon: Phone, label: "Mobile Companion", status: "planned" },
+  { Icon: MapIcon, label: "Atlas", status: "static preview" }
+];
+
+function MissionAtlasSection() {
+  return (
+    <section id="atlas" className="flex flex-col gap-5">
+      <SectionHeading
+        eyebrow="03 · mission atlas"
+        title="See your business brain as a living map."
+        sub="Brain, memory, repos, missions, workflows, intelligence, delivery, mobile — all on one blueprint wall inside PromptReady OS. Click any cell on the desktop to read the detail panel and export the whole blueprint to Markdown."
+      />
+
+      <div className="overflow-hidden rounded-3xl border border-accent/25 bg-accent/[0.04] shadow-glow">
+        <div className="flex items-center justify-between border-b border-white/8 px-4 py-2">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
+            <MapIcon className="h-3 w-3" />
+            mission atlas · static product preview
+          </div>
+          <span className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
+            no live data
+          </span>
+        </div>
+
+        <div
+          className="grid gap-2 p-4 md:gap-3"
+          style={{
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            backgroundImage:
+              "linear-gradient(rgba(124,155,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(124,155,255,0.06) 1px, transparent 1px)",
+            backgroundSize: "24px 24px"
+          }}
+        >
+          {ATLAS_CELLS.map((c) => {
+            const core = c.label === "Brain Core";
+            const offline = c.status === "offline" || c.status === "planned";
+            return (
+              <article
+                key={c.label}
+                className={`relative flex h-[110px] flex-col justify-between rounded-2xl border p-3 ${
+                  core
+                    ? "border-accent/40 bg-accent/[0.08] shadow-glow"
+                    : offline
+                      ? "border-white/8 bg-white/[0.012]"
+                      : "border-white/10 bg-white/[0.02]"
+                }`}
+              >
+                <span className="absolute -left-px -top-px h-2.5 w-2.5 border-l border-t border-accent" />
+                <span className="absolute -right-px -top-px h-2.5 w-2.5 border-r border-t border-accent" />
+                <span className="absolute -left-px -bottom-px h-2.5 w-2.5 border-l border-b border-accent" />
+                <span className="absolute -right-px -bottom-px h-2.5 w-2.5 border-r border-b border-accent" />
+
+                <header className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <c.Icon className="h-3 w-3 text-accent" />
+                    <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/80">
+                      {c.label}
+                    </span>
+                  </div>
+                  <span
+                    className={`rounded border px-1 py-px font-mono text-[8.5px] uppercase tracking-wider ${
+                      core
+                        ? "border-accent/40 bg-accent/[0.1] text-accent"
+                        : offline
+                          ? "border-white/10 bg-white/[0.03] text-white/55"
+                          : "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200"
+                    }`}
+                  >
+                    {c.status}
+                  </span>
+                </header>
+
+                <ul className="grid grid-cols-2 gap-1">
+                  {["pill", "pill"].map((_, i) => (
+                    <li
+                      key={i}
+                      className="h-[14px] rounded-sm border border-white/8 bg-white/[0.012]"
+                    />
+                  ))}
+                </ul>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+
+      <p className="text-[11.5px] text-white/45">
+        Every cell on the desktop reads from your local stores — brain, missions,
+        sources, terminal pins. Click a cell to open a detail panel, then export
+        the entire Atlas to Markdown.
+      </p>
+    </section>
+  );
+}
+
+// ============================================================================
 // Customer value cards
 // ============================================================================
 
@@ -406,7 +520,7 @@ function RoadmapSection() {
   return (
     <section id="roadmap" className="flex flex-col gap-5">
       <SectionHeading
-        eyebrow="03 · roadmap"
+        eyebrow="06 · roadmap"
         title="What ships when."
         sub="Honest staging. Now is what you'd find on your machine today. Next is in active build. Later is committed but not yet engineered."
       />
@@ -469,7 +583,7 @@ function PricingTeaser() {
   return (
     <section id="pricing" className="flex flex-col gap-5">
       <SectionHeading
-        eyebrow="04 · pricing"
+        eyebrow="07 · pricing"
         title="Free is generous. Operator is real."
         sub="Local rules engine is unlimited at every tier. Cloud routes + Memory connectors + Intelligence Terminal unlock as you go up. No card to start."
       />
