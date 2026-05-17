@@ -18,6 +18,8 @@ import {
   Sparkles
 } from "lucide-react";
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
+import { BrainGraph } from "@/components/BrainGraph";
+import { AutoConfigure } from "@/components/AutoConfigure";
 import {
   useBrainStore,
   MEMORY_OPTIONS,
@@ -313,26 +315,28 @@ export default function BrainPage() {
         </div>
       </section>
 
-      {/* ============================== Graph ============================== */}
-      <section className="rounded-2xl border border-white/8 bg-white/[0.018] p-4">
-        <header className="mb-2 flex items-center gap-2">
-          <Database className="h-3.5 w-3.5 text-accent" />
-          <span className="text-[13px] font-semibold text-white">Knowledge graph</span>
-        </header>
-        <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.008] px-5 py-10 text-center">
-          <Brain className="mx-auto h-6 w-6 text-white/35" />
-          <p className="mt-2 text-[12px] text-white/75">
-            {identity ? "Graph empty for now." : "Bootstrap a brain to see the graph."}
-          </p>
-          <p className="mt-1 text-[11px] text-white/45">
-            Connect a source above or capture a Brain Note under Memory. The
-            graph fills in as the brain learns who you are.
-          </p>
-          <div className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/55">
-            <Pencil className="h-3 w-3" /> add a note in /memory →
+      {/* ============================ Brain Graph ============================ */}
+      <section className="rounded-2xl border border-white/8 bg-white/[0.018] p-4 shadow-glass">
+        <header className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Database className="h-3.5 w-3.5 text-accent" />
+            <span className="text-[13px] font-semibold text-white">Brain Graph</span>
           </div>
-        </div>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+            real state · click a node for detail
+          </span>
+        </header>
+        <BrainGraph />
+        <p className="mx-auto mt-3 max-w-[60ch] text-center text-[11px] text-white/45">
+          Edges only draw to nodes the brain actually knows about. Counts
+          are live. The brain wakes as you connect sources, dispatch
+          missions, and pin watch cards. {!identity && "Bootstrap a brain to see it light up."}
+          {!identity && <Pencil className="ml-1 inline h-3 w-3 text-white/45" />}
+        </p>
       </section>
+
+      {/* ============================ Auto setup ============================ */}
+      <AutoConfigure />
 
     </div>
   );

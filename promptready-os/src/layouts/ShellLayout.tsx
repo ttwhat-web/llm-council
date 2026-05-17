@@ -14,6 +14,7 @@ import {
   Workflow
 } from "lucide-react";
 import { KbdHint } from "@/components/primitives/KbdHint";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 /**
  * Shell layout · PromptReady OS frame.
@@ -104,7 +105,10 @@ export function ShellLayout() {
             <span className="text-white/25">·</span>
             <span>Mission Control for AI Workflows</span>
           </div>
-          <StatusRail />
+          <div className="flex items-center gap-2">
+            <StatusRail />
+            <ThemeSwitcher />
+          </div>
         </header>
 
         <div className="flex-1 overflow-auto scrollbar-thin">

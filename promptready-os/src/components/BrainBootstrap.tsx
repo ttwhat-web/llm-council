@@ -63,7 +63,7 @@ export function BrainBootstrap() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 backdrop-blur">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-graphite-950/95 backdrop-blur">
       <div className="relative flex w-full max-w-[760px] flex-col gap-5 rounded-3xl border border-white/8 bg-white/[0.018] p-7 shadow-glass">
         <header className="flex flex-col gap-1">
           <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">

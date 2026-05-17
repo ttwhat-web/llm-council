@@ -38,6 +38,10 @@ const SECTIONS = [
   {
     title: "BYOK + self-host",
     body: "Bring your own Anthropic / OpenAI / Google keys; routing flips to your account. Operators run the Docker runtime (planned) or a private Vercel deploy."
+  },
+  {
+    title: "Mobile Companion",
+    body: "Phone is a capture + approval device. Voice notes and screenshots ship to your desktop brain. Risky actions (cloud spend, repo write-back, shell) wait for your tap. Pair via QR; revocable from desktop. Planned secure pairing — not built yet."
   }
 ];
 

@@ -1,27 +1,27 @@
 /**
- * Mission store · Phase 12.
+ * Mission store · Phase 13.
  *
- * Owns the mission lifecycle. The eight typed stages mirror the
- * Operations Pipeline:
+ * Drives the deterministic mission runner. Persists receipts to
+ * localStorage so the Library and Brain stat strip can read them.
  *
+ * Eight typed stages:
  *   idle → briefing → routing → memory-scan → model-select →
  *   execution → validation → deliverable-ready
  *
- * The engine is not connected yet. So `dispatch()` does NOT advance
- * stages — it stamps the brief and flips the runtime to one of the
- * honest "stalled" states:
+ * Runtime is honest:
+ *   ready              · engine reachable
+ *   waiting-for-engine · unknown, awaiting first dispatch / probe
+ *   local-mode         · deterministic-only, no Ollama/cloud
+ *   offline            · no engine path resolved
  *
- *   waiting-for-engine  · the desktop runtime isn't wired
- *   local-mode          · the user explicitly picked local but the
- *                          engine isn't reachable
- *   offline             · no engine reachable at all
- *
- * The timeline UI reads `state.stage` to decide which card is the
- * "current" cursor and never auto-advances. When the runtime ships, the
- * pipeline service calls `advance()` with real events.
+ * The deterministic runner always works locally, so after the first
+ * dispatch the runtime flips to `local-mode` (honest: nothing else is
+ * configured).
  */
 
 import { create } from "zustand";
+import { runMission, type Deliverable } from "@/services/missionRunner";
+import { useBrainStore } from "@/store/brain";
 
 export type MissionStage =
   | "idle"
@@ -57,6 +57,11 @@ export interface MissionReceipt {
   stage: MissionStage;
   runtime: RuntimeStatus;
   events: MissionEvent[];
+  deliverables: Deliverable[];
+  score?: number;
+  elapsedMs?: number;
+  memoryMatches?: number;
+  repoContext?: string | null;
 }
 
 interface MissionState {
@@ -64,10 +69,11 @@ interface MissionState {
   current: MissionReceipt | null;
   history: MissionReceipt[];
 
-  dispatch(brief: string, mode: string, quality: string): void;
-  advance(stage: MissionStage, event?: Omit<MissionEvent, "at" | "stage">): void;
+  dispatch(brief: string, mode: string, quality: string, repoContext?: string | null): Promise<void>;
   cancel(): void;
-  reset(): void;
+  clearHistory(): void;
+  hydrate(): void;
+  setRuntime(s: RuntimeStatus): void;
 }
 
 export const STAGES: MissionStage[] = [
@@ -85,50 +91,41 @@ export const STAGE_META: Record<
   MissionStage,
   { code: string; label: string; blurb: string }
 > = {
-  idle: {
-    code: "00",
-    label: "Idle",
-    blurb: "Brief not dispatched yet."
-  },
-  briefing: {
-    code: "01",
-    label: "Briefing",
-    blurb: "Clean the brief · classify intent · tag mode."
-  },
-  routing: {
-    code: "02",
-    label: "Routing",
-    blurb: "Decide engine path · local / cloud / hybrid."
-  },
-  "memory-scan": {
-    code: "03",
-    label: "Memory scan",
-    blurb: "Pull relevant brain notes and connector context."
-  },
-  "model-select": {
-    code: "04",
-    label: "Model select",
-    blurb: "Pick the model · resolve quality tier · log cost ceiling."
-  },
-  execution: {
-    code: "05",
-    label: "Execution",
-    blurb: "Stream tokens · capture trace · respect safety screen."
-  },
-  validation: {
-    code: "06",
-    label: "Validation",
-    blurb: "Score · constraint check · ranking before deliverables."
-  },
-  "deliverable-ready": {
-    code: "07",
-    label: "Deliverable ready",
-    blurb: "Named outputs persisted to the Operations Archive."
-  }
+  idle: { code: "00", label: "Idle", blurb: "Brief not dispatched yet." },
+  briefing: { code: "01", label: "Briefing", blurb: "Clean the brief · classify intent · tag mode." },
+  routing: { code: "02", label: "Routing", blurb: "Decide engine path · local / cloud / hybrid." },
+  "memory-scan": { code: "03", label: "Memory scan", blurb: "Pull relevant brain notes and connector context." },
+  "model-select": { code: "04", label: "Model select", blurb: "Pick the model · resolve quality tier · log cost ceiling." },
+  execution: { code: "05", label: "Execution", blurb: "Run the engine · capture trace · respect safety screen." },
+  validation: { code: "06", label: "Validation", blurb: "Score · constraint check · ranking before deliverables." },
+  "deliverable-ready": { code: "07", label: "Deliverable ready", blurb: "Named outputs persisted to the Operations Archive." }
 };
+
+const STORAGE_KEY = "promptready-os.mission";
 
 function newId() {
   return `m-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function loadHistory(): MissionReceipt[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as { history?: MissionReceipt[] };
+    return Array.isArray(parsed.history) ? parsed.history : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(history: MissionReceipt[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ history }));
+  } catch {
+    // ignore
+  }
 }
 
 export const useMissionStore = create<MissionState>((set, get) => ({
@@ -136,62 +133,83 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   current: null,
   history: [],
 
-  dispatch(brief, mode, quality) {
-    if (!brief.trim()) return;
+  async dispatch(brief, mode, quality, repoContext = null) {
+    const trimmed = brief.trim();
+    if (!trimmed) return;
+    if (get().current) return; // do not double-dispatch
+
+    const brainSources = useBrainStore.getState().memorySources;
+
     const receipt: MissionReceipt = {
       id: newId(),
-      brief: brief.trim(),
+      brief: trimmed,
       mode,
       quality,
       startedAt: Date.now(),
       stage: "briefing",
-      runtime: get().runtime,
-      events: [
-        {
-          at: Date.now(),
-          stage: "briefing",
-          kind: "info",
-          tag: "input",
-          message: `Brief received (${brief.trim().length} chars)`
-        },
-        {
-          at: Date.now(),
-          stage: "briefing",
-          kind: "warn",
-          tag: "engine",
-          message:
-            get().runtime === "waiting-for-engine"
-              ? "Engine not connected in this preview · pipeline halted at briefing"
-              : "Engine offline · pipeline halted at briefing"
-        }
-      ]
+      runtime: "local-mode",
+      events: [],
+      deliverables: [],
+      repoContext
     };
-    set({ current: receipt });
-  },
+    set({ current: receipt, runtime: "local-mode" });
 
-  advance(stage, event) {
-    const cur = get().current;
-    if (!cur) return;
-    const evt: MissionEvent = {
-      at: Date.now(),
-      stage,
-      kind: event?.kind ?? "info",
-      tag: event?.tag ?? "stage",
-      message: event?.message ?? `Advanced to ${stage}`
+    let working = receipt;
+    const pushEvent = (e: Omit<MissionEvent, "at">) => {
+      working = {
+        ...working,
+        events: [...working.events, { ...e, at: Date.now() }]
+      };
+      set({ current: working });
     };
-    const next: MissionReceipt = {
-      ...cur,
-      stage,
-      events: [...cur.events, evt],
-      endedAt: stage === "deliverable-ready" ? Date.now() : cur.endedAt
+    const advance = (stage: MissionStage) => {
+      working = { ...working, stage };
+      set({ current: working });
     };
-    set({
-      current: next,
-      history:
-        stage === "deliverable-ready"
-          ? [next, ...get().history].slice(0, 50)
-          : get().history
-    });
+
+    try {
+      const result = await runMission({
+        brief: trimmed,
+        mode,
+        quality,
+        sources: brainSources,
+        repoContext,
+        onEvent: pushEvent,
+        onAdvance: advance
+      });
+
+      const finalReceipt: MissionReceipt = {
+        ...working,
+        stage: "deliverable-ready",
+        endedAt: Date.now(),
+        deliverables: result.deliverables,
+        score: result.score,
+        elapsedMs: result.elapsedMs,
+        memoryMatches: result.memoryMatches
+      };
+
+      const history = [finalReceipt, ...get().history].slice(0, 100);
+      set({ current: finalReceipt, history });
+      saveHistory(history);
+      useBrainStore.getState().bumpMission();
+    } catch (err) {
+      const errReceipt: MissionReceipt = {
+        ...working,
+        stage: "idle",
+        endedAt: Date.now(),
+        events: [
+          ...working.events,
+          {
+            at: Date.now(),
+            stage: working.stage,
+            kind: "err",
+            tag: "runner",
+            message: `Runner error · ${err instanceof Error ? err.message : "unknown"}`
+          }
+        ]
+      };
+      set({ current: errReceipt });
+    }
   },
 
   cancel() {
@@ -212,10 +230,22 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         }
       ]
     };
-    set({ current: null, history: [cancelled, ...get().history].slice(0, 50) });
+    const history = [cancelled, ...get().history].slice(0, 100);
+    set({ current: null, history });
+    saveHistory(history);
   },
 
-  reset() {
-    set({ runtime: "waiting-for-engine", current: null, history: [] });
+  clearHistory() {
+    set({ history: [] });
+    saveHistory([]);
+  },
+
+  hydrate() {
+    const history = loadHistory();
+    set({ history });
+  },
+
+  setRuntime(s) {
+    set({ runtime: s });
   }
 }));

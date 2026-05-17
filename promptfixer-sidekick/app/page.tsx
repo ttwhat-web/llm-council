@@ -32,6 +32,8 @@ export default function LandingPage() {
       <Hero />
       <DownloadGrid />
       <ProductSections />
+      <ValuePropsSection />
+      <MobileCompanionSection />
       <RoadmapSection />
       <PricingTeaser />
     </MarketingShell>
@@ -277,6 +279,88 @@ function ProductSections() {
           </article>
         ))}
       </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// Customer value cards
+// ============================================================================
+
+const VALUE_PROPS = [
+  { title: "Own your memory", body: "Notes, repos, vaults stay on your machine. No vendor lock-in." },
+  { title: "Dispatch missions, don't chat", body: "Briefs in, named deliverables out. Receipts for everything." },
+  { title: "Connect repos and notes", body: "Attach a repo URL, point at a folder, paste a note. The brain grows." },
+  { title: "Approve from your phone", body: "Risky actions wait for a tap. Cloud spend, repo writes, shell commands." },
+  { title: "Local-first by default", body: "Deterministic engine ships in the box. Ollama if installed. Cloud if you opt in." },
+  { title: "Bring your own model", body: "Anthropic, OpenAI, Google keys you control. Or stay local forever." },
+  { title: "Export every deliverable", body: "Markdown, shell, JSON, text. Copy or download per artifact." },
+  { title: "Build your private AI brain", body: "Not a chat. A persistent operator that learns who you are." }
+];
+
+function ValuePropsSection() {
+  return (
+    <section className="flex flex-col gap-5">
+      <SectionHeading
+        eyebrow="04 · why operators pay"
+        title="What you actually get."
+      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {VALUE_PROPS.map((v) => (
+          <article
+            key={v.title}
+            className="flex flex-col gap-1 rounded-2xl border border-white/8 bg-white/[0.02] p-4 transition hover:border-accent/30"
+          >
+            <span className="text-[13px] font-semibold text-white">{v.title}</span>
+            <span className="text-[11.5px] text-white/55">{v.body}</span>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// Mobile Companion teaser
+// ============================================================================
+
+function MobileCompanionSection() {
+  return (
+    <section className="flex flex-col gap-4 rounded-3xl border border-accent/25 bg-accent/[0.04] p-6 shadow-glow">
+      <header className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+            05 · mobile companion
+          </span>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-white md:text-3xl">
+            Capture and approve from your phone.
+          </h2>
+          <p className="mt-1 max-w-[60ch] text-[13px] text-white/65">
+            Mobile is not the product. The desktop is. Mobile is the capture
+            device and the approval gate — voice notes, screenshots, share-sheet
+            into your brain. Risky actions wait for your tap.
+          </p>
+        </div>
+        <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/55">
+          planned · secure pairing
+        </span>
+      </header>
+      <ul className="grid grid-cols-1 gap-2 md:grid-cols-4">
+        {[
+          { t: "Capture", b: "voice · screenshot · share-sheet" },
+          { t: "Approve", b: "cloud spend · repo writes · shell" },
+          { t: "View", b: "receipts · deliverables · flight recorder" },
+          { t: "Dispatch", b: "ask my brain · send to desktop" }
+        ].map((c) => (
+          <li
+            key={c.t}
+            className="flex flex-col gap-0.5 rounded-xl border border-white/8 bg-white/[0.012] p-3"
+          >
+            <span className="text-[12.5px] font-semibold text-white">{c.t}</span>
+            <span className="text-[11px] text-white/55">{c.b}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
