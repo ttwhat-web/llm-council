@@ -19,6 +19,8 @@
 export { usePromptsStore } from "./prompts";
 export { useSessionsStore } from "./sessions";
 export { useSettingsStore } from "./settings";
+export { useBrainStore } from "./brain";
+export { useMissionStore } from "./mission";
 
 // Phase-2+ stores (declared, implementation lands with their module):
 // export { useFixerStore } from "./fixer";

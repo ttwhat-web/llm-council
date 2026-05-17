@@ -1,19 +1,25 @@
 import { useEffect } from "react";
 import { AppRouter } from "@/routes";
-import { useSettingsStore } from "@/store";
+import { useSettingsStore, useBrainStore } from "@/store";
+import { BrainBootstrap } from "@/components/BrainBootstrap";
 
 /**
- * App root — boots the settings store, then mounts the router.
- *
- * Stores hydrate lazily; only settings is awaited so the rest of the
- * tree can render immediately without a flash. Other stores call
- * `load()` from inside their owning module's first effect.
+ * App root — hydrates persisted stores, then mounts the router. The
+ * BrainBootstrap overlay renders on top of the router when no brain
+ * exists yet; it doesn't block the shell from rendering underneath, so
+ * the user always sees the product behind the bootstrap.
  */
 
 export function App() {
   useEffect(() => {
     void useSettingsStore.getState().hydrate();
+    useBrainStore.getState().hydrate();
   }, []);
 
-  return <AppRouter />;
+  return (
+    <>
+      <AppRouter />
+      <BrainBootstrap />
+    </>
+  );
 }

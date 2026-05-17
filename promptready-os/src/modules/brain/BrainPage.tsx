@@ -3,149 +3,276 @@
 import { useState } from "react";
 import clsx from "clsx";
 import {
+  Activity,
   BookOpen,
   Brain,
   Cpu,
   Database,
-  FileText,
   Folder,
   Github,
   HardDrive,
-  Mail,
-  Package
+  Package,
+  Pencil,
+  Plus,
+  RefreshCcw,
+  Sparkles
 } from "lucide-react";
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
+import {
+  useBrainStore,
+  MEMORY_OPTIONS,
+  type MemorySourceKind,
+  type EngineKind
+} from "@/store/brain";
 
 /**
- * Brain layer · Phase D.
+ * Brain dashboard · Phase 12.
  *
- * The "Build your own AI Brain" surface. Three zones:
- *
- *   1. Brain status — single ring showing connected sources, indexed
- *      docs, and last sync. Honestly zero today.
- *   2. Memory sources — Obsidian / GitHub / Gmail / Drive / Local /
- *      Knowledge packs / Connected models. Each card is honest about
- *      its connector state.
- *   3. Knowledge graph — placeholder grid that says "no facts yet".
+ * Top: identity card (name · mode · created · demo badge if applicable).
+ * Stats: missions · sources · engines · vault · packs · last activity.
+ * Sources: real cards from the store with state pills.
+ * Engines: cards with active/configured state.
+ * Knowledge packs: curated bundles (still planned).
+ * Reset / re-bootstrap controls at the bottom.
  */
 
-type ConnectorState = "not connected" | "coming soon" | "manual";
+const SOURCE_ICON: Record<MemorySourceKind, typeof BookOpen> = {
+  "brain-notes": Activity,
+  obsidian: BookOpen,
+  github: Github,
+  drive: HardDrive,
+  "local-folder": Folder
+};
 
-interface SourceCard {
-  name: string;
-  blurb: string;
-  Icon: typeof Folder;
-  state: ConnectorState;
-  cta: string;
-}
-
-const SOURCES: SourceCard[] = [
-  {
-    name: "Obsidian vault",
-    blurb: "Index a folder of markdown notes. Read-only · two-way sync optional later.",
-    Icon: BookOpen,
-    state: "coming soon",
-    cta: "Pick vault folder"
-  },
-  {
-    name: "GitHub repos",
-    blurb: "Index issues, PRs, and READMEs across the repos you select.",
-    Icon: Github,
-    state: "not connected",
-    cta: "Connect GitHub"
-  },
-  {
-    name: "Gmail",
-    blurb: "Read-only summaries of new threads · classified by intent · never sent.",
-    Icon: Mail,
-    state: "coming soon",
-    cta: "Connect Gmail"
-  },
-  {
-    name: "Google Drive",
-    blurb: "Index docs and sheets in a chosen folder. Local OCR for PDFs.",
-    Icon: HardDrive,
-    state: "coming soon",
-    cta: "Connect Drive"
-  },
-  {
-    name: "Local folders",
-    blurb: "Point at any directory of text / md / pdf / code. Indexes on-device first.",
-    Icon: Folder,
-    state: "coming soon",
-    cta: "Add folder"
-  }
-];
-
-const KNOWLEDGE_PACKS: SourceCard[] = [
+const KNOWLEDGE_PACKS = [
   {
     name: "Operator handbook",
     blurb: "Curated prompt anatomy, mode taxonomy, deliverable specs.",
-    Icon: Package,
-    state: "manual",
-    cta: "Browse pack"
+    state: "manual" as const
   },
   {
     name: "Engineering tactics",
     blurb: "Debugging heuristics · code review checklists · safe shell recipes.",
-    Icon: Package,
-    state: "coming soon",
-    cta: "Install pack"
+    state: "coming-soon" as const
   }
 ];
 
-const MODELS: Array<{ name: string; via: string; state: ConnectorState }> = [
-  { name: "Local · Ollama", via: "http://localhost:11434", state: "not connected" },
-  { name: "Anthropic · Claude", via: "BYOK", state: "not connected" },
-  { name: "OpenAI · GPT", via: "BYOK", state: "not connected" },
-  { name: "Google · Gemini", via: "BYOK", state: "not connected" }
-];
-
 export default function BrainPage() {
-  const [pulse, setPulse] = useState(false);
+  const identity = useBrainStore((s) => s.identity);
+  const sources = useBrainStore((s) => s.memorySources);
+  const engines = useBrainStore((s) => s.engines);
+  const missionCount = useBrainStore((s) => s.missionCount);
+  const vaultCount = useBrainStore((s) => s.vaultCount);
+  const knowledgePacks = useBrainStore((s) => s.knowledgePacks);
+  const lastActivity = useBrainStore((s) => s.lastActivity);
+  const demo = useBrainStore((s) => s.demo);
+  const removeMemorySource = useBrainStore((s) => s.removeMemorySource);
+  const addMemorySource = useBrainStore((s) => s.addMemorySource);
+  const enableEngine = useBrainStore((s) => s.enableEngine);
+  const reset = useBrainStore((s) => s.reset);
+
+  const [addingSource, setAddingSource] = useState(false);
+
+  const availableSourceKinds = MEMORY_OPTIONS.filter(
+    (m) => !sources.some((s) => s.kind === m.value)
+  );
+  const availableEngines: EngineKind[] = (
+    ["deterministic", "ollama", "cloud"] as EngineKind[]
+  ).filter((k) => !engines.some((e) => e.kind === k));
 
   return (
     <div className="mx-auto flex w-full max-w-[1300px] flex-col gap-5 px-5 py-5 md:px-7 md:py-7">
       <SurfaceHeader
         eyebrow="brain · build your own ai brain"
         title="Brain"
-        sub="Connect what should inform every mission. Local-first · opt-in cloud. Connectors below are honest about whether they're wired today."
+        sub="Identity, memory, engines, and activity for this brain. Everything is local · revocable · honest."
         right={
           <button
             type="button"
-            onClick={() => setPulse(true)}
-            className="no-drag rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/65 transition hover:bg-white/[0.06]"
+            onClick={reset}
+            className="no-drag inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/65 transition hover:bg-white/[0.06]"
           >
-            {pulse ? "ping · no sources" : "ping brain"}
+            <RefreshCcw className="h-3 w-3" />
+            re-bootstrap brain
           </button>
         }
       />
 
-      {/* ============================== Status ============================== */}
-      <section className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="sources connected" value="0" />
-          <Stat label="documents indexed" value="0" />
-          <Stat label="brain notes" value="manual" />
-          <Stat label="last sync" value="never" />
+      {/* =========================== Identity card =========================== */}
+      <section
+        className={clsx(
+          "flex flex-col gap-4 rounded-2xl border p-4 md:flex-row md:items-center md:justify-between",
+          demo
+            ? "border-accent/30 bg-accent/[0.04] shadow-glow"
+            : "border-white/8 bg-white/[0.02]"
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30 shadow-glow">
+            <Brain className="h-5 w-5 text-accent" />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+              brain identity
+            </span>
+            <span className="text-xl font-semibold text-white">
+              {identity?.name ?? "No brain yet"}
+            </span>
+            <span className="text-[11.5px] text-white/55">
+              {identity ? (
+                <>
+                  Mode · <span className="text-white">{identity.mode}</span> · created{" "}
+                  {new Date(identity.createdAt).toLocaleString()}
+                </>
+              ) : (
+                "Bootstrap a brain from the welcome flow to fill this card."
+              )}
+            </span>
+          </div>
         </div>
+        {demo && (
+          <div className="flex items-center gap-1.5 rounded-md border border-accent/30 bg-accent/[0.08] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent">
+            <Sparkles className="h-3 w-3" />
+            demo data · labelled · safe to reset
+          </div>
+        )}
       </section>
 
-      {/* =========================== Memory sources ========================== */}
+      {/* =============================== Stats =============================== */}
+      <section className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
+        <Stat label="missions" value={String(missionCount)} />
+        <Stat label="active memories" value={String(sources.length)} />
+        <Stat label="engines" value={String(engines.length)} />
+        <Stat label="vaults" value={String(vaultCount)} />
+        <Stat label="packs" value={String(knowledgePacks)} />
+        <Stat
+          label="last activity"
+          value={lastActivity ? relativeTime(lastActivity) : "never"}
+        />
+      </section>
+
+      {/* ============================= Sources =============================== */}
       <section className="flex flex-col gap-2">
         <header className="flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold text-white">
-            Memory sources
-          </h2>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
-            opt-in · local-first · revocable
-          </span>
+          <h2 className="text-[13px] font-semibold text-white">Memory sources</h2>
+          {availableSourceKinds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setAddingSource((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+            >
+              <Plus className="h-3 w-3" /> add source
+            </button>
+          )}
         </header>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {SOURCES.map((s) => (
-            <SourceTile key={s.name} card={s} />
-          ))}
-        </div>
+
+        {addingSource && availableSourceKinds.length > 0 && (
+          <div className="grid grid-cols-1 gap-2 rounded-xl border border-accent/25 bg-accent/[0.04] p-3 md:grid-cols-2 lg:grid-cols-3">
+            {availableSourceKinds.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => {
+                  addMemorySource({
+                    kind: m.value,
+                    label: m.label,
+                    state: m.state
+                  });
+                  setAddingSource(false);
+                }}
+                className="flex flex-col items-start gap-0.5 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1.5 text-left hover:bg-white/[0.08]"
+              >
+                <span className="text-[12px] font-semibold text-white">{m.label}</span>
+                <span className="text-[10.5px] text-white/55">{m.blurb}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {sources.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.008] p-5 text-center">
+            <p className="text-[12px] text-white/75">No memory connected.</p>
+            <p className="mt-1 text-[10.5px] text-white/45">
+              Add a source above to give the brain something to draw from.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {sources.map((s) => {
+              const Icon = SOURCE_ICON[s.kind];
+              return (
+                <article
+                  key={s.id}
+                  className="flex items-start justify-between gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-3"
+                >
+                  <div className="flex items-start gap-2">
+                    <Icon className="mt-0.5 h-3.5 w-3.5 text-accent" />
+                    <div className="flex flex-col">
+                      <span className="text-[12.5px] font-semibold text-white">
+                        {s.label}
+                      </span>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
+                        {s.state}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeMemorySource(s.id)}
+                    className="rounded-md border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55 hover:bg-white/[0.06]"
+                  >
+                    remove
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ============================== Engines ============================== */}
+      <section className="flex flex-col gap-2">
+        <header className="flex items-center justify-between">
+          <h2 className="text-[13px] font-semibold text-white">Connected engines</h2>
+          {availableEngines.length > 0 && (
+            <div className="flex items-center gap-1">
+              {availableEngines.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => enableEngine(k)}
+                  className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+                >
+                  <Plus className="h-3 w-3" /> {k}
+                </button>
+              ))}
+            </div>
+          )}
+        </header>
+        {engines.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.008] p-5 text-center">
+            <p className="text-[12px] text-white/75">No engine selected.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+            {engines.map((e) => (
+              <article
+                key={e.id}
+                className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Cpu className="h-3.5 w-3.5 text-accent" />
+                  <span className="text-[12.5px] font-semibold text-white">
+                    {e.label}
+                  </span>
+                </div>
+                <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
+                  {e.state}
+                </span>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* =========================== Knowledge packs ========================= */}
@@ -157,40 +284,36 @@ export default function BrainPage() {
           </span>
         </header>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {KNOWLEDGE_PACKS.map((s) => (
-            <SourceTile key={s.name} card={s} />
-          ))}
-        </div>
-      </section>
-
-      {/* =========================== Connected models ======================== */}
-      <section className="flex flex-col gap-2">
-        <header className="flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold text-white">Connected models</h2>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
-            routes resolved at dispatch
-          </span>
-        </header>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          {MODELS.map((m) => (
+          {KNOWLEDGE_PACKS.map((p) => (
             <article
-              key={m.name}
-              className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.018] px-3 py-2"
+              key={p.name}
+              className="flex flex-col gap-1 rounded-2xl border border-white/8 bg-white/[0.02] p-3"
             >
-              <div className="flex items-center gap-2">
-                <Cpu className="h-3.5 w-3.5 text-accent" />
-                <div className="flex flex-col">
-                  <span className="text-[12.5px] font-medium text-white">{m.name}</span>
-                  <span className="font-mono text-[10px] text-white/45">{m.via}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Package className="h-3.5 w-3.5 text-accent" />
+                  <span className="text-[12.5px] font-semibold text-white">
+                    {p.name}
+                  </span>
                 </div>
+                <span
+                  className={clsx(
+                    "rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider",
+                    p.state === "manual"
+                      ? "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200"
+                      : "border-white/10 bg-white/[0.03] text-white/55"
+                  )}
+                >
+                  {p.state === "manual" ? "manual" : "coming soon"}
+                </span>
               </div>
-              <StatePill state={m.state} />
+              <p className="text-[11px] text-white/55">{p.blurb}</p>
             </article>
           ))}
         </div>
       </section>
 
-      {/* ============================ Graph block ============================ */}
+      {/* ============================== Graph ============================== */}
       <section className="rounded-2xl border border-white/8 bg-white/[0.018] p-4">
         <header className="mb-2 flex items-center gap-2">
           <Database className="h-3.5 w-3.5 text-accent" />
@@ -198,20 +321,24 @@ export default function BrainPage() {
         </header>
         <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.008] px-5 py-10 text-center">
           <Brain className="mx-auto h-6 w-6 text-white/35" />
-          <p className="mt-2 text-[12px] text-white/75">No facts in the brain yet.</p>
+          <p className="mt-2 text-[12px] text-white/75">
+            {identity ? "Graph empty for now." : "Bootstrap a brain to see the graph."}
+          </p>
           <p className="mt-1 text-[11px] text-white/45">
             Connect a source above or capture a Brain Note under Memory. The
-            graph fills in as the brain learns who you are and what you work on.
+            graph fills in as the brain learns who you are.
           </p>
+          <div className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/55">
+            <Pencil className="h-3 w-3" /> add a note in /memory →
+          </div>
         </div>
       </section>
+
     </div>
   );
 }
 
-// ============================================================================
-// Atoms
-// ============================================================================
+// ----------------------------------------------------------------------------
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -224,44 +351,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SourceTile({ card }: { card: SourceCard }) {
-  const { Icon } = card;
-  return (
-    <article className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon className="h-3.5 w-3.5 text-accent" />
-          <span className="text-[13px] font-semibold text-white">{card.name}</span>
-        </div>
-        <StatePill state={card.state} />
-      </header>
-      <p className="text-[11.5px] text-white/55">{card.blurb}</p>
-      <button
-        type="button"
-        disabled
-        className="mt-1 inline-flex cursor-not-allowed items-center gap-1 self-start rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10.5px] font-medium text-white/45"
-      >
-        <FileText className="h-3 w-3" /> {card.cta}
-      </button>
-    </article>
-  );
+function relativeTime(ts: number) {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return "just now";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return `${Math.floor(diff / 86_400_000)}d ago`;
 }
-
-function StatePill({ state }: { state: ConnectorState }) {
-  const cls = {
-    "not connected": "border-white/10 bg-white/[0.03] text-white/55",
-    "coming soon": "border-amber-400/25 bg-amber-500/[0.05] text-amber-200/80",
-    manual: "border-emerald-400/25 bg-emerald-500/[0.05] text-emerald-200/80"
-  }[state];
-  return (
-    <span
-      className={clsx(
-        "rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider",
-        cls
-      )}
-    >
-      {state}
-    </span>
-  );
-}
-

@@ -32,7 +32,7 @@ export default function LandingPage() {
       <Hero />
       <DownloadGrid />
       <ProductSections />
-      <PreviewPanel />
+      <RoadmapSection />
       <PricingTeaser />
     </MarketingShell>
   );
@@ -86,10 +86,7 @@ function Hero() {
       </div>
       <FounderCounter variant="cta" />
       <p className="text-[11px] text-white/35">
-        Want a preview without installing?{" "}
-        <Link href="/app" className="text-accent/85 hover:text-accent hover:underline">
-          Open the web preview of Mission Control →
-        </Link>
+        Desktop is the product. The web sells, the OS runs.
       </p>
     </section>
   );
@@ -285,120 +282,96 @@ function ProductSections() {
 }
 
 // ============================================================================
-// Cinematic preview panel
+// Roadmap
 // ============================================================================
 
-function PreviewPanel() {
+const ROADMAP = [
+  {
+    phase: "Now",
+    tone: "ok" as const,
+    items: [
+      "Desktop shell with eight operator surfaces",
+      "Mission lifecycle scaffold (eight typed stages)",
+      "Brain bootstrap · identity · sources · engines",
+      "BYOK key fields and local Brain Notes"
+    ]
+  },
+  {
+    phase: "Next",
+    tone: "soon" as const,
+    items: [
+      "Operations Pipeline live (real telemetry per stage)",
+      "Signed installers · macOS · Windows · Linux",
+      "Obsidian + Local folder indexers",
+      "Docker self-host runtime"
+    ]
+  },
+  {
+    phase: "Later",
+    tone: "muted" as const,
+    items: [
+      "Agent runtime (Inbox Triager · Repo Watchdog · Research Scout)",
+      "Workflow chains across missions",
+      "Connected feeds in Intelligence Terminal",
+      "Operator-tier shared workspaces"
+    ]
+  }
+];
+
+function RoadmapSection() {
   return (
-    <section id="preview" className="flex flex-col gap-5">
+    <section id="roadmap" className="flex flex-col gap-5">
       <SectionHeading
-        eyebrow="03 · preview"
-        title="Mission Control · static preview"
-        sub="Layout only. No live data is rendered below — when you install PromptReady OS, every value comes from real telemetry."
+        eyebrow="03 · roadmap"
+        title="What ships when."
+        sub="Honest staging. Now is what you'd find on your machine today. Next is in active build. Later is committed but not yet engineered."
       />
-      <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]">
-        <div className="flex items-center justify-between border-b border-white/5 px-4 py-2">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
-              promptready os · mission control
-            </span>
-            <span className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
-              static preview
-            </span>
-          </div>
-          <span className="font-mono text-[9px] uppercase tracking-wider text-white/35">
-            no live data
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-[260px_minmax(0,1fr)_280px]">
-          {/* col 1 — brief */}
-          <aside className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.012] p-3">
-            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
-              mission brief
-            </div>
-            <div className="rounded-md border border-white/10 bg-white/[0.025] px-2 py-1.5 text-[11.5px] text-white/55">
-              Paste a messy prompt, an error log, a product idea…
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {["claude", "cursor", "dev", "terminal"].map((t) => (
-                <span
-                  key={t}
-                  className="rounded border border-white/10 bg-white/[0.04] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-white/55"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-            <div className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent/85 px-2.5 py-1 text-[11px] font-semibold text-white">
-              Dispatch Mission
-            </div>
-          </aside>
-
-          {/* col 2 — operations */}
-          <section className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.012] p-3">
-            <div className="flex items-center justify-between">
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
-                operations pipeline
-              </div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-white/35">
-                idle
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {ROADMAP.map((r) => (
+          <article
+            key={r.phase}
+            className={`flex flex-col gap-3 rounded-2xl border bg-white/[0.02] p-4 ${
+              r.tone === "ok"
+                ? "border-emerald-400/30"
+                : r.tone === "soon"
+                  ? "border-accent/30"
+                  : "border-white/10"
+            }`}
+          >
+            <header className="flex items-center justify-between">
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/55">
+                {r.phase}
               </span>
-            </div>
-            <div className="grid grid-cols-8 gap-1">
-              {["IN", "CL", "IT", "ST", "CN", "GN", "VL", "OUT"].map((s, i) => (
-                <div key={s} className="flex flex-col items-center gap-1 p-1.5">
+              <span
+                className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
+                  r.tone === "ok"
+                    ? "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200"
+                    : r.tone === "soon"
+                      ? "border-accent/30 bg-accent/[0.06] text-accent"
+                      : "border-white/10 bg-white/[0.03] text-white/55"
+                }`}
+              >
+                {r.tone === "ok" ? "shipped" : r.tone === "soon" ? "in build" : "committed"}
+              </span>
+            </header>
+            <ul className="flex flex-col gap-1.5">
+              {r.items.map((it) => (
+                <li key={it} className="flex items-start gap-2 text-[12px] text-white/75">
                   <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      i === 0 ? "bg-emerald-400/80" : "bg-white/15"
+                    className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${
+                      r.tone === "ok"
+                        ? "bg-emerald-400"
+                        : r.tone === "soon"
+                          ? "bg-accent"
+                          : "bg-white/35"
                     }`}
                   />
-                  <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-white/45">
-                    {s}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <ul className="mt-1 flex flex-col divide-y divide-white/5 text-[10.5px]">
-              {[
-                ["info", "input", "Awaiting brief"],
-                ["info", "router", "Ollama reachable · cloud absent"],
-                ["info", "safety", "Screen armed"]
-              ].map(([k, tag, msg], i) => (
-                <li key={i} className="flex items-center gap-2 py-1">
-                  <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
-                    {String(k)}
-                  </span>
-                  <span className="rounded border border-white/10 bg-white/[0.04] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-white/45">
-                    {tag}
-                  </span>
-                  <span className="text-white/65">{msg}</span>
+                  <span>{it}</span>
                 </li>
               ))}
             </ul>
-          </section>
-
-          {/* col 3 — deliverables */}
-          <aside className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.012] p-3">
-            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
-              deliverables
-            </div>
-            <div className="rounded-md border border-dashed border-white/10 bg-white/[0.012] p-3 text-center text-[11.5px] text-white/45">
-              Awaiting mission. Cursor Task · Claude Prompt · Linear Issue ·
-              Terminal Safe Command and 7 more deliverables ship per run.
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1 text-[9px]">
-              {["mode=auto", "quality=fast", "route=ollama", "0ms"].map((t) => (
-                <span
-                  key={t}
-                  className="rounded border border-white/10 bg-white/[0.04] px-1 py-px font-mono uppercase tracking-wider text-white/40"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          </aside>
-        </div>
+          </article>
+        ))}
       </div>
     </section>
   );
