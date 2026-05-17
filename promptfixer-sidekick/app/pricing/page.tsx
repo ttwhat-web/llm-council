@@ -23,13 +23,12 @@ const PLANS = [
     price: "$0",
     cadence: "always",
     Icon: Zap,
-    blurb: "Run real missions before you commit a card.",
+    blurb: "Run real missions on the local rules engine before you commit a card.",
     features: [
-      "10 daily missions",
-      "5 saved stacks",
-      "1 recording draft",
-      "All eleven deliverables",
-      "Local Ollama option",
+      "Local rules engine — unlimited",
+      "10 cloud missions / day once a provider is connected",
+      "Mission Archive — local",
+      "Basic templates",
       "Anonymous session — no signup required"
     ],
     cta: "Start free",
@@ -42,35 +41,35 @@ const PLANS = [
     cadence: "/ month",
     Icon: Crown,
     highlight: true,
-    blurb: "The daily-driver Command Center. The default we recommend.",
+    blurb: "The daily-driver Mission Control. The default we recommend.",
     features: [
-      "Unlimited missions",
-      "Unlimited stacks + recordings",
-      "Mission Alerts (Telegram)",
-      "Audit + receipt permalinks",
-      "Personal API access (rolling out)",
-      "Priority routing on cloud providers",
-      "BYOK 20% discount"
+      "Unlimited cloud missions",
+      "Advanced exports (Cursor / Claude / ChatGPT / Linear / GitHub / Terminal Safe)",
+      "Architect mode",
+      "Memory connectors — Obsidian + GitHub (rolling out)",
+      "Local Ollama profiles",
+      "Mission Alerts (Telegram)"
     ],
     cta: "Go Pro",
     href: "/app?plan=pro"
   },
   {
     id: "team" as const,
-    name: "Team",
+    name: "Operator",
     price: "$39",
     cadence: "/ seat / month",
     Icon: Users,
-    blurb: "When more than one operator runs the missions.",
+    blurb: "Terminal workspace + agents for operators running real ops.",
     features: [
       "Everything in Pro",
-      "Shared workflows (rolling out)",
-      "Shared team memory (rolling out)",
-      "Audit log + CSV export",
-      "Workspace billing",
-      "SAML basic"
+      "Terminal workspace — markets / repos / inbox panels",
+      "Agent actions",
+      "Repo intelligence",
+      "Market intelligence",
+      "Scheduled missions",
+      "Advanced telemetry"
     ],
-    cta: "See Team",
+    cta: "Open Operator",
     href: "/app?plan=team"
   }
 ];

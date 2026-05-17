@@ -147,34 +147,36 @@ export const BILLING_PLANS: Array<{
     name: "Free",
     price: "$0",
     features: [
-      "10 daily fixes",
-      "Fast model only",
-      "Local rules engine — unlimited"
+      "Local rules engine — unlimited",
+      "10 cloud missions / day once connected",
+      "Mission Archive — local",
+      "Basic templates"
     ]
   },
   {
     id: "pro",
     name: "Pro",
-    price: "$14 / mo",
+    price: "$19 / mo",
     highlight: true,
     features: [
-      "Unlimited fixes",
-      "Saved Prompt Stacks",
-      "Workflow Recorder",
-      "Cursor / Claude / ChatGPT exports",
-      "Project Memory",
-      "Priority routing"
+      "Unlimited cloud missions",
+      "Advanced exports + Architect",
+      "Memory connectors (Obsidian + GitHub, rolling out)",
+      "Local Ollama profiles",
+      "Mission Alerts"
     ]
   },
   {
     id: "team",
-    name: "Team",
-    price: "$24 / seat / mo",
+    name: "Operator",
+    price: "$39 / seat / mo",
     features: [
       "Everything in Pro",
-      "Shared workflows",
-      "Team memory",
-      "Audit logs",
+      "Terminal workspace",
+      "Agent actions",
+      "Repo + market intelligence",
+      "Scheduled missions",
+      "Advanced telemetry",
       "Priority support"
     ]
   }

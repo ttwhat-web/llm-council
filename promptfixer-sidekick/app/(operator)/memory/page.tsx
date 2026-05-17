@@ -7,11 +7,12 @@ import {
   Mail,
   type LucideIcon
 } from "lucide-react";
+import { MemoryNotesClient } from "@/components/MemoryNotesClient";
 import { OperatorPageHeader } from "@/components/OperatorPageHeader";
 
 export const metadata = {
   title: "Memory · operator.center",
-  description: "Sources, graph, recalls and privacy for the operator's brain."
+  description: "Manual notes today. Sources, graph, recalls planned next."
 };
 
 interface SourceCard {
@@ -19,7 +20,6 @@ interface SourceCard {
   name: string;
   blurb: string;
   Icon: LucideIcon;
-  /** What this connector will actually do once wired. */
   willConnect: string[];
 }
 
@@ -83,57 +83,85 @@ const SOURCES: SourceCard[] = [
 
 export default function MemoryPage() {
   return (
-    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
+    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-8 px-4 py-6 md:px-8 md:py-10">
       <OperatorPageHeader
         eyebrow="memory · the operator's brain"
-        title="Sources"
-        sub="Memory connectors are not yet wired. Each card below describes what it will do when the connector lands. No data is currently indexed, embedded or transmitted."
+        title="Memory"
+        sub="Manual notes are live and local. Cloud connectors (Obsidian / GitHub / Gmail / Drive) ship in a later phase — no fake connection state."
       />
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {SOURCES.map((s) => (
-          <article
-            key={s.id}
-            className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4"
-          >
-            <header className="flex items-start gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.05] ring-1 ring-white/8">
-                <s.Icon className="h-4 w-4 text-accent" />
-              </span>
-              <div className="flex flex-1 flex-col leading-tight">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-[13px] font-semibold text-white">{s.name}</h2>
-                  <NotConnectedPill />
-                </div>
-                <p className="mt-0.5 text-[12px] text-white/55">{s.blurb}</p>
-              </div>
-            </header>
-            <ul className="flex flex-col gap-1 text-[11.5px] text-white/65">
-              {s.willConnect.map((bullet) => (
-                <li key={bullet} className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-white/30" />
-                  <span>{bullet}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-1">
-              <PlannedConnectorButton />
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <aside className="flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/[0.05] p-4 text-[12px] text-amber-100/90">
-        <Database className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-200" />
-        <div className="flex flex-col gap-1">
-          <strong className="text-amber-200">No memory is currently indexed.</strong>
-          <span className="text-amber-100/80">
-            The Memory engine, embeddings pipeline and recall surface ship in a
-            later phase. Until then, the buttons below are advisory — clicking
-            them does nothing.
+      {/* --------------- Notes (real, local) --------------- */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/85">
+            Notes
+          </h2>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+            local · this browser
           </span>
         </div>
-      </aside>
+        <MemoryNotesClient />
+        <p className="text-[11px] text-white/45">
+          Attach notes to a mission from the &ldquo;Memory&rdquo; button in Mission
+          Control. Attached notes are prepended as a Markdown context block to
+          the mission input.
+        </p>
+      </section>
+
+      {/* --------------- Sources (placeholder) --------------- */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/85">
+            Sources
+          </h2>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+            planned connectors
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {SOURCES.map((s) => (
+            <article
+              key={s.id}
+              className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4"
+            >
+              <header className="flex items-start gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.05] ring-1 ring-white/8">
+                  <s.Icon className="h-4 w-4 text-accent" />
+                </span>
+                <div className="flex flex-1 flex-col leading-tight">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[13px] font-semibold text-white">{s.name}</h3>
+                    <NotConnectedPill />
+                  </div>
+                  <p className="mt-0.5 text-[12px] text-white/55">{s.blurb}</p>
+                </div>
+              </header>
+              <ul className="flex flex-col gap-1 text-[11.5px] text-white/65">
+                {s.willConnect.map((bullet) => (
+                  <li key={bullet} className="flex items-start gap-2">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-white/30" />
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+              <PlannedConnectorButton />
+            </article>
+          ))}
+        </div>
+        <aside className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.012] p-4 text-[12px] text-white/65">
+          <Database className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/45" />
+          <div className="flex flex-col gap-1">
+            <strong className="text-white/85">
+              No external memory is indexed.
+            </strong>
+            <span className="text-white/55">
+              Connectors above are not wired yet. The Notes section above
+              works fully and is the operator&apos;s first-class memory until
+              cloud sources land.
+            </span>
+          </div>
+        </aside>
+      </section>
     </div>
   );
 }
@@ -153,7 +181,7 @@ function PlannedConnectorButton() {
       type="button"
       disabled
       title="Planned connector — not wired yet"
-      className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium text-white/55"
+      className="inline-flex w-fit cursor-not-allowed items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium text-white/55"
     >
       Planned connector
     </button>

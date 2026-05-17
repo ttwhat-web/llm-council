@@ -33,6 +33,14 @@ import { EmptyStateExamples } from "./EmptyStateExamples";
 import { RecentMissions } from "./RecentMissions";
 import { LaunchBadge } from "./LaunchBadge";
 import { MissionReceipt } from "./MissionReceipt";
+import {
+  MemoryAttachButton,
+  MemoryAttachChips
+} from "./MemoryAttachButton";
+import {
+  notesToContextBlock,
+  type MemoryNote
+} from "@/lib/memory-notes";
 import { track } from "@/lib/analytics";
 import {
   incrementBilling,
@@ -175,6 +183,9 @@ export function PromptFixer({ variant = "web" }: Props) {
   // panel + Library page. Auto-saved on every successful mission, never
   // sent to the server.
   const [localReceipt, setLocalReceipt] = useState<ReceiptEntry | null>(null);
+  // Phase 2 — Memory notes attached to the next mission. On submit
+  // we prepend a "## Context" block to the input before sending.
+  const [attachedNotes, setAttachedNotes] = useState<MemoryNote[]>([]);
 
   const isLocal = settings.modelQuality === "local";
   const derivedEngine = getQuality(settings.modelQuality).engine;
@@ -519,6 +530,12 @@ export function PromptFixer({ variant = "web" }: Props) {
       setError(null);
 
       const startedAt = Date.now();
+      // Prepend attached memory notes as a Markdown context block.
+      // Transforms (override) re-render the previous result; they
+      // don't take a fresh input, so the attachments only apply to
+      // fresh missions.
+      const memoryContext = !override ? notesToContextBlock(attachedNotes) : "";
+      const effectiveInput = memoryContext ? `${memoryContext}${input}` : input;
       if (!override) {
         setLog((prev) => appendLog(prev, logUserSubmit(input)));
         setArchitect(null);
@@ -535,7 +552,7 @@ export function PromptFixer({ variant = "web" }: Props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            input: override ? "" : input,
+            input: override ? "" : effectiveInput,
             mode: settings.autoMode && !override ? undefined : settings.mode,
             engine: derivedEngine,
             autoMode: !override && settings.autoMode,
@@ -653,7 +670,8 @@ export function PromptFixer({ variant = "web" }: Props) {
       bumpBilling,
       refreshServerBilling,
       openPaywall,
-      recordStep
+      recordStep,
+      attachedNotes
     ]
   );
 
@@ -1216,7 +1234,21 @@ export function PromptFixer({ variant = "web" }: Props) {
                 setLog((prev) => appendLog(prev, logTemplate("agent action")));
               }}
             />
+            <MemoryAttachButton
+              attached={attachedNotes}
+              onChange={setAttachedNotes}
+              compact={compact}
+            />
           </div>
+
+          {attachedNotes.length > 0 && (
+            <MemoryAttachChips
+              attached={attachedNotes}
+              onRemove={(id) =>
+                setAttachedNotes((prev) => prev.filter((n) => n.id !== id))
+              }
+            />
+          )}
 
           {isLocal && (
             <Toggle

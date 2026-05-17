@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { MissionToast } from "@/components/MissionToast";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { PromptFixer } from "@/components/PromptFixer";
 
 /**
@@ -30,6 +31,10 @@ export default function MissionControlPage() {
       <Suspense fallback={null}>
         <MissionToast />
       </Suspense>
+
+      {/* First-run-only — checks pf.onboarding.v1.completed on mount and
+          returns null thereafter. Skippable. */}
+      <OnboardingWizard />
     </div>
   );
 }

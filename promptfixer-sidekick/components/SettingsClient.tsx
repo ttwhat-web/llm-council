@@ -8,11 +8,15 @@ import {
   Cpu,
   CreditCard,
   Database,
+  HardDrive,
   Link as LinkIcon,
   Loader2,
+  Lock,
+  Terminal,
   Users,
   XCircle
 } from "lucide-react";
+import { LocalDataPanel } from "./LocalDataPanel";
 
 /**
  * Settings — real values only.
@@ -225,6 +229,91 @@ export function SettingsClient() {
           </Link>{" "}
           (gated to admins in production).
         </p>
+      </Section>
+
+      <Section
+        Icon={Terminal}
+        title="Local Ollama"
+        sub="Run missions on a local model — no cloud, no quota, no data leaves the machine."
+      >
+        <ol className="ml-4 list-decimal space-y-1.5 text-[12px] text-white/70">
+          <li>
+            Install Ollama:{" "}
+            <a
+              href="https://ollama.com/download"
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent hover:underline"
+            >
+              ollama.com/download
+            </a>
+            .
+          </li>
+          <li>
+            Pull a fast supervisor + a code model:{" "}
+            <code className="font-mono text-[11px]">ollama pull gemma2:2b</code>{" "}
+            and{" "}
+            <code className="font-mono text-[11px]">ollama pull qwen2.5-coder:7b</code>.
+          </li>
+          <li>
+            Start the daemon (it auto-starts on macOS):{" "}
+            <code className="font-mono text-[11px]">ollama serve</code>.
+          </li>
+          <li>
+            On the server, set{" "}
+            <code className="font-mono text-[11px]">OLLAMA_BASE_URL=http://localhost:11434</code>{" "}
+            and optionally override the model profiles via{" "}
+            <code className="font-mono text-[11px]">OLLAMA_FAST_MODEL</code>,{" "}
+            <code className="font-mono text-[11px]">OLLAMA_SMART_MODEL</code>,{" "}
+            <code className="font-mono text-[11px]">OLLAMA_CODER_MODEL</code>.
+          </li>
+          <li>
+            In Mission Control, pick the <strong>Local</strong> quality. The
+            router will refuse to silently fall back to cloud unless you
+            explicitly allow it.
+          </li>
+        </ol>
+      </Section>
+
+      <Section
+        Icon={Lock}
+        title="Privacy · local-first by design"
+        sub="What stays on your machine, what leaves it, and on whose terms."
+      >
+        <ul className="flex flex-col gap-1.5 text-[12px] text-white/70">
+          <li>
+            <strong className="text-white/85">Local:</strong> mission receipts,
+            saved stacks, drafts, memory notes, watchlist symbols, recorded
+            workflows, the Pro Preview flag and your Mission Control settings
+            all live in this browser&apos;s localStorage. They never leave
+            unless you opt in.
+          </li>
+          <li>
+            <strong className="text-white/85">Server:</strong> when you click
+            &ldquo;Save receipt&rdquo; or &ldquo;Share receipt&rdquo;, a redacted
+            copy goes to the server-side mission store (see <code>/api/missions</code>).
+            Same for billing records when you check out.
+          </li>
+          <li>
+            <strong className="text-white/85">Cloud models:</strong> mission
+            text is sent to the provider you route to (Anthropic / OpenAI /
+            Google). With <strong>Local</strong> quality + Ollama, no
+            third-party provider is touched.
+          </li>
+          <li>
+            <strong className="text-white/85">Secrets:</strong> tokens / keys
+            inside your mission input are pattern-redacted before persist and
+            before any share permalink renders.
+          </li>
+        </ul>
+      </Section>
+
+      <Section
+        Icon={HardDrive}
+        title="Local data"
+        sub="Export, import, or wipe everything operator.center has written to this browser."
+      >
+        <LocalDataPanel />
       </Section>
     </div>
   );
