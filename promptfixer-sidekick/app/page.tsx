@@ -89,6 +89,12 @@ function Hero() {
         >
           Join founder waitlist
         </Link>
+        <Link
+          href="/roadmap"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm font-medium text-white/65 transition hover:bg-white/[0.06]"
+        >
+          Roadmap 30
+        </Link>
         <span className="text-[11px] text-white/40">
           Source build works today · signed installers next.
         </span>

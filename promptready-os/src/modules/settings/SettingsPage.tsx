@@ -38,6 +38,13 @@ import { AuditLogCard } from "@/components/AuditLogCard";
 import { ComplianceCard } from "@/components/ComplianceCard";
 import { RuntimeBus } from "@/components/RuntimeBus";
 import { OperatorModeCard } from "@/components/OperatorModeCard";
+import { RoadmapPanel } from "@/components/RoadmapPanel";
+import {
+  CloudSyncCard,
+  MobileCompanionRoadmapCard,
+  ConnectorHubCard,
+  EnterpriseServerCard
+} from "@/components/PlannedSurfacesCard";
 import { useAtlasStore } from "@/store/atlas";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
@@ -121,6 +128,7 @@ export default function SettingsPage() {
         sub="Auto-setup, appearance, BYOK keys, safety, telemetry, mobile companion. Keys you paste stay in memory for this session only — keychain lands with the desktop runtime."
       />
 
+      <RoadmapPanel />
       <SetupWizard />
       <DemoWorkspaceCard />
       <RuntimeBus />
@@ -223,6 +231,10 @@ export default function SettingsPage() {
       <DesktopTrustCard />
       <PackagingCard />
       <DiagnosticsCard />
+      <ConnectorHubCard />
+      <CloudSyncCard />
+      <MobileCompanionRoadmapCard />
+      <EnterpriseServerCard />
     </div>
   );
 }
