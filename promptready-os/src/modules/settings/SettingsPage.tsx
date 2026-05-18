@@ -1,25 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import {
   AlertTriangle,
+  Apple,
+  Archive,
+  BookOpen,
   Copy,
   Cpu,
+  Download,
   Eye,
   EyeOff,
+  HardDrive,
   Key,
+  Loader2,
+  Monitor,
   Palette,
   Phone,
   QrCode,
   RefreshCcw,
+  Send,
   ShieldCheck,
   Terminal as TerminalIcon,
-  Trash2
+  Trash2,
+  Upload
 } from "lucide-react";
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { AutoConfigure } from "@/components/AutoConfigure";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useAtlasStore } from "@/store/atlas";
+import { useBrainStore } from "@/store/brain";
+import { useMissionStore } from "@/store/mission";
+import {
+  downloadSnapshot,
+  restoreSnapshotFromFile
+} from "@/services/snapshot";
+import { downloadDiagnostics } from "@/services/diagnostics";
 
 /**
  * Settings · Phase 13.
@@ -169,6 +185,11 @@ export default function SettingsPage() {
       </section>
 
       <MobileCompanionCard />
+      <TelegramCompanionCard />
+      <SnapshotsCard />
+      <DesktopTrustCard />
+      <PackagingCard />
+      <DiagnosticsCard />
     </div>
   );
 }
@@ -341,5 +362,488 @@ function Capability({
       <span className="text-[12.5px] font-semibold text-white">{title}</span>
       <span className="text-[11px] text-white/55">{body}</span>
     </article>
+  );
+}
+
+// ============================================================================
+// Telegram companion
+// ============================================================================
+
+function TelegramCompanionCard() {
+  const link = useAtlasStore((s) => s.telegram);
+  const generate = useAtlasStore((s) => s.generateTelegramLink);
+  const clear = useAtlasStore((s) => s.clearTelegramLink);
+
+  const onCopy = () => {
+    if (!link) return;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      void navigator.clipboard.writeText(link.code);
+    }
+  };
+
+  const commands = [
+    ["/missions", "list active and recent missions"],
+    ["/receipt <id>", "show a receipt"],
+    ["/status", "current engine + brain state"],
+    ["/brain", "summary of brain identity"],
+    ["/approve <id>", "approve a pending workflow node"],
+    ["/reject <id>", "reject a pending workflow node"],
+    ["/pause", "pause running workflow"],
+    ["/resume", "resume paused workflow"]
+  ];
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+      <header className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Send className="h-4 w-4 text-accent" />
+          <span className="text-[13px] font-semibold text-white">Telegram Companion</span>
+        </div>
+        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+          {link ? "link issued · not connected" : "not connected"}
+        </span>
+      </header>
+
+      <p className="text-[11.5px] text-white/65">
+        Optional control surface — the bot accepts commands, never replaces
+        the desktop brain. Issuance is local; the actual Telegram bot wires
+        up with the desktop runtime.
+      </p>
+
+      <div className="mt-3 flex flex-col gap-2 rounded-xl border border-white/10 bg-graphite-900/60 p-3">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+            link code
+          </span>
+          {link && (
+            <button
+              type="button"
+              onClick={clear}
+              className="inline-flex items-center gap-1 rounded-md border border-rose-400/25 bg-rose-500/[0.06] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose-200 hover:bg-rose-500/[0.12]"
+            >
+              <Trash2 className="h-2.5 w-2.5" /> revoke
+            </button>
+          )}
+        </div>
+        {link ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-mono text-[18px] tracking-[0.28em] text-white">{link.code}</span>
+            <button
+              type="button"
+              onClick={onCopy}
+              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/75 hover:bg-white/[0.06]"
+            >
+              <Copy className="h-2.5 w-2.5" /> copy
+            </button>
+            <button
+              type="button"
+              onClick={generate}
+              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/75 hover:bg-white/[0.06]"
+            >
+              <RefreshCcw className="h-2.5 w-2.5" /> regenerate
+            </button>
+            <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/45">
+              issued {new Date(link.createdAt).toLocaleString()}
+            </span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={generate}
+            className="inline-flex items-center justify-center gap-1.5 self-start rounded-md bg-accent/85 px-3 py-1.5 text-[12px] font-semibold text-white shadow-glow transition hover:bg-accent"
+          >
+            <Send className="h-3.5 w-3.5" /> Generate Telegram link code
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3">
+        <div className="mb-1 font-mono text-[9.5px] uppercase tracking-[0.22em] text-white/40">
+          control commands · planned
+        </div>
+        <ul className="grid grid-cols-1 gap-1 md:grid-cols-2">
+          {commands.map(([cmd, desc]) => (
+            <li
+              key={cmd}
+              className="flex items-center gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]"
+            >
+              <code className="rounded bg-black/40 px-1 py-px font-mono text-[10.5px] text-accent">{cmd}</code>
+              <span className="text-white/65">{desc}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// Snapshots
+// ============================================================================
+
+function SnapshotsCard() {
+  const snapshots = useAtlasStore((s) => s.snapshots);
+  const removeSnapshot = useAtlasStore((s) => s.removeSnapshot);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [label, setLabel] = useState("");
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onCreate = () => {
+    const lbl = label.trim() || "snapshot";
+    setBusy(true);
+    try {
+      downloadSnapshot(lbl);
+    } finally {
+      setBusy(false);
+      setLabel("");
+    }
+  };
+
+  const onPickFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setBusy(true);
+    const r = await restoreSnapshotFromFile(f);
+    setImportResult(r.ok ? "Restored · stores updated" : `Failed · ${r.error}`);
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
+    window.setTimeout(() => setImportResult(null), 4000);
+  };
+
+  return (
+    <section className="rounded-2xl border border-accent/25 bg-accent/[0.04] p-4 shadow-glow">
+      <header className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Archive className="h-4 w-4 text-accent" />
+          <span className="text-[13px] font-semibold text-white">Brain Snapshots</span>
+        </div>
+        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+          {snapshots.length} recorded
+        </span>
+      </header>
+
+      <p className="text-[11.5px] text-white/65">
+        Export the entire local state — brain identity, missions, receipts,
+        workflow canvas, repo contexts, memory docs, pins, atlas layout — as
+        a downloadable <span className="font-mono">.brainpack</span> file. Reimport
+        on any machine to restore.
+      </p>
+
+      <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
+        <input
+          type="text"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="snapshot label (optional)"
+          className="flex-1 rounded-md border border-white/8 bg-white/[0.025] px-2 py-1.5 text-[12px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+        />
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onCreate}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent/90 px-3 py-1.5 text-[12px] font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Download className="h-3.5 w-3.5" /> Export
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".brainpack,application/json"
+            onChange={onPickFile}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[12px] font-semibold text-white/85 hover:bg-white/[0.06]"
+          >
+            <Upload className="h-3.5 w-3.5" /> Restore
+          </button>
+        </div>
+      </div>
+
+      {importResult && (
+        <p className="mt-2 rounded-md border border-accent/30 bg-accent/[0.08] px-2 py-1 font-mono text-[10.5px] uppercase tracking-wider text-accent">
+          {importResult}
+        </p>
+      )}
+
+      {snapshots.length > 0 && (
+        <ul className="mt-3 flex max-h-[160px] flex-col gap-1 overflow-auto pr-1">
+          {snapshots.map((s) => (
+            <li
+              key={s.id}
+              className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]"
+            >
+              <span className="font-mono text-white/80">{s.label}</span>
+              <div className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-wider text-white/45">
+                <span>{new Date(s.createdAt).toLocaleString()}</span>
+                <span>{(s.size / 1024).toFixed(1)}KB</span>
+                <button
+                  type="button"
+                  onClick={() => removeSnapshot(s.id)}
+                  className="rounded p-0.5 text-white/40 hover:bg-white/[0.06] hover:text-white/80"
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ============================================================================
+// Desktop trust
+// ============================================================================
+
+function DesktopTrustCard() {
+  const sources = useBrainStore((s) => s.memorySources);
+  const engines = useBrainStore((s) => s.engines);
+  const history = useMissionStore((s) => s.history);
+  const memoryDocs = useAtlasStore((s) => s.memoryDocs);
+  const files = useAtlasStore((s) => s.files);
+  const snapshots = useAtlasStore((s) => s.snapshots);
+
+  const lastReceipt = history[0];
+  const lastSnapshot = snapshots[0];
+  const lastImport = memoryDocs[0];
+
+  // Approximate brain size in bytes by summing localStorage keys.
+  let storageBytes = 0;
+  let storageKeys = 0;
+  if (typeof window !== "undefined") {
+    try {
+      storageKeys = window.localStorage.length;
+      for (let i = 0; i < storageKeys; i++) {
+        const k = window.localStorage.key(i);
+        if (!k) continue;
+        storageBytes += k.length + (window.localStorage.getItem(k) ?? "").length;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const resetWorkspace = () => {
+    if (typeof window === "undefined") return;
+    if (
+      !window.confirm(
+        "Reset workspace? This clears all local stores: brain, missions, atlas. Snapshots stay on disk."
+      )
+    )
+      return;
+    try {
+      window.localStorage.clear();
+      window.location.reload();
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+      <header className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <HardDrive className="h-4 w-4 text-accent" />
+          <span className="text-[13px] font-semibold text-white">Desktop · trust layer</span>
+        </div>
+        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+          local only
+        </span>
+      </header>
+
+      <ul className="grid grid-cols-2 gap-2 md:grid-cols-3">
+        <Stat label="workspace" value="browser localStorage" />
+        <Stat label="brain size" value={`${(storageBytes / 1024).toFixed(1)}KB`} hint={`${storageKeys} keys`} />
+        <Stat label="memory docs" value={`${memoryDocs.length}`} />
+        <Stat label="files tracked" value={`${files.length}`} />
+        <Stat label="receipts" value={`${history.length}`} />
+        <Stat
+          label="last activity"
+          value={lastReceipt ? new Date(lastReceipt.startedAt).toLocaleString() : "never"}
+        />
+        <Stat
+          label="last import"
+          value={lastImport ? new Date(lastImport.addedAt).toLocaleString() : "never"}
+        />
+        <Stat
+          label="last backup"
+          value={lastSnapshot ? new Date(lastSnapshot.createdAt).toLocaleString() : "never"}
+        />
+        <Stat
+          label="engine"
+          value={engines.length > 0 ? engines.map((e) => e.kind).join(" · ") : "deterministic"}
+          hint={`${sources.length} sources`}
+        />
+      </ul>
+
+      <p className="mt-3 text-[11px] text-white/55">
+        Workspace path moves to a Tauri-managed directory when you install
+        the desktop runtime — at which point this card swaps "browser
+        localStorage" for the absolute on-disk path.
+      </p>
+
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={resetWorkspace}
+          className="inline-flex items-center gap-1 rounded-md border border-rose-400/25 bg-rose-500/[0.06] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-rose-200 hover:bg-rose-500/[0.12]"
+        >
+          <Trash2 className="h-3 w-3" /> Reset workspace
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <li className="flex flex-col gap-0.5 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5">
+      <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-white/40">
+        {label}
+      </span>
+      <span className="text-[12.5px] font-semibold text-white">{value}</span>
+      {hint && (
+        <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/45">
+          {hint}
+        </span>
+      )}
+    </li>
+  );
+}
+
+// ============================================================================
+// Packaging
+// ============================================================================
+
+function PackagingCard() {
+  type PackagingState = "ready" | "partial" | "planned";
+  const PLATFORMS: Array<{
+    label: string;
+    arch: string;
+    Icon: typeof Apple;
+    state: PackagingState;
+    hint: string;
+  }> = [
+    {
+      label: "macOS",
+      arch: "Apple Silicon · Intel",
+      Icon: Apple,
+      state: "partial",
+      hint: "Tauri config present · installer not yet signed."
+    },
+    {
+      label: "Windows",
+      arch: "x86_64",
+      Icon: Monitor,
+      state: "partial",
+      hint: "Tauri config present · MSI not yet packaged."
+    },
+    {
+      label: "Linux",
+      arch: "AppImage · deb",
+      Icon: Monitor,
+      state: "planned",
+      hint: "AppImage / .deb build pending."
+    }
+  ];
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+      <header className="mb-3 flex items-center gap-2">
+        <BookOpen className="h-4 w-4 text-accent" />
+        <span className="text-[13px] font-semibold text-white">Packaging prep</span>
+      </header>
+      <ul className="grid grid-cols-1 gap-2 md:grid-cols-3">
+        {PLATFORMS.map((p) => (
+          <li
+            key={p.label}
+            className="flex flex-col gap-1 rounded-xl border border-white/8 bg-white/[0.012] p-3"
+          >
+            <header className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <p.Icon className="h-3.5 w-3.5 text-accent" />
+                <span className="text-[12.5px] font-semibold text-white">{p.label}</span>
+              </div>
+              <span
+                className={
+                  p.state === "ready"
+                    ? "rounded border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald-200"
+                    : p.state === "partial"
+                      ? "rounded border border-amber-400/30 bg-amber-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200"
+                      : "rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55"
+                }
+              >
+                {p.state}
+              </span>
+            </header>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
+              {p.arch}
+            </span>
+            <span className="text-[11px] text-white/55">{p.hint}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-[10.5px] text-white/45">
+        Build with <span className="font-mono">npm run tauri:build</span> once
+        signing keys land. Offline support is built in — the deterministic
+        engine never reaches the network.
+      </p>
+    </section>
+  );
+}
+
+// ============================================================================
+// Diagnostics
+// ============================================================================
+
+function DiagnosticsCard() {
+  const [busy, setBusy] = useState(false);
+  const [filename, setFilename] = useState<string | null>(null);
+
+  const onExport = () => {
+    setBusy(true);
+    try {
+      setFilename(downloadDiagnostics());
+    } finally {
+      setBusy(false);
+      window.setTimeout(() => setFilename(null), 4000);
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+      <header className="mb-3 flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-accent" />
+        <span className="text-[13px] font-semibold text-white">Diagnostics</span>
+      </header>
+      <p className="text-[11px] text-white/55">
+        Build a Markdown report of runtime, storage, brain shape, recent
+        receipts, and workflow runs. Useful for support, migration, and
+        debug. Local only.
+      </p>
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-md bg-accent/90 px-3 py-1.5 text-[12px] font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          Export diagnostics.md
+        </button>
+        {filename && (
+          <span className="font-mono text-[10.5px] uppercase tracking-wider text-accent">
+            saved {filename}
+          </span>
+        )}
+      </div>
+    </section>
   );
 }

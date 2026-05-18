@@ -21,7 +21,7 @@ import {
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore, type MissionReceipt } from "@/store/mission";
-import { useAtlasStore, type AtlasHomeMode } from "@/store/atlas";
+import { useAtlasStore, type AtlasHomeMode, type InboxItem, type MemoryDoc } from "@/store/atlas";
 import { AtlasHud } from "./AtlasHud";
 import { OperationsView, LiveView } from "./AtlasViews";
 import { DispatchPanel } from "./panels/DispatchPanel";
@@ -125,6 +125,9 @@ export default function AtlasPage() {
   const [selected, setSelected] = useState<SectionId | null>(null);
   const [zoom, setZoom] = useState(1);
 
+  const inboxItems = useAtlasStore((s) => s.inbox);
+  const memoryDocs = useAtlasStore((s) => s.memoryDocs);
+
   const sections = useMemo<SectionData[]>(
     () =>
       buildSections({
@@ -138,7 +141,9 @@ export default function AtlasPage() {
         alerts,
         totalDeliverables,
         githubSources,
-        repoContextHistory
+        repoContextHistory,
+        inboxItems,
+        memoryDocs
       }),
     [
       identity,
@@ -151,7 +156,9 @@ export default function AtlasPage() {
       alerts,
       totalDeliverables,
       githubSources,
-      repoContextHistory
+      repoContextHistory,
+      inboxItems,
+      memoryDocs
     ]
   );
 
@@ -716,6 +723,8 @@ interface BuildArgs {
   totalDeliverables: number;
   githubSources: ReturnType<typeof useBrainStore.getState>["memorySources"];
   repoContextHistory: string[];
+  inboxItems: InboxItem[];
+  memoryDocs: MemoryDoc[];
 }
 
 function buildSections(a: BuildArgs): SectionData[] {
@@ -787,6 +796,8 @@ function buildSections(a: BuildArgs): SectionData[] {
   });
 
   // 3. Memory Layer
+  const inboxCount = a.inboxItems.length;
+  const memoryDocCount = a.memoryDocs.length;
   out.push({
     id: "memory-layer",
     title: "Memory Layer",
@@ -795,13 +806,13 @@ function buildSections(a: BuildArgs): SectionData[] {
     position: LAYOUT["memory-layer"],
     pills: [
       { label: "sources", value: String(a.sources.length) },
-      { label: "notes", value: "manual" },
-      { label: "vaults", value: String(a.sources.filter((s) => s.kind === "obsidian").length) },
-      { label: "files", value: String(a.sources.filter((s) => s.kind === "local-folder").length) }
+      { label: "inbox", value: String(inboxCount) },
+      { label: "imported", value: String(memoryDocCount) },
+      { label: "vaults", value: String(a.sources.filter((s) => s.kind === "obsidian").length) }
     ],
     status:
-      a.sources.length > 0
-        ? { tone: "ok", label: `${a.sources.length} connected` }
+      a.sources.length + memoryDocCount + inboxCount > 0
+        ? { tone: "ok", label: `${a.sources.length} src · ${memoryDocCount} docs · ${inboxCount} inbox` }
         : { tone: "muted", label: "empty" },
     real:
       a.sources.length > 0

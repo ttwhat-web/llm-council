@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Rocket, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy, Cpu, Loader2, Rocket, X } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
+import { probeOllama, type OllamaProbeResult } from "@/services/missionRunner";
 
 const MODES = ["auto", "claude", "chatgpt", "cursor", "gemini", "dev", "terminal", "business", "general"] as const;
 const QUALITIES = ["fast", "smart", "expert", "code", "local"] as const;
+const SUGGESTED_OLLAMA_MODELS = ["gemma2:2b", "llama3.1:8b", "qwen2.5-coder:7b"] as const;
 
 /**
  * Inline mission dispatch · used inside the Atlas Mission System
@@ -23,6 +25,27 @@ export function DispatchPanel({ onClose }: { onClose: () => void }) {
   const [repoContext, setRepoContext] = useState(githubLabel ?? "");
   const [useMemory, setUseMemory] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [engine, setEngine] = useState<"deterministic" | "ollama">("deterministic");
+  const [ollamaModel, setOllamaModel] = useState<string>("gemma2:2b");
+  const [probe, setProbe] = useState<OllamaProbeResult | null>(null);
+  const [probing, setProbing] = useState(false);
+
+  useEffect(() => {
+    if (engine !== "ollama" || probe) return;
+    setProbing(true);
+    void probeOllama().then((p) => {
+      setProbe(p);
+      if (p.models.length > 0 && !p.models.includes(ollamaModel)) {
+        setOllamaModel(p.models[0]);
+      }
+      setProbing(false);
+    });
+  }, [engine, probe, ollamaModel]);
+
+  const modelAvailable =
+    engine !== "ollama" ||
+    !probe ||
+    probe.models.some((m) => m === ollamaModel || m.startsWith(`${ollamaModel}:`));
 
   const onSubmit = async () => {
     if (!brief.trim() || submitting) return;
@@ -31,10 +54,18 @@ export function DispatchPanel({ onClose }: { onClose: () => void }) {
       useMemory ? brief : brief + "\n\n(memory scan disabled by operator)",
       mode,
       quality,
-      repoContext.trim() || null
+      repoContext.trim() || null,
+      engine === "ollama" ? { engine: "ollama", ollamaModel } : undefined
     );
     setSubmitting(false);
     onClose();
+  };
+
+  const pullCommand = `ollama pull ${ollamaModel}`;
+  const onCopyPull = () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      void navigator.clipboard.writeText(pullCommand);
+    }
   };
 
   return (
@@ -91,6 +122,75 @@ export function DispatchPanel({ onClose }: { onClose: () => void }) {
         Scan brain memory ({sources.length} source{sources.length === 1 ? "" : "s"})
       </label>
 
+      {/* Engine selector */}
+      <div className="rounded-md border border-white/8 bg-white/[0.012] p-2">
+        <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
+          <span>engine</span>
+          {probing && <Loader2 className="h-2.5 w-2.5 animate-spin text-accent" />}
+        </div>
+        <div className="flex items-center gap-1">
+          <EngineChip on={engine === "deterministic"} onClick={() => setEngine("deterministic")}>
+            deterministic
+          </EngineChip>
+          <EngineChip on={engine === "ollama"} onClick={() => setEngine("ollama")}>
+            ollama
+            {probe && (
+              <span
+                className={`ml-1 inline-block h-1 w-1 rounded-full ${
+                  probe.reachable ? "bg-emerald-400" : "bg-rose-400"
+                }`}
+              />
+            )}
+          </EngineChip>
+        </div>
+
+        {engine === "ollama" && (
+          <div className="mt-1.5 flex flex-col gap-1.5">
+            <select
+              value={ollamaModel}
+              onChange={(e) => setOllamaModel(e.target.value)}
+              className="no-drag rounded-md border border-white/8 bg-white/[0.025] px-2 py-1 text-[11.5px] text-white focus:border-accent/40 focus:outline-none"
+            >
+              {(probe?.models.length ? probe.models : SUGGESTED_OLLAMA_MODELS).map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+              {!probe?.models.includes(ollamaModel) && probe?.models.length === 0 && (
+                <option value={ollamaModel}>{ollamaModel}</option>
+              )}
+            </select>
+            <input
+              type="text"
+              value={ollamaModel}
+              onChange={(e) => setOllamaModel(e.target.value)}
+              placeholder="custom model id"
+              className="no-drag rounded-md border border-white/8 bg-white/[0.025] px-2 py-1 text-[11px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+            />
+            {probe && !probe.reachable && (
+              <p className="rounded-md border border-amber-400/25 bg-amber-500/[0.05] px-2 py-1 text-[10.5px] text-amber-200/85">
+                Ollama not reachable at localhost:11434 · runner will fall back to deterministic.
+              </p>
+            )}
+            {probe && probe.reachable && !modelAvailable && (
+              <div className="rounded-md border border-amber-400/25 bg-amber-500/[0.05] p-2">
+                <p className="text-[10.5px] text-amber-200/85">Model not installed.</p>
+                <div className="mt-1 flex items-center gap-1">
+                  <code className="flex-1 truncate rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10.5px] text-white">
+                    {pullCommand}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={onCopyPull}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/75 hover:bg-white/[0.06]"
+                  >
+                    <Copy className="h-2.5 w-2.5" /> copy
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <button
         type="button"
         onClick={onSubmit}
@@ -104,6 +204,31 @@ export function DispatchPanel({ onClose }: { onClose: () => void }) {
         Mission runs in-place. Timeline + receipt + Mission node pulse all update on this page.
       </p>
     </div>
+  );
+}
+
+function EngineChip({
+  on,
+  onClick,
+  children
+}: {
+  on: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        on
+          ? "inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/[0.1] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent"
+          : "inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+      }
+    >
+      <Cpu className="h-2.5 w-2.5" />
+      {children}
+    </button>
   );
 }
 

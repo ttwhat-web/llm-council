@@ -38,6 +38,80 @@ export interface WorkflowNode {
   y: number;
 }
 
+export interface WorkflowRunStep {
+  at: number;
+  nodeId: string;
+  kind: WorkflowNodeKind;
+  state: "ok" | "blocked" | "skipped" | "approval-required";
+  message: string;
+}
+
+export interface WorkflowRun {
+  id: string;
+  startedAt: number;
+  endedAt?: number;
+  steps: WorkflowRunStep[];
+  status: "running" | "completed" | "blocked" | "awaiting-approval";
+}
+
+// ---------- Brain Inbox ----------
+export type InboxKind = "text" | "url" | "file" | "repo" | "voice";
+export type InboxState = "new" | "attached" | "used" | "archived";
+
+export interface InboxItem {
+  id: string;
+  kind: InboxKind;
+  body: string;
+  meta?: string;
+  addedAt: number;
+  state: InboxState;
+}
+
+// ---------- Imported memory docs ----------
+export interface MemoryDoc {
+  id: string;
+  name: string;
+  path?: string;
+  ext: string;
+  size: number;
+  body: string;
+  addedAt: number;
+}
+
+// ---------- Snapshots ----------
+export interface SnapshotMeta {
+  id: string;
+  label: string;
+  createdAt: number;
+  size: number;
+}
+
+// ---------- Agent queue ----------
+export type AgentKind =
+  | "research"
+  | "builder"
+  | "memory"
+  | "repo"
+  | "marketing";
+export type AgentState =
+  | "idle"
+  | "running"
+  | "blocked"
+  | "waiting"
+  | "approval";
+
+export interface AgentSlot {
+  kind: AgentKind;
+  state: AgentState;
+  assignedMissionId?: string;
+}
+
+// ---------- Telegram pairing ----------
+export interface TelegramLink {
+  code: string;
+  createdAt: number;
+}
+
 export interface WorkflowEdge {
   from: string;
   to: string;
@@ -57,8 +131,14 @@ interface AtlasState {
   files: AtlasFile[];
   workflowNodes: WorkflowNode[];
   workflowEdges: WorkflowEdge[];
+  workflowRuns: WorkflowRun[];
   pinnedDeliverables: string[];
   pairingCode: string | null;
+  telegram: TelegramLink | null;
+  inbox: InboxItem[];
+  memoryDocs: MemoryDoc[];
+  snapshots: SnapshotMeta[];
+  agents: AgentSlot[];
 
   setHomeMode(m: AtlasHomeMode): void;
   addFiles(files: Array<Omit<AtlasFile, "id" | "addedAt" | "state">>): void;
@@ -69,34 +149,49 @@ interface AtlasState {
   removeWorkflowNode(id: string): void;
   toggleEdge(from: string, to: string): void;
   clearWorkflow(): void;
+  recordWorkflowRun(r: WorkflowRun): void;
+  clearWorkflowRuns(): void;
   togglePin(deliverableId: string): void;
   generatePairingCode(): string;
   clearPairing(): void;
+  generateTelegramLink(): string;
+  clearTelegramLink(): void;
+  addInbox(item: Omit<InboxItem, "id" | "addedAt" | "state">): InboxItem;
+  setInboxState(id: string, state: InboxState): void;
+  removeInbox(id: string): void;
+  addMemoryDocs(docs: Array<Omit<MemoryDoc, "id" | "addedAt">>): MemoryDoc[];
+  removeMemoryDoc(id: string): void;
+  recordSnapshot(m: Omit<SnapshotMeta, "id" | "createdAt">): void;
+  removeSnapshot(id: string): void;
+  setAgentState(kind: AgentKind, state: AgentState, missionId?: string): void;
   hydrate(): void;
+  exportAll(): unknown;
+  importAll(payload: unknown): boolean;
 }
 
 const STORAGE_KEY = "promptready-os.atlas";
 
-const DEFAULT: Omit<AtlasState,
-  | "setHomeMode"
-  | "addFiles"
-  | "removeFile"
-  | "addWorkflowNode"
-  | "moveWorkflowNode"
-  | "renameWorkflowNode"
-  | "removeWorkflowNode"
-  | "toggleEdge"
-  | "clearWorkflow"
-  | "togglePin"
-  | "generatePairingCode"
-  | "clearPairing"
-  | "hydrate"> = {
-  homeMode: "blueprint",
-  files: [],
-  workflowNodes: [],
-  workflowEdges: [],
-  pinnedDeliverables: [],
-  pairingCode: null
+const DEFAULT_AGENTS: AgentSlot[] = [
+  { kind: "research", state: "idle" },
+  { kind: "builder", state: "idle" },
+  { kind: "memory", state: "idle" },
+  { kind: "repo", state: "idle" },
+  { kind: "marketing", state: "idle" }
+];
+
+const DEFAULT = {
+  homeMode: "blueprint" as AtlasHomeMode,
+  files: [] as AtlasFile[],
+  workflowNodes: [] as WorkflowNode[],
+  workflowEdges: [] as WorkflowEdge[],
+  workflowRuns: [] as WorkflowRun[],
+  pinnedDeliverables: [] as string[],
+  pairingCode: null as string | null,
+  telegram: null as TelegramLink | null,
+  inbox: [] as InboxItem[],
+  memoryDocs: [] as MemoryDoc[],
+  snapshots: [] as SnapshotMeta[],
+  agents: DEFAULT_AGENTS
 };
 
 function save(state: AtlasState) {
@@ -107,8 +202,14 @@ function save(state: AtlasState) {
       files: state.files,
       workflowNodes: state.workflowNodes,
       workflowEdges: state.workflowEdges,
+      workflowRuns: state.workflowRuns.slice(0, 20),
       pinnedDeliverables: state.pinnedDeliverables,
-      pairingCode: state.pairingCode
+      pairingCode: state.pairingCode,
+      telegram: state.telegram,
+      inbox: state.inbox,
+      memoryDocs: state.memoryDocs,
+      snapshots: state.snapshots,
+      agents: state.agents
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
   } catch {
@@ -239,13 +340,168 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     save(next);
   },
 
+  recordWorkflowRun(r) {
+    const next = {
+      ...get(),
+      workflowRuns: [r, ...get().workflowRuns].slice(0, 20)
+    };
+    set(next);
+    save(next);
+  },
+
+  clearWorkflowRuns() {
+    const next = { ...get(), workflowRuns: [] };
+    set(next);
+    save(next);
+  },
+
+  generateTelegramLink() {
+    const code = makePairingCode();
+    const next = {
+      ...get(),
+      telegram: { code, createdAt: Date.now() }
+    };
+    set(next);
+    save(next);
+    return code;
+  },
+
+  clearTelegramLink() {
+    const next = { ...get(), telegram: null };
+    set(next);
+    save(next);
+  },
+
+  addInbox(item) {
+    const created: InboxItem = {
+      ...item,
+      id: rid("ix"),
+      addedAt: Date.now(),
+      state: "new"
+    };
+    const next = { ...get(), inbox: [created, ...get().inbox].slice(0, 200) };
+    set(next);
+    save(next);
+    return created;
+  },
+
+  setInboxState(id, state) {
+    const next = {
+      ...get(),
+      inbox: get().inbox.map((i) => (i.id === id ? { ...i, state } : i))
+    };
+    set(next);
+    save(next);
+  },
+
+  removeInbox(id) {
+    const next = { ...get(), inbox: get().inbox.filter((i) => i.id !== id) };
+    set(next);
+    save(next);
+  },
+
+  addMemoryDocs(docs) {
+    const now = Date.now();
+    const created: MemoryDoc[] = docs.map((d) => ({
+      ...d,
+      id: rid("doc"),
+      addedAt: now
+    }));
+    const next = {
+      ...get(),
+      memoryDocs: [...created, ...get().memoryDocs].slice(0, 500)
+    };
+    set(next);
+    save(next);
+    return created;
+  },
+
+  removeMemoryDoc(id) {
+    const next = {
+      ...get(),
+      memoryDocs: get().memoryDocs.filter((d) => d.id !== id)
+    };
+    set(next);
+    save(next);
+  },
+
+  recordSnapshot(m) {
+    const created: SnapshotMeta = {
+      ...m,
+      id: rid("snap"),
+      createdAt: Date.now()
+    };
+    const next = {
+      ...get(),
+      snapshots: [created, ...get().snapshots].slice(0, 25)
+    };
+    set(next);
+    save(next);
+  },
+
+  removeSnapshot(id) {
+    const next = {
+      ...get(),
+      snapshots: get().snapshots.filter((s) => s.id !== id)
+    };
+    set(next);
+    save(next);
+  },
+
+  setAgentState(kind, state, missionId) {
+    const next = {
+      ...get(),
+      agents: get().agents.map((a) =>
+        a.kind === kind ? { ...a, state, assignedMissionId: missionId } : a
+      )
+    };
+    set(next);
+    save(next);
+  },
+
+  exportAll() {
+    const s = get();
+    return {
+      homeMode: s.homeMode,
+      files: s.files,
+      workflowNodes: s.workflowNodes,
+      workflowEdges: s.workflowEdges,
+      workflowRuns: s.workflowRuns,
+      pinnedDeliverables: s.pinnedDeliverables,
+      pairingCode: s.pairingCode,
+      telegram: s.telegram,
+      inbox: s.inbox,
+      memoryDocs: s.memoryDocs,
+      snapshots: s.snapshots,
+      agents: s.agents
+    };
+  },
+
+  importAll(payload) {
+    if (!payload || typeof payload !== "object") return false;
+    const p = payload as Partial<AtlasState>;
+    const next = { ...get(), ...DEFAULT, ...p };
+    set(next);
+    save(next);
+    return true;
+  },
+
   hydrate() {
     if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<AtlasState>;
-      set({ ...DEFAULT, ...parsed });
+      // Ensure default agents seeded even on older saves.
+      const merged = {
+        ...DEFAULT,
+        ...parsed,
+        agents:
+          parsed.agents && parsed.agents.length > 0
+            ? parsed.agents
+            : DEFAULT_AGENTS
+      };
+      set(merged);
     } catch {
       // ignore
     }

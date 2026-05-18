@@ -20,7 +20,7 @@
  */
 
 import { create } from "zustand";
-import { runMission, type Deliverable } from "@/services/missionRunner";
+import { runMission, type Deliverable, type RunnerEngine } from "@/services/missionRunner";
 import { useBrainStore } from "@/store/brain";
 
 export type MissionStage =
@@ -47,6 +47,11 @@ export interface MissionEvent {
   message: string;
 }
 
+export interface DispatchOptions {
+  engine?: RunnerEngine;
+  ollamaModel?: string;
+}
+
 export interface MissionReceipt {
   id: string;
   brief: string;
@@ -62,6 +67,9 @@ export interface MissionReceipt {
   elapsedMs?: number;
   memoryMatches?: number;
   repoContext?: string | null;
+  engine?: RunnerEngine;
+  model?: string;
+  llmLatencyMs?: number;
 }
 
 interface MissionState {
@@ -69,11 +77,18 @@ interface MissionState {
   current: MissionReceipt | null;
   history: MissionReceipt[];
 
-  dispatch(brief: string, mode: string, quality: string, repoContext?: string | null): Promise<void>;
+  dispatch(
+    brief: string,
+    mode: string,
+    quality: string,
+    repoContext?: string | null,
+    options?: DispatchOptions
+  ): Promise<MissionReceipt | null>;
   cancel(): void;
   clearHistory(): void;
   hydrate(): void;
   setRuntime(s: RuntimeStatus): void;
+  setHistory(h: MissionReceipt[]): void;
 }
 
 export const STAGES: MissionStage[] = [
@@ -133,12 +148,13 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   current: null,
   history: [],
 
-  async dispatch(brief, mode, quality, repoContext = null) {
+  async dispatch(brief, mode, quality, repoContext = null, options) {
     const trimmed = brief.trim();
-    if (!trimmed) return;
-    if (get().current) return; // do not double-dispatch
+    if (!trimmed) return null;
+    if (get().current) return null; // do not double-dispatch
 
     const brainSources = useBrainStore.getState().memorySources;
+    const engine: RunnerEngine = options?.engine ?? "deterministic";
 
     const receipt: MissionReceipt = {
       id: newId(),
@@ -150,7 +166,9 @@ export const useMissionStore = create<MissionState>((set, get) => ({
       runtime: "local-mode",
       events: [],
       deliverables: [],
-      repoContext
+      repoContext,
+      engine,
+      model: engine === "ollama" ? options?.ollamaModel : undefined
     };
     set({ current: receipt, runtime: "local-mode" });
 
@@ -174,6 +192,8 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         quality,
         sources: brainSources,
         repoContext,
+        engine,
+        ollamaModel: options?.ollamaModel,
         onEvent: pushEvent,
         onAdvance: advance
       });
@@ -185,13 +205,17 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         deliverables: result.deliverables,
         score: result.score,
         elapsedMs: result.elapsedMs,
-        memoryMatches: result.memoryMatches
+        memoryMatches: result.memoryMatches,
+        engine: result.engine,
+        model: result.model,
+        llmLatencyMs: result.llmLatencyMs
       };
 
       const history = [finalReceipt, ...get().history].slice(0, 100);
       set({ current: finalReceipt, history });
       saveHistory(history);
       useBrainStore.getState().bumpMission();
+      return finalReceipt;
     } catch (err) {
       const errReceipt: MissionReceipt = {
         ...working,
@@ -209,7 +233,13 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         ]
       };
       set({ current: errReceipt });
+      return null;
     }
+  },
+
+  setHistory(h) {
+    set({ history: h });
+    saveHistory(h);
   },
 
   cancel() {

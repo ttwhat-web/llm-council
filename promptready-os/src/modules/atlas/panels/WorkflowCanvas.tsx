@@ -6,6 +6,8 @@ import {
   Cpu,
   Database,
   Github,
+  Loader2,
+  Play,
   Plus,
   Rocket,
   ShieldCheck,
@@ -17,8 +19,10 @@ import {
   useAtlasStore,
   WORKFLOW_NODE_META,
   type WorkflowNode,
-  type WorkflowNodeKind
+  type WorkflowNodeKind,
+  type WorkflowRun
 } from "@/store/atlas";
+import { runWorkflow } from "@/services/workflowRunner";
 
 /**
  * Workflow Canvas · inside Atlas Workflow Layer detail.
@@ -52,9 +56,23 @@ export function WorkflowCanvas({ onClose }: { onClose: () => void }) {
   const removeNode = useAtlasStore((s) => s.removeWorkflowNode);
   const toggleEdge = useAtlasStore((s) => s.toggleEdge);
   const clearWorkflow = useAtlasStore((s) => s.clearWorkflow);
+  const workflowRuns = useAtlasStore((s) => s.workflowRuns);
 
   const [connecting, setConnecting] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
+  const [running, setRunning] = useState(false);
+  const [lastRun, setLastRun] = useState<WorkflowRun | null>(workflowRuns[0] ?? null);
+
+  const onRun = async () => {
+    if (running) return;
+    setRunning(true);
+    try {
+      const r = await runWorkflow({});
+      setLastRun(r);
+    } finally {
+      setRunning(false);
+    }
+  };
   const canvasRef = useRef<HTMLDivElement | null>(null);
 
   // drag tracking
@@ -258,7 +276,7 @@ export function WorkflowCanvas({ onClose }: { onClose: () => void }) {
         })}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() =>
@@ -274,10 +292,56 @@ export function WorkflowCanvas({ onClose }: { onClose: () => void }) {
         >
           {connecting ? "click target to link" : "connect mode"}
         </button>
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={running || nodes.length === 0}
+          className="inline-flex items-center gap-1.5 rounded-md bg-accent/90 px-2.5 py-1 text-[11px] font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+          {running ? "Running" : "Run workflow"}
+        </button>
         <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/40">
-          nodes: {nodes.length} · edges: {edges.length} · execution: planned
+          nodes: {nodes.length} · edges: {edges.length} · runs: {workflowRuns.length}
         </span>
       </div>
+
+      {lastRun && (
+        <div className="rounded-md border border-white/8 bg-black/30 p-2">
+          <header className="mb-1 flex items-center justify-between">
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+              last run · {lastRun.status}
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
+              {lastRun.steps.length} step{lastRun.steps.length === 1 ? "" : "s"}
+            </span>
+          </header>
+          <ul className="flex flex-col gap-0.5 font-mono text-[10px]">
+            {lastRun.steps.map((s, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span
+                  className={clsx(
+                    "uppercase tracking-wider",
+                    s.state === "ok"
+                      ? "text-emerald-300/85"
+                      : s.state === "blocked"
+                        ? "text-rose-300/85"
+                        : s.state === "approval-required"
+                          ? "text-amber-300/85"
+                          : "text-white/45"
+                  )}
+                >
+                  {s.state}
+                </span>
+                <span className="rounded border border-white/10 bg-white/[0.03] px-1 py-px uppercase tracking-wider text-white/45">
+                  {s.kind}
+                </span>
+                <span className="truncate text-white/75">{s.message}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

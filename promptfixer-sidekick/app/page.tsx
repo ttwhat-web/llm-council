@@ -231,39 +231,39 @@ function DownloadTile({ card }: { card: DownloadCard }) {
 const PRODUCT_SECTIONS = [
   {
     Icon: Workflow,
-    name: "Mission Control",
+    name: "Workflow Execution",
     blurb:
-      "Three-column HUD: brief → live operations pipeline → deliverables. Six typed stages, real telemetry, no fake spinners."
+      "Compose mission → repo → memory → export → approval on a free-form canvas. One Run button walks the graph through the real engine, halts on approval nodes."
   },
   {
     Icon: Cpu,
-    name: "Local AI via Ollama",
+    name: "Real Ollama execution",
     blurb:
-      "Unlimited local missions against gemma · qwen-coder · hermes · mistral. The router refuses to fall back to cloud unless you opt in."
+      "Probe localhost:11434, pick a model, dispatch. Receipts record engine · model · latency. Deterministic engine stays the always-on default."
   },
   {
     Icon: Brain,
-    name: "Memory / Brain",
+    name: "Local memory import",
     blurb:
-      "Start with manual notes. Obsidian vault + GitHub + Gmail + Drive connectors land per-platform. Indexed on-device first."
+      "Drop or pick a folder of .md / .txt / .json. Files read on-device, keyword-searchable, attachable to any mission in one tap."
   },
   {
     Icon: TerminalIcon,
-    name: "Intelligence Terminal",
+    name: "Brain Inbox",
     blurb:
-      "Dense multi-panel terminal: watchlist, market feed, repo feed, research feed, alerts. Honest about which panels are live."
+      "Universal capture · paste text, URLs, repo links, file paths. Every item attachable to the next mission · move to repo context · pin to Atlas."
   },
   {
     Icon: Github,
-    name: "GitHub · Gmail · Obsidian",
+    name: "Brain snapshots",
     blurb:
-      "Connectors land one at a time. Operator picks per-source what's indexed. Nothing leaves the machine unless you flip it on."
+      "Export every local slice — brain, missions, workflow, memory, pins — as a portable .brainpack. Restore on any machine."
   },
   {
     Icon: Lock,
-    name: "Local-first privacy",
+    name: "Desktop-first · local-only",
     blurb:
-      "Receipts, stacks, drafts, brain notes, watchlist live in your machine. Cloud providers are accelerators, never the gate."
+      "Diagnostics report, workspace stats, reset-workspace control. Mac · Windows · Linux packaging prep ships in the box. No keys, no cloud unless you opt in."
   }
 ];
 

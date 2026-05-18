@@ -1,9 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { Activity, Brain, Rocket, ShieldCheck } from "lucide-react";
+import { Activity, Brain, Rocket, Radar, ShieldCheck, Users } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore, STAGE_META, STAGES } from "@/store/mission";
+import { useAtlasStore, type AgentKind, type AgentState } from "@/store/atlas";
 
 /**
  * Operations + Live views for the Atlas home-mode toggle.
@@ -20,12 +21,32 @@ export function OperationsView({ onOpenSection }: { onOpenSection: (id: string) 
   const current = useMissionStore((s) => s.current);
   const history = useMissionStore((s) => s.history);
   const sources = useBrainStore((s) => s.memorySources);
+  const workflowRuns = useAtlasStore((s) => s.workflowRuns);
+  const inbox = useAtlasStore((s) => s.inbox);
+  const memoryDocs = useAtlasStore((s) => s.memoryDocs);
+  const agents = useAtlasStore((s) => s.agents);
+  const setAgentState = useAtlasStore((s) => s.setAgentState);
 
   const repos = sources.filter((s) => s.kind === "github");
   const recent = history.slice(0, 6);
+  const blocked = workflowRuns.filter((r) => r.status === "blocked").length;
+  const awaitingApproval = workflowRuns.filter((r) => r.status === "awaiting-approval").length;
+  const recentImports = memoryDocs.slice(0, 3);
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <RadarPanel
+        current={current}
+        receipts={history.length}
+        blocked={blocked}
+        awaitingApproval={awaitingApproval}
+        repos={repos.length}
+        imports={memoryDocs.length}
+        inbox={inbox.length}
+      />
+
+      <AgentQueuePanel agents={agents} onCycle={setAgentState} />
+
       <Card eyebrow="active mission" title={current ? "In flight" : "Idle"}>
         {current ? (
           <div className="flex flex-col gap-1">
@@ -215,6 +236,120 @@ export function LiveView() {
         </div>
       </section>
     </div>
+  );
+}
+
+function RadarPanel({
+  current,
+  receipts,
+  blocked,
+  awaitingApproval,
+  repos,
+  imports,
+  inbox
+}: {
+  current: ReturnType<typeof useMissionStore.getState>["current"];
+  receipts: number;
+  blocked: number;
+  awaitingApproval: number;
+  repos: number;
+  imports: number;
+  inbox: number;
+}) {
+  const rows: Array<{ label: string; value: string; tone: "ok" | "warn" | "muted" }> = [
+    {
+      label: "running missions",
+      value: current ? "1" : "0",
+      tone: current ? "ok" : "muted"
+    },
+    { label: "blocked workflows", value: String(blocked), tone: blocked > 0 ? "warn" : "muted" },
+    { label: "approval waits", value: String(awaitingApproval), tone: awaitingApproval > 0 ? "warn" : "muted" },
+    { label: "recent receipts", value: String(receipts), tone: receipts > 0 ? "ok" : "muted" },
+    { label: "repo activity", value: String(repos), tone: repos > 0 ? "ok" : "muted" },
+    { label: "memory imports", value: String(imports), tone: imports > 0 ? "ok" : "muted" },
+    { label: "inbox", value: String(inbox), tone: inbox > 0 ? "ok" : "muted" }
+  ];
+  return (
+    <Card eyebrow="mission radar" title="Local-only signals">
+      <ul className="flex flex-col gap-1 text-[11px]">
+        {rows.map((r) => (
+          <li
+            key={r.label}
+            className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1"
+          >
+            <span className="text-white/70">{r.label}</span>
+            <span
+              className={clsx(
+                "font-mono",
+                r.tone === "ok"
+                  ? "text-emerald-300/85"
+                  : r.tone === "warn"
+                    ? "text-amber-300/85"
+                    : "text-white/55"
+              )}
+            >
+              {r.value}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/40">
+        <Radar className="mr-1 inline h-3 w-3 text-accent" /> no fake metrics
+      </span>
+    </Card>
+  );
+}
+
+function AgentQueuePanel({
+  agents,
+  onCycle
+}: {
+  agents: Array<{ kind: AgentKind; state: AgentState }>;
+  onCycle: (kind: AgentKind, state: AgentState) => void;
+}) {
+  const cycle = (cur: AgentState): AgentState => {
+    const order: AgentState[] = ["idle", "running", "blocked", "waiting", "approval"];
+    const i = order.indexOf(cur);
+    return order[(i + 1) % order.length];
+  };
+  return (
+    <Card eyebrow="agent queue" title="Status only · no autonomous execution">
+      <ul className="flex flex-col gap-1 text-[11px]">
+        {agents.map((a) => (
+          <li
+            key={a.kind}
+            className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1"
+          >
+            <span className="flex items-center gap-1.5">
+              <Users className="h-3 w-3 text-accent" />
+              <span className="text-white/85">{a.kind}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onCycle(a.kind, cycle(a.state))}
+              className={
+                a.state === "running"
+                  ? "rounded border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald-200"
+                  : a.state === "blocked"
+                    ? "rounded border border-rose-400/30 bg-rose-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose-200"
+                    : a.state === "approval"
+                      ? "rounded border border-amber-400/30 bg-amber-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200"
+                      : a.state === "waiting"
+                        ? "rounded border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent"
+                        : "rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55"
+              }
+              title="cycle state · runtime ships with desktop"
+            >
+              {a.state}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[10.5px] text-white/45">
+        Owner-only state today. Click a state to cycle through{" "}
+        <span className="font-mono">idle → running → blocked → waiting → approval</span>.
+      </p>
+    </Card>
   );
 }
 

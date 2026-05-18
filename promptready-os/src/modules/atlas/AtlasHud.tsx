@@ -1,9 +1,10 @@
 "use client";
 
 import clsx from "clsx";
-import { Activity, Brain, Cpu, Database, Github, Receipt } from "lucide-react";
+import { Activity, Archive, Brain, Cpu, Database, Github, Receipt } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
+import { useAtlasStore } from "@/store/atlas";
 
 /**
  * Atlas HUD · top bar always visible on the Atlas surface.
@@ -21,6 +22,7 @@ export function AtlasHud() {
   const history = useMissionStore((s) => s.history);
   const current = useMissionStore((s) => s.current);
   const runtime = useMissionStore((s) => s.runtime);
+  const snapshots = useAtlasStore((s) => s.snapshots);
 
   const repos = sources.filter((s) => s.kind === "github").length;
   const engineKinds = engines.map((e) => e.kind).join(" · ") || "deterministic";
@@ -35,6 +37,7 @@ export function AtlasHud() {
         <Hud Icon={Github} label="repos" value={String(repos)} />
         <Hud Icon={Activity} label="missions" value={String(missionCount)} />
         <Hud Icon={Receipt} label="receipts" value={String(history.length)} />
+        <Hud Icon={Archive} label="snapshots" value={String(snapshots.length)} />
       </div>
       <div className="flex items-center gap-1 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
         <span

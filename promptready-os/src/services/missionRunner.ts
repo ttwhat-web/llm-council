@@ -13,12 +13,18 @@
 import type { MissionStage, MissionEvent } from "@/store/mission";
 import type { MemorySource } from "@/store/brain";
 
+export type RunnerEngine = "deterministic" | "ollama";
+
 export interface RunnerOptions {
   brief: string;
   mode: string;
   quality: string;
   sources: MemorySource[];
   repoContext?: string | null;
+  /** When set to "ollama" + ollamaModel, the runner attempts a real LLM call. */
+  engine?: RunnerEngine;
+  ollamaModel?: string;
+  ollamaHost?: string;
   onEvent: (event: Omit<MissionEvent, "at">) => void;
   onAdvance: (stage: MissionStage) => void;
 }
@@ -37,6 +43,9 @@ export interface RunnerResult {
   elapsedMs: number;
   memoryMatches: number;
   intent: BriefIntent;
+  engine: RunnerEngine;
+  model: string;
+  llmLatencyMs?: number;
 }
 
 interface BriefIntent {
@@ -102,6 +111,93 @@ function pickModel(quality: string, intent: BriefIntent): string {
   if (quality === "local") return "deterministic-v1 (rules · local)";
   if (intent.asksForCode || intent.kind === "debug") return "deterministic-v1 (code-aware rules · local)";
   return "deterministic-v1 (rules · local)";
+}
+
+// ---------- Ollama ----------
+
+export interface OllamaProbeResult {
+  reachable: boolean;
+  version?: string;
+  models: string[];
+}
+
+const OLLAMA_DEFAULT_HOST = "http://localhost:11434";
+const OLLAMA_TIMEOUT_MS = 1800;
+const OLLAMA_GENERATE_TIMEOUT_MS = 120_000;
+
+export async function probeOllama(host = OLLAMA_DEFAULT_HOST): Promise<OllamaProbeResult> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), OLLAMA_TIMEOUT_MS);
+  try {
+    const r = await fetch(`${host}/api/tags`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!r.ok) return { reachable: false, models: [] };
+    const j = (await r.json()) as { models?: Array<{ name: string }> };
+    const models = (j.models ?? []).map((m) => m.name);
+    // version is best-effort, do not block
+    let version: string | undefined;
+    try {
+      const vr = await fetch(`${host}/api/version`, { signal: ctrl.signal });
+      if (vr.ok) {
+        const vj = (await vr.json()) as { version?: string };
+        version = vj.version;
+      }
+    } catch {
+      // ignore
+    }
+    return { reachable: true, version, models };
+  } catch {
+    clearTimeout(timer);
+    return { reachable: false, models: [] };
+  }
+}
+
+export interface OllamaResult {
+  ok: boolean;
+  response?: string;
+  latencyMs: number;
+  error?: string;
+}
+
+async function callOllama(
+  host: string,
+  model: string,
+  prompt: string
+): Promise<OllamaResult> {
+  const t0 = performance.now();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
+  try {
+    const r = await fetch(`${host}/api/generate`, {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt, stream: false })
+    });
+    clearTimeout(timer);
+    const latencyMs = Math.round(performance.now() - t0);
+    if (!r.ok) {
+      const text = await r.text();
+      const m = /model (".+?") not found/.exec(text);
+      return {
+        ok: false,
+        latencyMs,
+        error: m
+          ? `Model ${m[1]} not installed`
+          : `Ollama responded HTTP ${r.status}`
+      };
+    }
+    const j = (await r.json()) as { response?: string; error?: string };
+    if (j.error) return { ok: false, latencyMs, error: j.error };
+    return { ok: true, latencyMs, response: j.response ?? "" };
+  } catch (e) {
+    clearTimeout(timer);
+    return {
+      ok: false,
+      latencyMs: Math.round(performance.now() - t0),
+      error: e instanceof Error ? e.message : "unknown"
+    };
+  }
 }
 
 function executeRules(brief: string, mode: string, intent: BriefIntent) {
@@ -266,7 +362,12 @@ export async function runMission(opts: RunnerOptions): Promise<RunnerResult> {
   });
   await tick();
 
-  const model = pickModel(opts.quality, intent);
+  const wantsOllama = opts.engine === "ollama" && !!opts.ollamaModel;
+  const ollamaHost = opts.ollamaHost ?? OLLAMA_DEFAULT_HOST;
+  const baseModel = pickModel(opts.quality, intent);
+  const model = wantsOllama
+    ? `ollama · ${opts.ollamaModel}`
+    : baseModel;
   opts.onAdvance("model-select");
   opts.onEvent({
     stage: "model-select",
@@ -286,6 +387,45 @@ export async function runMission(opts: RunnerOptions): Promise<RunnerResult> {
   });
   await tick();
 
+  // Optional real Ollama call. The deterministic engine has already
+  // produced its deliverables — Ollama output is appended as one extra
+  // "Model Response" deliverable, never replacing the rules-engine
+  // artifacts. This keeps the flow honest: local rules always run.
+  let ollamaDeliverable: Deliverable | null = null;
+  let llmLatencyMs: number | undefined;
+  if (wantsOllama && opts.ollamaModel) {
+    opts.onEvent({
+      stage: "execution",
+      kind: "info",
+      tag: "ollama",
+      message: `Calling Ollama · ${opts.ollamaModel} @ ${ollamaHost}`
+    });
+    const result = await callOllama(ollamaHost, opts.ollamaModel, opts.brief);
+    llmLatencyMs = result.latencyMs;
+    if (result.ok && result.response) {
+      opts.onEvent({
+        stage: "execution",
+        kind: "ok",
+        tag: "ollama",
+        message: `Ollama responded in ${result.latencyMs}ms · ${result.response.length} chars`
+      });
+      ollamaDeliverable = {
+        id: `ollama-${Math.random().toString(36).slice(2, 8)}`,
+        label: "Model Response",
+        format: "markdown",
+        blurb: `Local LLM response from ${opts.ollamaModel}.`,
+        content: result.response.trim()
+      };
+    } else {
+      opts.onEvent({
+        stage: "execution",
+        kind: "warn",
+        tag: "ollama",
+        message: `Ollama failed · ${result.error ?? "unknown"} · falling back to deterministic only`
+      });
+    }
+  }
+
   const score = scoreOutput(exec);
   opts.onAdvance("validation");
   opts.onEvent({
@@ -296,7 +436,10 @@ export async function runMission(opts: RunnerOptions): Promise<RunnerResult> {
   });
   await tick();
 
-  const deliverables = formatDeliverables(opts.brief, opts.mode, exec, score, opts.repoContext ?? null);
+  const baseDeliverables = formatDeliverables(opts.brief, opts.mode, exec, score, opts.repoContext ?? null);
+  const deliverables = ollamaDeliverable
+    ? [ollamaDeliverable, ...baseDeliverables]
+    : baseDeliverables;
   opts.onAdvance("deliverable-ready");
   opts.onEvent({
     stage: "deliverable-ready",
@@ -310,6 +453,11 @@ export async function runMission(opts: RunnerOptions): Promise<RunnerResult> {
     score,
     elapsedMs: Math.round(performance.now() - t0),
     memoryMatches: matches.length,
-    intent
+    intent,
+    engine: wantsOllama && ollamaDeliverable ? "ollama" : "deterministic",
+    model: wantsOllama && ollamaDeliverable
+      ? `ollama · ${opts.ollamaModel}`
+      : baseModel,
+    llmLatencyMs
   };
 }
