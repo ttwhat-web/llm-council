@@ -13,7 +13,47 @@
 
 Branch: `claude/promptfixer-sidekick-Q1zpg` · last build clean.
 
-Status legend:
+---
+
+## POST-DEMO EXECUTION TIER (locked priority)
+
+> Your own tier list, pinned at the top so post-stage there's no
+> argument about what gets built first.
+
+### 🔴 Tier A · the six pieces that flip demo → sellable beta
+
+1. **Replay Mission** — receipt → step-by-step replay → "AI ne yaptı?" answer in one screen. *(S2.7 · data already there)*
+2. **Presence System** — desktop / Ollama / approval / workflow signals readable from the phone. *(S4.16 + S5.20 · bridge ready)*
+3. **Telegram real bridge** — `BOT_TOKEN` + `/getUpdates` + `/sendMessage` + receipt push + approval push. *(S5.17 · adapter ready)*
+4. **Operator Dock (phone)** — six verbs only: approve · reject · pause · resume · receipt · alert. No chat. *(S5.18-20)*
+
+### 🟠 Tier B · premium operator feel
+
+5. **Operator Timeline** — chronological event swimlane (09:21 repo · 09:24 mission · 09:25 receipt · 09:27 snapshot). *(S4.15 · audit log already feeds it)*
+6. **Brain Passport** — `.atlas-passport.brain` export (operator · brain · health · repos · workflows · imports). *(matches `.brainpack` shape)*
+7. **Brain Diff** — A vs B snapshot diff (+12 receipts · +2 repos · −4 duplicates). *(snapshots already in memory)*
+
+### 🟢 Tier C · investor wow
+
+8. **Mission Tree** — Mission → Approval → Receipt → Export → Follow-up lineage graph. *(S2.8)*
+9. **Runtime Heatmap** — Mission ████ · Repo ███ · Memory ████ · Workflow ██. *(S4 stream)*
+10. **Operator Morning Brief** — yesterday + pending + suggested action card. *(S4.13)*
+
+### 🔵 Tier D · later · category-creating
+
+- Brain Twin · Brain Museum · Skill Forge · Operator Economy · Operator Universe.
+
+### Honest current state
+
+> 65–70% of "sellable beta" is on this branch. The six items in Tier A
+> are the exact conversion gap. Everything else is polish on top of a
+> system that already dispatches, persists, audits, and exports.
+
+---
+
+## Stream legend
+
+Status keys used in the seven streams below:
 
 | Grade | Meaning |
 |---|---|
