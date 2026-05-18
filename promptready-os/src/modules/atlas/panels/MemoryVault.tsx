@@ -508,7 +508,8 @@ const INBOX_KIND_LABEL: Record<InboxKind, string> = {
   url: "URL",
   file: "File",
   repo: "Repo",
-  voice: "Voice"
+  voice: "Voice",
+  image: "Image"
 };
 
 function BrainInbox({
@@ -525,8 +526,21 @@ function BrainInbox({
   const [kind, setKind] = useState<InboxKind>("text");
   const [body, setBody] = useState("");
   const [meta, setMeta] = useState("");
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const dispatch = useMissionStore((s) => s.dispatch);
   const addMemorySource = useBrainStore((s) => s.addMemorySource);
+
+  const onPickImage = (e: ChangeEvent<HTMLInputElement>) => {
+    const list = Array.from(e.target.files ?? []);
+    for (const f of list) {
+      onAdd({
+        kind: "image",
+        body: f.name,
+        meta: `${(f.size / 1024).toFixed(0)}KB · ${f.type || "image/*"}`
+      });
+    }
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
 
   const onAddItem = () => {
     const v = body.trim();
@@ -560,7 +574,7 @@ function BrainInbox({
       </p>
 
       <div className="flex flex-col gap-1.5 rounded-md border border-white/8 bg-white/[0.012] p-2">
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {(Object.keys(INBOX_KIND_LABEL) as InboxKind[]).map((k) => (
             <button
               key={k}
@@ -578,37 +592,60 @@ function BrainInbox({
             </button>
           ))}
         </div>
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder={
-            kind === "url"
-              ? "https://example.com/article"
-              : kind === "repo"
-                ? "owner/repo or full URL"
-                : kind === "voice"
-                  ? "(voice transcript · planned)"
-                  : "Paste anything · idea, snippet, log"
-          }
-          rows={3}
-          disabled={kind === "voice"}
-          className="no-drag w-full resize-y rounded-md border border-white/8 bg-white/[0.025] px-2 py-1.5 text-[12px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none disabled:opacity-50"
-        />
-        <input
-          type="text"
-          value={meta}
-          onChange={(e) => setMeta(e.target.value)}
-          placeholder="optional note"
-          className="no-drag rounded-md border border-white/8 bg-white/[0.025] px-2 py-1 text-[11px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={onAddItem}
-          disabled={!body.trim() || kind === "voice"}
-          className="inline-flex items-center justify-center gap-1 rounded-md bg-accent/85 px-2 py-1 text-[11.5px] font-semibold text-white shadow-glow hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <InboxIcon className="h-3 w-3" /> Capture
-        </button>
+        {kind === "image" ? (
+          <>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={onPickImage}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              className="inline-flex items-center justify-center gap-1.5 rounded-md border border-dashed border-accent/40 bg-accent/[0.04] px-3 py-3 text-[11.5px] text-white/80 hover:bg-accent/[0.08]"
+            >
+              <Upload className="h-3.5 w-3.5 text-accent" />
+              Pick image(s) · metadata only · content never leaves the machine
+            </button>
+          </>
+        ) : (
+          <>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder={
+                kind === "url"
+                  ? "https://example.com/article"
+                  : kind === "repo"
+                    ? "owner/repo or full URL"
+                    : kind === "voice"
+                      ? "(voice transcript · planned)"
+                      : "Paste anything · idea, snippet, log"
+              }
+              rows={3}
+              disabled={kind === "voice"}
+              className="no-drag w-full resize-y rounded-md border border-white/8 bg-white/[0.025] px-2 py-1.5 text-[12px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none disabled:opacity-50"
+            />
+            <input
+              type="text"
+              value={meta}
+              onChange={(e) => setMeta(e.target.value)}
+              placeholder="optional note"
+              className="no-drag rounded-md border border-white/8 bg-white/[0.025] px-2 py-1 text-[11px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={onAddItem}
+              disabled={!body.trim() || kind === "voice"}
+              className="inline-flex items-center justify-center gap-1 rounded-md bg-accent/85 px-2 py-1 text-[11.5px] font-semibold text-white shadow-glow hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <InboxIcon className="h-3 w-3" /> Capture
+            </button>
+          </>
+        )}
       </div>
 
       {inbox.length === 0 ? (

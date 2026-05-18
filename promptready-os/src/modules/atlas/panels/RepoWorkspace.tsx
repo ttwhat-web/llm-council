@@ -1,9 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Github, Plus, Rocket, X } from "lucide-react";
+import { Github, Loader2, Plus, Rocket, X } from "lucide-react";
 import { useBrainStore, type MemorySource } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
+import {
+  REPO_ACTIONS,
+  collectRepoDocs,
+  dispatchRepoAction,
+  type RepoAction
+} from "@/services/repoIntelligence";
 
 /**
  * Repo workspace · used inside the Atlas Repo Layer detail.
@@ -20,10 +26,26 @@ export function RepoWorkspace({ onClose }: { onClose: () => void }) {
   const dispatch = useMissionStore((s) => s.dispatch);
 
   const repos = sources.filter((s) => s.kind === "github");
+  const repoDocs = collectRepoDocs();
 
   const [url, setUrl] = useState("");
   const [branch, setBranch] = useState("");
   const [note, setNote] = useState("");
+  const [busyAction, setBusyAction] = useState<{ url: string; kind: string } | null>(null);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+
+  const onAction = async (repo: MemorySource, action: RepoAction) => {
+    setBusyAction({ url: repo.label, kind: action.kind });
+    setLastResult(null);
+    const r = await dispatchRepoAction(action, repo.label);
+    setBusyAction(null);
+    setLastResult(r.message);
+    if (r.ok) {
+      window.setTimeout(() => onClose(), 600);
+    } else {
+      window.setTimeout(() => setLastResult(null), 4000);
+    }
+  };
 
   const onAttach = () => {
     const trimmed = url.trim();
@@ -137,6 +159,65 @@ export function RepoWorkspace({ onClose }: { onClose: () => void }) {
           </ul>
         )}
       </div>
+
+      {repos.length > 0 && (
+        <div className="rounded-md border border-accent/25 bg-accent/[0.04] p-2">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+              repo intelligence
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
+              {repoDocs.length} repo file{repoDocs.length === 1 ? "" : "s"} imported
+            </span>
+          </div>
+          <p className="mb-1.5 text-[10.5px] text-white/55">
+            Templated missions that include any imported README, package.json,
+            prisma schema, env.example, or route/component files as real
+            context. Nothing is fetched from GitHub.
+          </p>
+          {repos.map((repo) => (
+            <div key={`actions-${repo.id}`} className="mb-2 last:mb-0">
+              <div className="mb-1 truncate font-mono text-[10.5px] text-white/80">
+                {repo.label}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {REPO_ACTIONS.map((action) => {
+                  const busy =
+                    busyAction?.url === repo.label && busyAction.kind === action.kind;
+                  return (
+                    <button
+                      key={action.kind}
+                      type="button"
+                      onClick={() => onAction(repo, action)}
+                      disabled={!!busyAction}
+                      title={action.blurb}
+                      className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/75 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {busy ? (
+                        <Loader2 className="h-2.5 w-2.5 animate-spin text-accent" />
+                      ) : (
+                        <Rocket className="h-2.5 w-2.5 text-accent" />
+                      )}
+                      {action.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {lastResult && (
+            <p className="mt-1 rounded-md border border-accent/30 bg-accent/[0.08] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent">
+              {lastResult}
+            </p>
+          )}
+          {repoDocs.length === 0 && (
+            <p className="text-[10px] text-white/45">
+              Import README · package.json · prisma · env.example via the
+              Memory Vault Files tab to enrich these actions.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

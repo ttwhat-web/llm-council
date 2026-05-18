@@ -1,10 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
 import clsx from "clsx";
-import { Activity, Brain, Rocket, Radar, ShieldCheck, Users } from "lucide-react";
+import { Activity, Brain, Coins, Rocket, Radar, ShieldCheck, Users } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore, STAGE_META, STAGES } from "@/store/mission";
 import { useAtlasStore, type AgentKind, type AgentState } from "@/store/atlas";
+import { computeCostBoard, formatUsd, PRICING } from "@/services/cost";
 
 /**
  * Operations + Live views for the Atlas home-mode toggle.
@@ -44,6 +46,8 @@ export function OperationsView({ onOpenSection }: { onOpenSection: (id: string) 
         imports={memoryDocs.length}
         inbox={inbox.length}
       />
+
+      <CostBoardPanel />
 
       <AgentQueuePanel agents={agents} onCycle={setAgentState} />
 
@@ -236,6 +240,47 @@ export function LiveView() {
         </div>
       </section>
     </div>
+  );
+}
+
+function CostBoardPanel() {
+  const history = useMissionStore((s) => s.history);
+  const board = useMemo(() => computeCostBoard(history), [history]);
+  const rows: Array<{ label: string; value: string; tone: "ok" | "muted" }> = [
+    { label: "local missions", value: String(board.localMissions), tone: board.localMissions > 0 ? "ok" : "muted" },
+    { label: "ollama missions", value: String(board.ollamaMissions), tone: board.ollamaMissions > 0 ? "ok" : "muted" },
+    { label: "total deliverables", value: String(board.totalDeliverables), tone: board.totalDeliverables > 0 ? "ok" : "muted" },
+    { label: "ollama tokens", value: `${board.totalOllamaTokens}`, tone: board.totalOllamaTokens > 0 ? "ok" : "muted" },
+    { label: "ollama latency (sum)", value: `${(board.totalOllamaLatencyMs / 1000).toFixed(1)}s`, tone: "muted" },
+    { label: "est. tokens saved", value: String(board.estimatedTokensSaved), tone: board.estimatedTokensSaved > 0 ? "ok" : "muted" },
+    { label: "est. cloud cost avoided", value: formatUsd(board.estimatedCloudCostAvoidedUSD), tone: board.estimatedCloudCostAvoidedUSD > 0 ? "ok" : "muted" }
+  ];
+  return (
+    <Card eyebrow="cost board" title="What you didn't pay for">
+      <ul className="flex flex-col gap-1 text-[11px]">
+        {rows.map((r) => (
+          <li
+            key={r.label}
+            className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1"
+          >
+            <span className="text-white/70">{r.label}</span>
+            <span
+              className={clsx(
+                "font-mono",
+                r.tone === "ok" ? "text-emerald-300/85" : "text-white/55"
+              )}
+            >
+              {r.value}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[10px] text-white/45">
+        <Coins className="mr-1 inline h-3 w-3 text-accent" />
+        estimate model · {PRICING.modelLabel} · input ${PRICING.inputPer1M}/1M · output ${PRICING.outputPer1M}/1M ·
+        avg brief {board.estimatedAvgBriefTokens}t · avg resp {board.estimatedAvgResponseTokens}t
+      </p>
+    </Card>
   );
 }
 

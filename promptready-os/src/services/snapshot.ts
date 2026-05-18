@@ -78,8 +78,32 @@ export function downloadSnapshot(label: string): { size: number; filename: strin
   a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   const size = snapshotSize(snap);
-  useAtlasStore.getState().recordSnapshot({ label, size });
+  // Keep the whole snapshot in memory for Time Machine restore.
+  useAtlasStore.getState().recordSnapshot({ label, size }, snap);
   return { size, filename };
+}
+
+/** In-app restore from a snapshot kept in the recent payloads list. */
+export function restoreSnapshotById(id: string): boolean {
+  const found = useAtlasStore
+    .getState()
+    .recentSnapshotPayloads.find((p) => p.id === id);
+  if (!found) return false;
+  const snap = found.payload as BrainSnapshot;
+  if (!snap || snap.format !== "promptready-os.brainpack") return false;
+  if (snap.payload.brain) {
+    useBrainStore.setState((cur) => ({ ...cur, ...snap.payload.brain }));
+  }
+  if (snap.payload.missions?.history) {
+    useMissionStore.getState().setHistory(snap.payload.missions.history);
+  }
+  if (snap.payload.atlas) {
+    useAtlasStore.getState().importAll(snap.payload.atlas);
+  }
+  if (snap.payload.theme?.id) {
+    useThemeStore.getState().set(snap.payload.theme.id);
+  }
+  return true;
 }
 
 export async function restoreSnapshotFromFile(file: File): Promise<{

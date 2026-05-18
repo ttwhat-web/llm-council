@@ -8,6 +8,7 @@ import {
   useAtlasStore
 } from "@/store";
 import { BrainBootstrap } from "@/components/BrainBootstrap";
+import { RecoveryBanner } from "@/components/RecoveryBanner";
 
 export function App() {
   useEffect(() => {
@@ -22,6 +23,7 @@ export function App() {
     <>
       <AppRouter />
       <BrainBootstrap />
+      <RecoveryBanner />
     </>
   );
 }

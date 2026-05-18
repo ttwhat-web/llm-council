@@ -33,9 +33,11 @@ import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
 import {
   downloadSnapshot,
-  restoreSnapshotFromFile
+  restoreSnapshotFromFile,
+  restoreSnapshotById
 } from "@/services/snapshot";
 import { downloadDiagnostics } from "@/services/diagnostics";
+import { executeCommand, COMMAND_HELP } from "@/services/commandConsole";
 
 /**
  * Settings · Phase 13.
@@ -459,7 +461,7 @@ function TelegramCompanionCard() {
 
       <div className="mt-3">
         <div className="mb-1 font-mono text-[9.5px] uppercase tracking-[0.22em] text-white/40">
-          control commands · planned
+          control commands · local console
         </div>
         <ul className="grid grid-cols-1 gap-1 md:grid-cols-2">
           {commands.map(([cmd, desc]) => (
@@ -473,7 +475,124 @@ function TelegramCompanionCard() {
           ))}
         </ul>
       </div>
+
+      <CommandConsole />
     </section>
+  );
+}
+
+// ============================================================================
+// Command console — local · same handlers a Telegram bot will call
+// ============================================================================
+
+interface ConsoleEntry {
+  id: string;
+  input: string;
+  ok: boolean;
+  output: string;
+  at: number;
+}
+
+function CommandConsole() {
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [log, setLog] = useState<ConsoleEntry[]>([]);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  const onSubmit = async () => {
+    const line = input.trim();
+    if (!line || busy) return;
+    setBusy(true);
+    const r = await executeCommand(line);
+    setLog((prev) => [
+      { id: Math.random().toString(36).slice(2), input: line, ok: r.ok, output: r.output, at: Date.now() },
+      ...prev
+    ].slice(0, 20));
+    setInput("");
+    setBusy(false);
+    window.setTimeout(() => {
+      ref.current?.scrollTo({ top: 0 });
+    }, 30);
+  };
+
+  return (
+    <div className="mt-3 rounded-md border border-white/10 bg-graphite-900/70 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+          live console · local preview
+        </span>
+        <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
+          same handlers will run via telegram when wired
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        <code className="rounded bg-black/40 px-1.5 py-1 font-mono text-[11px] text-accent">/</code>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void onSubmit();
+          }}
+          placeholder="status · brain · missions · receipt <id> · run <brief> · ollama …"
+          className="flex-1 rounded-md border border-white/8 bg-white/[0.025] px-2 py-1.5 font-mono text-[11.5px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={busy || !input.trim()}
+          className="inline-flex items-center gap-1 rounded-md bg-accent/85 px-2.5 py-1.5 text-[11.5px] font-semibold text-white shadow-glow hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : "Run"}
+        </button>
+      </div>
+
+      <div className="mt-1 flex flex-wrap gap-1">
+        {COMMAND_HELP.slice(0, 6).map((c) => (
+          <button
+            key={c.cmd}
+            type="button"
+            onClick={() => setInput(c.cmd)}
+            className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+          >
+            {c.cmd}
+          </button>
+        ))}
+      </div>
+
+      <div
+        ref={ref}
+        className="mt-2 max-h-[260px] overflow-auto rounded-md border border-white/8 bg-black/40 p-2"
+      >
+        {log.length === 0 ? (
+          <p className="font-mono text-[10.5px] text-white/45">
+            Try <code className="rounded bg-white/[0.06] px-1 py-px text-accent">/status</code> or{" "}
+            <code className="rounded bg-white/[0.06] px-1 py-px text-accent">/help</code>.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {log.map((entry) => (
+              <li key={entry.id} className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                  <span className="text-white/35">{new Date(entry.at).toLocaleTimeString()}</span>
+                  <span className="text-accent">{entry.input}</span>
+                </div>
+                <pre
+                  className={
+                    entry.ok
+                      ? "whitespace-pre-wrap rounded-md border border-emerald-400/15 bg-emerald-500/[0.04] px-2 py-1 font-mono text-[10.5px] text-white/85"
+                      : "whitespace-pre-wrap rounded-md border border-rose-400/20 bg-rose-500/[0.06] px-2 py-1 font-mono text-[10.5px] text-rose-100/90"
+                  }
+                >
+                  {entry.output}
+                </pre>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -483,11 +602,20 @@ function TelegramCompanionCard() {
 
 function SnapshotsCard() {
   const snapshots = useAtlasStore((s) => s.snapshots);
+  const recentPayloads = useAtlasStore((s) => s.recentSnapshotPayloads);
   const removeSnapshot = useAtlasStore((s) => s.removeSnapshot);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [label, setLabel] = useState("");
   const [importResult, setImportResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const recentIds = new Set(recentPayloads.map((p) => p.id));
+
+  const onRestoreFromRecent = (id: string) => {
+    const ok = restoreSnapshotById(id);
+    setImportResult(ok ? "Restored from in-memory snapshot" : "Restore failed");
+    window.setTimeout(() => setImportResult(null), 4000);
+  };
 
   const onCreate = () => {
     const lbl = label.trim() || "snapshot";
@@ -572,27 +700,74 @@ function SnapshotsCard() {
       )}
 
       {snapshots.length > 0 && (
-        <ul className="mt-3 flex max-h-[160px] flex-col gap-1 overflow-auto pr-1">
-          {snapshots.map((s) => (
-            <li
-              key={s.id}
-              className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]"
-            >
-              <span className="font-mono text-white/80">{s.label}</span>
-              <div className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-wider text-white/45">
-                <span>{new Date(s.createdAt).toLocaleString()}</span>
-                <span>{(s.size / 1024).toFixed(1)}KB</span>
-                <button
-                  type="button"
-                  onClick={() => removeSnapshot(s.id)}
-                  className="rounded p-0.5 text-white/40 hover:bg-white/[0.06] hover:text-white/80"
+        <>
+          <div className="mt-3 font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+            time machine · last {recentPayloads.length} kept in memory for one-click restore
+          </div>
+
+          {/* Horizontal timeline */}
+          {snapshots.length > 0 && (
+            <div className="mt-1 flex items-center gap-1 overflow-auto pb-1">
+              {snapshots.slice(0, 12).reverse().map((s, i) => {
+                const has = recentIds.has(s.id);
+                return (
+                  <div key={s.id} className="flex shrink-0 flex-col items-center gap-0.5">
+                    <button
+                      type="button"
+                      disabled={!has}
+                      onClick={() => onRestoreFromRecent(s.id)}
+                      title={has ? `Restore ${s.label}` : "snapshot file on disk · use Restore above"}
+                      className={
+                        has
+                          ? "h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_8px_1px_rgba(124,155,255,0.6)] hover:scale-125"
+                          : "h-2.5 w-2.5 rounded-full bg-white/25"
+                      }
+                    />
+                    <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
+                      {i === snapshots.slice(0, 12).length - 1 ? "now" : timeAgo(s.createdAt)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <ul className="mt-2 flex max-h-[200px] flex-col gap-1 overflow-auto pr-1">
+            {snapshots.map((s) => {
+              const has = recentIds.has(s.id);
+              return (
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]"
                 >
-                  <Trash2 className="h-2.5 w-2.5" />
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                  <span className="font-mono text-white/80">{s.label}</span>
+                  <div className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-wider text-white/45">
+                    <span>{new Date(s.createdAt).toLocaleString()}</span>
+                    <span>{(s.size / 1024).toFixed(1)}KB</span>
+                    {has ? (
+                      <button
+                        type="button"
+                        onClick={() => onRestoreFromRecent(s.id)}
+                        className="inline-flex items-center gap-1 rounded border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 text-accent hover:bg-accent/[0.12]"
+                      >
+                        restore
+                      </button>
+                    ) : (
+                      <span className="text-white/35">file only</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeSnapshot(s.id)}
+                      className="rounded p-0.5 text-white/40 hover:bg-white/[0.06] hover:text-white/80"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </section>
   );
@@ -846,4 +1021,12 @@ function DiagnosticsCard() {
       </div>
     </section>
   );
+}
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return "just";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
+  return `${Math.floor(diff / 86_400_000)}d`;
 }

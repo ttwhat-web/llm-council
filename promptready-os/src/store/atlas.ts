@@ -55,7 +55,7 @@ export interface WorkflowRun {
 }
 
 // ---------- Brain Inbox ----------
-export type InboxKind = "text" | "url" | "file" | "repo" | "voice";
+export type InboxKind = "text" | "url" | "file" | "repo" | "voice" | "image";
 export type InboxState = "new" | "attached" | "used" | "archived";
 
 export interface InboxItem {
@@ -84,6 +84,24 @@ export interface SnapshotMeta {
   label: string;
   createdAt: number;
   size: number;
+}
+
+// In-memory payloads for Time Machine restore. Capped to last 5 to
+// stay inside localStorage budget.
+export interface SnapshotPayload {
+  id: string;
+  payload: unknown;
+}
+
+// ---------- Recovery checkpoint ----------
+// A snapshot of "what was running" persisted on every state change so
+// boot can offer "Resume?" when a session ended mid-flight.
+export interface RecoveryCheckpoint {
+  savedAt: number;
+  hadInFlightMission: boolean;
+  inFlightMissionId?: string;
+  inFlightStage?: string;
+  pausedWorkflowId?: string;
 }
 
 // ---------- Agent queue ----------
@@ -138,7 +156,9 @@ interface AtlasState {
   inbox: InboxItem[];
   memoryDocs: MemoryDoc[];
   snapshots: SnapshotMeta[];
+  recentSnapshotPayloads: SnapshotPayload[];
   agents: AgentSlot[];
+  recovery: RecoveryCheckpoint | null;
 
   setHomeMode(m: AtlasHomeMode): void;
   addFiles(files: Array<Omit<AtlasFile, "id" | "addedAt" | "state">>): void;
@@ -161,9 +181,12 @@ interface AtlasState {
   removeInbox(id: string): void;
   addMemoryDocs(docs: Array<Omit<MemoryDoc, "id" | "addedAt">>): MemoryDoc[];
   removeMemoryDoc(id: string): void;
-  recordSnapshot(m: Omit<SnapshotMeta, "id" | "createdAt">): void;
+  recordSnapshot(m: Omit<SnapshotMeta, "id" | "createdAt">, payload?: unknown): void;
   removeSnapshot(id: string): void;
+  restoreFromRecent(id: string): boolean;
   setAgentState(kind: AgentKind, state: AgentState, missionId?: string): void;
+  setRecovery(c: RecoveryCheckpoint | null): void;
+  clearRecovery(): void;
   hydrate(): void;
   exportAll(): unknown;
   importAll(payload: unknown): boolean;
@@ -191,8 +214,13 @@ const DEFAULT = {
   inbox: [] as InboxItem[],
   memoryDocs: [] as MemoryDoc[],
   snapshots: [] as SnapshotMeta[],
-  agents: DEFAULT_AGENTS
+  recentSnapshotPayloads: [] as SnapshotPayload[],
+  agents: DEFAULT_AGENTS,
+  recovery: null as RecoveryCheckpoint | null
 };
+
+const RECENT_PAYLOAD_LIMIT = 5;
+const RECENT_PAYLOAD_MAX_BYTES = 600_000; // skip in-memory keep for big snapshots
 
 function save(state: AtlasState) {
   if (typeof window === "undefined") return;
@@ -209,11 +237,13 @@ function save(state: AtlasState) {
       inbox: state.inbox,
       memoryDocs: state.memoryDocs,
       snapshots: state.snapshots,
-      agents: state.agents
+      recentSnapshotPayloads: state.recentSnapshotPayloads,
+      agents: state.agents,
+      recovery: state.recovery
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
   } catch {
-    // ignore
+    // ignore — storage might be full; future saves will retry
   }
 }
 
@@ -425,15 +455,34 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
     save(next);
   },
 
-  recordSnapshot(m) {
+  recordSnapshot(m, payload) {
+    const id = rid("snap");
     const created: SnapshotMeta = {
       ...m,
-      id: rid("snap"),
+      id,
       createdAt: Date.now()
     };
+    // Keep the payload in memory for the Time Machine, but only if it
+    // fits the budget. Older payloads are dropped first.
+    let recentSnapshotPayloads = get().recentSnapshotPayloads;
+    if (payload !== undefined) {
+      let serialized = "";
+      try {
+        serialized = JSON.stringify(payload);
+      } catch {
+        serialized = "";
+      }
+      if (serialized && serialized.length <= RECENT_PAYLOAD_MAX_BYTES) {
+        recentSnapshotPayloads = [{ id, payload }, ...recentSnapshotPayloads].slice(
+          0,
+          RECENT_PAYLOAD_LIMIT
+        );
+      }
+    }
     const next = {
       ...get(),
-      snapshots: [created, ...get().snapshots].slice(0, 25)
+      snapshots: [created, ...get().snapshots].slice(0, 25),
+      recentSnapshotPayloads
     };
     set(next);
     save(next);
@@ -442,10 +491,19 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   removeSnapshot(id) {
     const next = {
       ...get(),
-      snapshots: get().snapshots.filter((s) => s.id !== id)
+      snapshots: get().snapshots.filter((s) => s.id !== id),
+      recentSnapshotPayloads: get().recentSnapshotPayloads.filter((p) => p.id !== id)
     };
     set(next);
     save(next);
+  },
+
+  restoreFromRecent(id) {
+    const found = get().recentSnapshotPayloads.find((p) => p.id === id);
+    if (!found) return false;
+    return get().importAll(
+      (found.payload as { payload?: unknown })?.payload ?? found.payload
+    );
   },
 
   setAgentState(kind, state, missionId) {
@@ -455,6 +513,18 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
         a.kind === kind ? { ...a, state, assignedMissionId: missionId } : a
       )
     };
+    set(next);
+    save(next);
+  },
+
+  setRecovery(c) {
+    const next = { ...get(), recovery: c };
+    set(next);
+    save(next);
+  },
+
+  clearRecovery() {
+    const next = { ...get(), recovery: null };
     set(next);
     save(next);
   },
