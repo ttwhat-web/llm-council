@@ -5,8 +5,10 @@ import { Activity, Archive, Brain, Cpu, Database, Github, Receipt } from "lucide
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
+import { useEffect, useState } from "react";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { SpaceSwitcher } from "@/components/SpaceSwitcher";
+import { readPresentationFlags } from "@/components/PresentationModeCard";
 
 /**
  * Atlas HUD · top bar always visible on the Atlas surface.
@@ -56,6 +58,7 @@ export function AtlasHud() {
             demo
           </span>
         )}
+        <PresentationPill />
         <SpaceSwitcher />
         <NotificationsBell />
       </div>
@@ -131,6 +134,29 @@ function Hud({
         </div>
       </div>
     </div>
+  );
+}
+
+function PresentationPill() {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    const refresh = () => {
+      const f = readPresentationFlags();
+      setActive(f.silent || f.ghost || f.demoLock);
+    };
+    refresh();
+    // Poll cheaply so a Settings change reflects without prop wiring.
+    const t = window.setInterval(refresh, 1500);
+    return () => window.clearInterval(t);
+  }, []);
+  if (!active) return null;
+  return (
+    <span
+      title="Presentation mode flags active · Settings → Presentation Mode"
+      className="rounded border border-accent/30 bg-accent/[0.08] px-1 py-px text-accent"
+    >
+      stage
+    </span>
   );
 }
 

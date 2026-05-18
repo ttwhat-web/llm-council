@@ -39,6 +39,7 @@ import { ComplianceCard } from "@/components/ComplianceCard";
 import { RuntimeBus } from "@/components/RuntimeBus";
 import { OperatorModeCard } from "@/components/OperatorModeCard";
 import { RoadmapPanel } from "@/components/RoadmapPanel";
+import { PresentationModeCard } from "@/components/PresentationModeCard";
 import {
   CloudSyncCard,
   MobileCompanionRoadmapCard,
@@ -129,6 +130,7 @@ export default function SettingsPage() {
       />
 
       <RoadmapPanel />
+      <PresentationModeCard />
       <SetupWizard />
       <DemoWorkspaceCard />
       <RuntimeBus />
