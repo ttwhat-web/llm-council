@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, RotateCcw, ShieldOff, X } from "lucide-react";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
 
@@ -77,6 +77,19 @@ export function RecoveryBanner() {
     setDismissed(true);
   };
 
+  const onSafeMode = () => {
+    // Safe mode: cancel current mission, clear workflow runs, leave
+    // brain identity + receipts intact. Designed for "the app boots
+    // but immediately crashes" — strips down to the bare brain.
+    if (current) cancel();
+    useAtlasStore.setState({
+      workflowRuns: [],
+      recovery: null
+    });
+    clearRecovery();
+    setDismissed(true);
+  };
+
   return (
     <div
       role="status"
@@ -102,6 +115,14 @@ export function RecoveryBanner() {
           <RotateCcw className="h-3 w-3" /> Resume
         </button>
       )}
+      <button
+        type="button"
+        onClick={onSafeMode}
+        title="Clear workflow runs · keep brain + receipts"
+        className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-500/[0.08] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-amber-200 hover:bg-amber-500/[0.12]"
+      >
+        <ShieldOff className="h-3 w-3" /> safe mode
+      </button>
       <button
         type="button"
         onClick={onDiscard}

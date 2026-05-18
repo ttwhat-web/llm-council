@@ -9,6 +9,7 @@ import {
 } from "@/store";
 import { BrainBootstrap } from "@/components/BrainBootstrap";
 import { RecoveryBanner } from "@/components/RecoveryBanner";
+import { bumpCrashCounter } from "@/services/telemetry";
 
 export function App() {
   useEffect(() => {
@@ -17,6 +18,13 @@ export function App() {
     useBrainStore.getState().hydrate();
     useMissionStore.getState().hydrate();
     useAtlasStore.getState().hydrate();
+
+    // Crash detection: a recovery checkpoint that survived a reload
+    // means the previous session shut down before the mission finished.
+    const checkpoint = useAtlasStore.getState().recovery;
+    if (checkpoint?.hadInFlightMission) {
+      bumpCrashCounter();
+    }
   }, []);
 
   return (

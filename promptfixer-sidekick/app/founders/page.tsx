@@ -16,16 +16,28 @@ import { MarketingShell } from "@/components/MarketingShell";
  * Admin CSV export is available at /founders?admin=1.
  */
 
+type FounderStatus = "waitlist" | "invited" | "activated";
+
 interface WaitlistEntry {
   id: string;
   email: string;
   role: string;
   use: string;
   at: number;
+  status: FounderStatus;
+  activationCode?: string;
+  activatedAt?: number;
 }
 
 const STORAGE_KEY = "operator.center.waitlist";
 const ROLES = ["Founder", "Engineer", "Operator", "Designer", "Investor", "Other"];
+
+function makeActivationCode(): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < 12; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return `${out.slice(0, 4)}-${out.slice(4, 8)}-${out.slice(8)}`;
+}
 
 export default function FoundersPage() {
   const [admin, setAdmin] = useState(false);
@@ -55,6 +67,8 @@ export default function FoundersPage() {
         </header>
 
         <WaitlistForm entries={entries} onChange={setEntries} />
+
+        <ActivationForm entries={entries} onChange={setEntries} />
 
         <Perks />
 
@@ -112,7 +126,8 @@ function WaitlistForm({
       email: trimmed,
       role,
       use: use.trim(),
-      at: Date.now()
+      at: Date.now(),
+      status: "waitlist"
     };
     const next = [entry, ...entries].slice(0, 500);
     saveEntries(next);
@@ -191,6 +206,86 @@ function WaitlistForm({
           </span>
         </div>
       </form>
+    </section>
+  );
+}
+
+function ActivationForm({
+  entries,
+  onChange
+}: {
+  entries: WaitlistEntry[];
+  onChange: (next: WaitlistEntry[]) => void;
+}) {
+  const [code, setCode] = useState("");
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const onActivate = () => {
+    const c = code.trim().toUpperCase();
+    if (!c) return;
+    const idx = entries.findIndex(
+      (e) => e.activationCode?.toUpperCase() === c
+    );
+    if (idx < 0) {
+      setResult({ ok: false, msg: "Code not recognised on this machine." });
+      window.setTimeout(() => setResult(null), 4000);
+      return;
+    }
+    const e = entries[idx];
+    if (e.status === "activated") {
+      setResult({ ok: true, msg: `Already activated · ${e.email}` });
+    } else {
+      const next = [...entries];
+      next[idx] = { ...e, status: "activated", activatedAt: Date.now() };
+      saveEntries(next);
+      onChange(next);
+      setResult({ ok: true, msg: `Activated · ${e.email} · founder lifetime unlocked` });
+    }
+    setCode("");
+    window.setTimeout(() => setResult(null), 5000);
+  };
+
+  return (
+    <section className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+      <header className="mb-2 flex items-center justify-between">
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+          activation
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
+          paste your code to flip status to activated
+        </span>
+      </header>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onActivate();
+          }}
+          placeholder="XXXX-XXXX-XXXX"
+          className="flex-1 rounded-md border border-white/8 bg-white/[0.025] px-3 py-2 font-mono text-[13px] uppercase tracking-[0.16em] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={onActivate}
+          disabled={!code.trim()}
+          className="rounded-md bg-accent/90 px-3 py-2 text-[12px] font-semibold text-white shadow-glow hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Activate
+        </button>
+      </div>
+      {result && (
+        <p
+          className={
+            result.ok
+              ? "mt-2 rounded-md border border-emerald-400/30 bg-emerald-500/[0.08] px-2 py-1 text-[11.5px] text-emerald-100/90"
+              : "mt-2 rounded-md border border-rose-400/30 bg-rose-500/[0.08] px-2 py-1 text-[11.5px] text-rose-100/90"
+          }
+        >
+          {result.msg}
+        </p>
+      )}
     </section>
   );
 }
@@ -276,21 +371,102 @@ function AdminPanel({
         CRM / sendgrid / mailchimp comes next.
       </p>
       {entries.length > 0 && (
-        <ul className="mt-2 flex max-h-[200px] flex-col gap-1 overflow-auto">
-          {entries.slice(0, 25).map((e) => (
-            <li
+        <ul className="mt-2 flex max-h-[260px] flex-col gap-1 overflow-auto">
+          {entries.slice(0, 50).map((e) => (
+            <AdminRow
               key={e.id}
-              className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]"
-            >
-              <span className="truncate font-mono text-white/85">{e.email}</span>
-              <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/45">
-                {e.role} · {new Date(e.at).toLocaleString()}
-              </span>
-            </li>
+              entry={e}
+              onIssueCode={() => {
+                const code = makeActivationCode();
+                const next = entries.map((x) =>
+                  x.id === e.id
+                    ? { ...x, status: "invited" as const, activationCode: code }
+                    : x
+                );
+                saveEntries(next);
+                onChange(next);
+              }}
+              onForceActivate={() => {
+                const next = entries.map((x) =>
+                  x.id === e.id
+                    ? { ...x, status: "activated" as const, activatedAt: Date.now() }
+                    : x
+                );
+                saveEntries(next);
+                onChange(next);
+              }}
+            />
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+function AdminRow({
+  entry,
+  onIssueCode,
+  onForceActivate
+}: {
+  entry: WaitlistEntry;
+  onIssueCode: () => void;
+  onForceActivate: () => void;
+}) {
+  const tone =
+    entry.status === "activated"
+      ? "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200"
+      : entry.status === "invited"
+        ? "border-accent/30 bg-accent/[0.08] text-accent"
+        : "border-white/10 bg-white/[0.03] text-white/55";
+  const onCopy = () => {
+    if (entry.activationCode && typeof navigator !== "undefined" && navigator.clipboard) {
+      void navigator.clipboard.writeText(entry.activationCode);
+    }
+  };
+  return (
+    <li className="rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 text-[11px]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate font-mono text-white/85">{entry.email}</span>
+        <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${tone}`}>
+          {entry.status}
+        </span>
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[9.5px] uppercase tracking-wider text-white/45">
+        <span>{entry.role} · {new Date(entry.at).toLocaleString()}</span>
+        <div className="flex items-center gap-1">
+          {entry.status === "waitlist" && (
+            <button
+              type="button"
+              onClick={onIssueCode}
+              className="rounded border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 uppercase tracking-wider text-accent hover:bg-accent/[0.14]"
+            >
+              issue code
+            </button>
+          )}
+          {entry.activationCode && entry.status !== "activated" && (
+            <>
+              <code className="rounded bg-black/40 px-1 py-px tracking-[0.16em] text-white">
+                {entry.activationCode}
+              </code>
+              <button
+                type="button"
+                onClick={onCopy}
+                className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+              >
+                copy
+              </button>
+              <button
+                type="button"
+                onClick={onForceActivate}
+                className="rounded border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 uppercase tracking-wider text-emerald-200 hover:bg-emerald-500/[0.14]"
+              >
+                force activate
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -318,8 +494,16 @@ function isLikelyEmail(s: string): boolean {
 }
 
 function toCsv(entries: WaitlistEntry[]): string {
-  const header = ["email", "role", "use", "at"];
-  const rows = entries.map((e) => [e.email, e.role, e.use, new Date(e.at).toISOString()]);
+  const header = ["email", "role", "use", "status", "activation_code", "at", "activated_at"];
+  const rows = entries.map((e) => [
+    e.email,
+    e.role,
+    e.use,
+    e.status,
+    e.activationCode ?? "",
+    new Date(e.at).toISOString(),
+    e.activatedAt ? new Date(e.activatedAt).toISOString() : ""
+  ]);
   const escape = (s: string) =>
     /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   return [

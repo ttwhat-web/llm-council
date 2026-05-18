@@ -32,6 +32,8 @@ import { AutoConfigure } from "@/components/AutoConfigure";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { SetupWizard } from "@/components/SetupWizard";
 import { DemoWorkspaceCard } from "@/components/DemoWorkspaceCard";
+import { ReleaseCenter } from "@/components/ReleaseCenter";
+import { TelemetryDashboard } from "@/components/TelemetryDashboard";
 import { useAtlasStore } from "@/store/atlas";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
@@ -117,6 +119,8 @@ export default function SettingsPage() {
 
       <SetupWizard />
       <DemoWorkspaceCard />
+      <ReleaseCenter />
+      <TelemetryDashboard />
       <AutoConfigure />
 
       <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
