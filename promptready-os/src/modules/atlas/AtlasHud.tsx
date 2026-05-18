@@ -6,6 +6,7 @@ import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
 import { NotificationsBell } from "@/components/NotificationsBell";
+import { SpaceSwitcher } from "@/components/SpaceSwitcher";
 
 /**
  * Atlas HUD · top bar always visible on the Atlas surface.
@@ -55,6 +56,7 @@ export function AtlasHud() {
             demo
           </span>
         )}
+        <SpaceSwitcher />
         <NotificationsBell />
       </div>
     </section>

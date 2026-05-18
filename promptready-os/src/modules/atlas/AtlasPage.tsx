@@ -13,6 +13,7 @@ import {
   Minimize2,
   Phone,
   Rocket,
+  Users as TeamIcon,
   Workflow,
   X,
   ZoomIn,
@@ -53,7 +54,8 @@ type SectionId =
   | "workflow-layer"
   | "intelligence-layer"
   | "delivery-layer"
-  | "mobile-companion";
+  | "mobile-companion"
+  | "team-layer";
 
 interface SectionPosition {
   row: number;
@@ -83,7 +85,8 @@ const LAYOUT: Record<SectionId, SectionPosition> = {
   "brain-core": { row: 2, col: 2 },
   "intelligence-layer": { row: 2, col: 3 },
   "delivery-layer": { row: 3, col: 1 },
-  "mobile-companion": { row: 3, col: 2 }
+  "mobile-companion": { row: 3, col: 2 },
+  "team-layer": { row: 3, col: 3 }
 };
 
 const CELL_W = 360;
@@ -973,6 +976,39 @@ function buildSections(a: BuildArgs): SectionData[] {
     missionLink: "/settings"
   });
 
+  // 9. Team Layer
+  const spaces = readSpaces();
+  const activeSpace = spaces.find((s) => s.id === spaces[0]?.id);
+  out.push({
+    id: "team-layer",
+    title: "Team Layer",
+    eyebrow: "08 · team layer",
+    Icon: TeamIcon,
+    position: LAYOUT["team-layer"],
+    pills: [
+      { label: "spaces", value: String(spaces.length) },
+      { label: "members", value: String(spaces.reduce((acc, s) => acc + s.members.length, 0)) },
+      { label: "active", value: activeSpace?.name ?? "default" },
+      { label: "shared workflows", value: "0", tone: "muted" }
+    ],
+    status:
+      spaces.length > 0
+        ? { tone: "ok", label: `${spaces.length} space${spaces.length === 1 ? "" : "s"}` }
+        : { tone: "muted", label: "single brain" },
+    real:
+      spaces.length > 0
+        ? spaces.map((s) => `${s.name} · ${s.kind} · ${s.members.length} member(s)`)
+        : ["No saved spaces yet · the current brain is the default workspace."],
+    planned: [
+      "Role enforcement (Owner / Operator / Viewer / Approver / Guest)",
+      "Shared workflow + memory packs across spaces",
+      "Team-side approvals via Telegram bridge",
+      "Cloud-sync spaces (opt-in)"
+    ],
+    nextAction: "Use the space switcher in the HUD to create a new brain.",
+    missionLink: "/settings"
+  });
+
   return out;
 }
 
@@ -982,6 +1018,25 @@ function buildSections(a: BuildArgs): SectionData[] {
 
 type PinnedCard = { id: string; text: string; tab: string };
 type Pinned = Record<string, PinnedCard[]>;
+
+interface SpaceLite {
+  id: string;
+  name: string;
+  kind: string;
+  members: { id: string }[];
+}
+
+function readSpaces(): SpaceLite[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem("promptready-os.spaces");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as { spaces?: SpaceLite[] };
+    return parsed.spaces ?? [];
+  } catch {
+    return [];
+  }
+}
 
 function readIntelTerminalPins(): Pinned {
   if (typeof window === "undefined") return {};
