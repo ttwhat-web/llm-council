@@ -63,39 +63,39 @@ function Hero() {
       <h1 className="max-w-[18ch] text-4xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
         Build your own AI Brain.
       </h1>
-      <p className="max-w-[58ch] text-[15px] leading-relaxed text-white/65 md:text-base">
+      <p className="max-w-[60ch] text-[15px] leading-relaxed text-white/65 md:text-base">
         PromptReady OS is the downloadable desktop app for operators who
         dispatch missions, route across local + cloud models, and keep their
-        brain on their machine. No paste-loops, no chat clutter, no key
-        required to open it.
+        brain on their machine. Local-first. No account, no key, no chat
+        window. The web sells, the OS runs, the phone is just the remote.
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <a
-          href="#download"
+        <Link
+          href="/download"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent/90 px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:bg-accent"
         >
           Download PromptReady OS
           <ArrowRight className="h-4 w-4" />
-        </a>
-        <a
-          href="#preview"
+        </Link>
+        <Link
+          href="/docs/demo-script"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white/85 transition hover:bg-white/[0.08]"
         >
-          Watch demo
-        </a>
+          Watch the 90s demo
+        </Link>
         <Link
-          href="/docs"
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm font-medium text-white/65 transition hover:bg-white/[0.06]"
+          href="/founders"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/[0.06] px-4 py-2.5 text-sm font-medium text-accent transition hover:bg-accent/[0.12]"
         >
-          View docs
+          Join founder waitlist
         </Link>
         <span className="text-[11px] text-white/40">
-          Local-first. Works without an account or API key.
+          Source build works today · signed installers next.
         </span>
       </div>
       <FounderCounter variant="cta" />
       <p className="text-[11px] text-white/35">
-        Desktop is the product. The web sells, the OS runs.
+        Desktop is the product. Web is the brochure. Phone is the remote.
       </p>
     </section>
   );

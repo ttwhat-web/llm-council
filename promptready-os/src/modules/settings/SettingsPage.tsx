@@ -30,6 +30,8 @@ import {
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { AutoConfigure } from "@/components/AutoConfigure";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { SetupWizard } from "@/components/SetupWizard";
+import { DemoWorkspaceCard } from "@/components/DemoWorkspaceCard";
 import { useAtlasStore } from "@/store/atlas";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
@@ -113,6 +115,8 @@ export default function SettingsPage() {
         sub="Auto-setup, appearance, BYOK keys, safety, telemetry, mobile companion. Keys you paste stay in memory for this session only — keychain lands with the desktop runtime."
       />
 
+      <SetupWizard />
+      <DemoWorkspaceCard />
       <AutoConfigure />
 
       <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
@@ -981,6 +985,22 @@ function PackagingCard() {
           </li>
         ))}
       </ul>
+      <div className="mt-3">
+        <div className="mb-1.5 font-mono text-[9.5px] uppercase tracking-[0.22em] text-white/40">
+          packaging readiness
+        </div>
+        <ul className="grid grid-cols-1 gap-1 md:grid-cols-2">
+          <ReadinessRow label="Tauri config" state="ready" detail="src-tauri/tauri.conf.json present" />
+          <ReadinessRow label="macOS · Apple Silicon build" state="partial" detail="config ready · `npm run tauri:build` works locally" />
+          <ReadinessRow label="macOS · Intel build" state="partial" detail="universal binary target pending" />
+          <ReadinessRow label="Windows MSI build" state="partial" detail="WiX toolset needed on CI" />
+          <ReadinessRow label="Linux AppImage / deb" state="planned" detail="not yet packaged" />
+          <ReadinessRow label="Code signing · macOS" state="unknown" detail="developer ID + notarization not yet configured" />
+          <ReadinessRow label="Code signing · Windows" state="unknown" detail="EV / OV certificate not yet acquired" />
+          <ReadinessRow label="Auto-update" state="planned" detail="Tauri updater requires signed release feed" />
+          <ReadinessRow label="Public installer" state="planned" detail="no signed binaries published yet — source build only" />
+        </ul>
+      </div>
       <p className="mt-3 text-[10.5px] text-white/45">
         Build with <span className="font-mono">npm run tauri:build</span> once
         signing keys land. Offline support is built in — the deterministic
@@ -1045,6 +1065,34 @@ function timeAgo(ts: number): string {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
   return `${Math.floor(diff / 86_400_000)}d`;
+}
+
+function ReadinessRow({
+  label,
+  state,
+  detail
+}: {
+  label: string;
+  state: "ready" | "partial" | "planned" | "unknown";
+  detail: string;
+}) {
+  const cls = {
+    ready: "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200",
+    partial: "border-amber-400/30 bg-amber-500/[0.08] text-amber-200",
+    planned: "border-white/10 bg-white/[0.03] text-white/55",
+    unknown: "border-white/10 bg-white/[0.03] text-white/45"
+  }[state];
+  return (
+    <li className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]">
+      <div className="flex min-w-0 flex-col">
+        <span className="text-white/85">{label}</span>
+        <span className="font-mono text-[9.5px] text-white/45">{detail}</span>
+      </div>
+      <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${cls}`}>
+        {state}
+      </span>
+    </li>
+  );
 }
 
 // ============================================================================
