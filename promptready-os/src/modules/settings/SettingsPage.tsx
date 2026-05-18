@@ -39,6 +39,8 @@ import { ComplianceCard } from "@/components/ComplianceCard";
 import { RuntimeBus } from "@/components/RuntimeBus";
 import { OperatorModeCard } from "@/components/OperatorModeCard";
 import { RoadmapPanel } from "@/components/RoadmapPanel";
+import { BrainScoreCard } from "@/components/BrainScoreCard";
+import { OperatorSafeModeCard } from "@/components/OperatorSafeModeCard";
 import { PresentationModeCard } from "@/components/PresentationModeCard";
 import {
   CloudSyncCard,
@@ -131,6 +133,7 @@ export default function SettingsPage() {
 
       <RoadmapPanel />
       <PresentationModeCard />
+      <OperatorSafeModeCard />
       <SetupWizard />
       <DemoWorkspaceCard />
       <RuntimeBus />
@@ -229,6 +232,7 @@ export default function SettingsPage() {
       <ComplianceCard />
       <AuditLogCard />
       <BrainHealthCard />
+      <BrainScoreCard />
       <SnapshotsCard />
       <DesktopTrustCard />
       <PackagingCard />
