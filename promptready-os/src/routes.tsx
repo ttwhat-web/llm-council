@@ -8,6 +8,7 @@ import IntelligenceTerminalPage from "@/modules/intelligence-terminal/Intelligen
 import WorkflowsPage from "@/modules/workflows/WorkflowsPage";
 import BrainPage from "@/modules/brain/BrainPage";
 import AtlasPage from "@/modules/atlas/AtlasPage";
+import MarketplacePage from "@/modules/marketplace/MarketplacePage";
 import SettingsPage from "@/modules/settings/SettingsPage";
 
 /**
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       { path: "workflows", element: <WorkflowsPage /> },
       { path: "brain", element: <BrainPage /> },
       { path: "atlas", element: <AtlasPage /> },
+      { path: "marketplace", element: <MarketplacePage /> },
       { path: "settings", element: <SettingsPage /> }
     ]
   }

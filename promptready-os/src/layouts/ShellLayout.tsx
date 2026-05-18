@@ -10,6 +10,7 @@ import {
   Cpu,
   Library,
   Map as MapIcon,
+  Package,
   Settings as SettingsIcon,
   Terminal as TerminalIcon,
   Workflow
@@ -47,6 +48,7 @@ const NAV: NavItem[] = [
   { to: "/terminal", label: "Terminal", Icon: TerminalIcon },
   { to: "/workflows", label: "Workflows", Icon: Archive },
   { to: "/brain", label: "Brain", Icon: Brain },
+  { to: "/marketplace", label: "Marketplace", Icon: Package },
   { to: "/settings", label: "Settings", Icon: SettingsIcon }
 ];
 
