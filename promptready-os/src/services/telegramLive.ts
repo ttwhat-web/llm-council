@@ -73,27 +73,27 @@ export interface TelegramConfig {
  * Read token + chat id from runtime config or build-time env. Never
  * reads from localStorage. The desktop runtime should populate
  * `window.__OPERATOR_CONFIG__` from its secure store on boot.
+ *
+ * Note: literal `import.meta.env.VITE_*` access is required so Vite
+ * statically inlines the value at build time. A destructured / cast
+ * read returns `{}` because Vite can't trace the indirection.
  */
 export function readTelegramConfig(): TelegramConfig {
-  // Tauri / desktop runtime push their config here.
   const runtime =
     typeof window !== "undefined"
       ? ((window as unknown as { __OPERATOR_CONFIG__?: Record<string, string | undefined> }).__OPERATOR_CONFIG__ ?? {})
       : {};
-  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
-  const token =
-    runtime.telegramBotToken ||
-    env.VITE_TELEGRAM_BOT_TOKEN ||
-    null;
-  const chatId =
-    runtime.telegramAllowedChatId ||
-    env.VITE_TELEGRAM_ALLOWED_CHAT_ID ||
-    null;
+  // Literal property access — Vite replaces these at build time.
+  const envToken: string | undefined = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+  const envChatId: string | undefined = import.meta.env.VITE_TELEGRAM_ALLOWED_CHAT_ID;
+
+  const token = runtime.telegramBotToken || envToken || null;
+  const chatId = runtime.telegramAllowedChatId || envChatId || null;
 
   const source: TelegramConfig["source"] = runtime.telegramBotToken
     ? "runtime"
-    : env.VITE_TELEGRAM_BOT_TOKEN
+    : envToken
       ? "env"
       : "none";
 
@@ -265,7 +265,7 @@ export async function pollTelegramUpdates(): Promise<{ count: number; error?: st
         continue;
       }
       if (!text.trim().startsWith("/")) continue;
-      const result = await executeCommand(text);
+      const result = await executeCommand(text, { remote: true });
       auditLog("telegram.send", { direction: "inbound", command: text.split(" ")[0] });
       await sendTelegramMessage(result.output.slice(0, 3500));
       processed++;

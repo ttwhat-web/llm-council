@@ -46,9 +46,10 @@ export function sendNotification(text: string): BridgeMessage {
 export async function receiveInbound(text: string): Promise<BridgeMessage> {
   const inbound = useAtlasStore.getState().appendBridgeMessage({ dir: "in", text });
   // Route through the real command parser so the same handlers a real
-  // bot would call back into are exercised here.
+  // bot would call back into are exercised here. `remote: true` makes
+  // the simulator honour Runtime Shield gates · same posture as live.
   if (text.trim().startsWith("/")) {
-    const result = await executeCommand(text);
+    const result = await executeCommand(text, { remote: true });
     useAtlasStore.getState().appendBridgeMessage({
       dir: "out",
       text: result.output

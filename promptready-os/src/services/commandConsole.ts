@@ -17,6 +17,7 @@ import { probeOllama } from "@/services/missionRunner";
 import { runWorkflow, resumeWorkflowRun } from "@/services/workflowRunner";
 import { isRemoteAllowed, auditBlocked, type ShieldAction } from "@/services/runtimeShield";
 import { readPresence, formatPresenceForTelegram, refreshOllamaProbe } from "@/services/presence";
+import { auditLog } from "@/services/auditLog";
 
 export interface CommandResult {
   ok: boolean;
@@ -52,7 +53,17 @@ export const COMMAND_HELP: Array<{ cmd: string; desc: string }> = [
   { cmd: "/help", desc: "this list" }
 ];
 
-export async function executeCommand(line: string): Promise<CommandResult> {
+export interface CommandContext {
+  /** Set to true when the command originated from a remote channel
+   *  (Telegram bridge simulator or real Telegram inbound). Local
+   *  operator consoles do NOT pass this — they run unrestricted. */
+  remote?: boolean;
+}
+
+export async function executeCommand(
+  line: string,
+  ctx: CommandContext = {}
+): Promise<CommandResult> {
   const raw = line.trim();
   if (!raw) return { ok: false, output: "Empty command." };
   const m = /^\/(\w+)(?:\s+([\s\S]+))?$/.exec(raw);
@@ -72,28 +83,27 @@ export async function executeCommand(line: string): Promise<CommandResult> {
     case "missions":
       return missions();
     case "receipt":
-      // Runtime Shield: read-only verb · default allow, gate honors the
-      // toggle so paranoid operators can lock even read access.
-      if (!gate("receipt", "receipt")) return blockedMsg("receipt");
+      // Shield gates apply to REMOTE only · local operator consoles run unrestricted.
+      if (ctx.remote && !gate("receipt", "receipt")) return blockedMsg("receipt");
       return receipt(arg);
     case "run":
-      if (!gate("run", "run")) return blockedMsg("run");
+      if (ctx.remote && !gate("run", "run")) return blockedMsg("run");
       return run(arg);
     case "pause":
-      if (!gate("pause", "pause-resume")) return blockedMsg("pause-resume");
+      if (ctx.remote && !gate("pause", "pause-resume")) return blockedMsg("pause-resume");
       return pause();
     case "resume":
-      if (!gate("resume", "pause-resume")) return blockedMsg("pause-resume");
+      if (ctx.remote && !gate("resume", "pause-resume")) return blockedMsg("pause-resume");
       return {
         ok: true,
         output:
           "Workflow resume is gated by `/approve <id>` on paused runs. Missions do not pause."
       };
     case "approve":
-      if (!gate("approve", "approve")) return blockedMsg("approve");
+      if (ctx.remote && !gate("approve", "approve")) return blockedMsg("approve");
       return await approve(arg);
     case "reject":
-      if (!gate("reject", "approve")) return blockedMsg("approve");
+      if (ctx.remote && !gate("reject", "approve")) return blockedMsg("approve");
       return reject(arg);
     case "workflows":
       return workflows();
@@ -208,6 +218,7 @@ function pause(): CommandResult {
   if (!ms.current) return { ok: false, output: "No mission in flight." };
   const id = ms.current.id;
   ms.cancel();
+  auditLog("mission.cancel", { id });
   return { ok: true, output: `Cancelled ${id}.` };
 }
 
@@ -220,6 +231,11 @@ async function approve(id: string): Promise<CommandResult> {
     return { ok: false, output: `Run ${id} is ${target.status}, not awaiting approval.` };
   // Real resume — walks remaining downstream nodes from resumeCursor.
   const resumed = await resumeWorkflowRun(id);
+  auditLog("workflow.approve", {
+    runId: id,
+    resumedStatus: resumed.status,
+    steps: resumed.steps.length
+  });
   return {
     ok: resumed.status !== "blocked",
     output: `Approved ${id} · resumed → ${resumed.status} · ${resumed.steps.length} total step${resumed.steps.length === 1 ? "" : "s"}`
@@ -249,6 +265,7 @@ function reject(id: string): CommandResult {
   useAtlasStore.setState((s) => ({
     workflowRuns: s.workflowRuns.map((r) => (r.id === id ? updated : r))
   }));
+  auditLog("workflow.reject", { runId: id, priorStatus: target.status });
   return { ok: true, output: `Rejected ${id}.` };
 }
 
