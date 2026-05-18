@@ -23,6 +23,8 @@ import { create } from "zustand";
 import { runMission, type Deliverable, type RunnerEngine } from "@/services/missionRunner";
 import { useBrainStore } from "@/store/brain";
 import { auditLog } from "@/services/auditLog";
+import { sendTelegramReceipt, getTelegramBridgeStatus } from "@/services/telegramLive";
+import { sendNotification } from "@/services/telegramBridge";
 
 export type MissionStage =
   | "idle"
@@ -223,6 +225,14 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         engine: finalReceipt.engine ?? "deterministic",
         score: finalReceipt.score ?? null
       });
+      // Push event · always queues local · also sends to Telegram when live.
+      sendNotification(
+        `✅ Mission complete · ${finalReceipt.id} · score ${finalReceipt.score ?? "?"}/100 · ${finalReceipt.deliverables.length} deliverables`
+      );
+      const tg = getTelegramBridgeStatus();
+      if (tg.live === "live-ready" || tg.live === "live-connected") {
+        void sendTelegramReceipt(finalReceipt);
+      }
       return finalReceipt;
     } catch (err) {
       const errReceipt: MissionReceipt = {

@@ -15,6 +15,8 @@ import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
 import { probeOllama } from "@/services/missionRunner";
 import { runWorkflow, resumeWorkflowRun } from "@/services/workflowRunner";
+import { isRemoteAllowed, auditBlocked, type ShieldAction } from "@/services/runtimeShield";
+import { readPresence, formatPresenceForTelegram, refreshOllamaProbe } from "@/services/presence";
 
 export interface CommandResult {
   ok: boolean;
@@ -64,26 +66,34 @@ export async function executeCommand(line: string): Promise<CommandResult> {
   const arg = m[2]?.trim() ?? "";
   switch (cmd) {
     case "status":
-      return status();
+      return await status();
     case "brain":
       return brain();
     case "missions":
       return missions();
     case "receipt":
+      // Runtime Shield: read-only verb · default allow, gate honors the
+      // toggle so paranoid operators can lock even read access.
+      if (!gate("receipt", "receipt")) return blockedMsg("receipt");
       return receipt(arg);
     case "run":
+      if (!gate("run", "run")) return blockedMsg("run");
       return run(arg);
     case "pause":
+      if (!gate("pause", "pause-resume")) return blockedMsg("pause-resume");
       return pause();
     case "resume":
+      if (!gate("resume", "pause-resume")) return blockedMsg("pause-resume");
       return {
         ok: true,
         output:
           "Workflow resume is gated by `/approve <id>` on paused runs. Missions do not pause."
       };
     case "approve":
+      if (!gate("approve", "approve")) return blockedMsg("approve");
       return await approve(arg);
     case "reject":
+      if (!gate("reject", "approve")) return blockedMsg("approve");
       return reject(arg);
     case "workflows":
       return workflows();
@@ -99,23 +109,38 @@ export async function executeCommand(line: string): Promise<CommandResult> {
   }
 }
 
+// ---------- shield gate ----------
+
+function gate(verb: string, action: ShieldAction): boolean {
+  if (isRemoteAllowed(action)) return true;
+  auditBlocked(verb, action);
+  return false;
+}
+
+function blockedMsg(action: ShieldAction): CommandResult {
+  const label =
+    action === "run"
+      ? "Remote run"
+      : action === "approve"
+        ? "Remote approve / reject"
+        : action === "pause-resume"
+          ? "Remote pause / resume"
+          : action === "receipt"
+            ? "Remote receipt"
+            : "Remote inbox capture";
+  return {
+    ok: false,
+    output: `${label} disabled. Enable in Settings → Runtime Shield.`
+  };
+}
+
 // ---------- handlers ----------
 
-function status(): CommandResult {
-  const brainS = useBrainStore.getState();
-  const missionS = useMissionStore.getState();
-  const lines: string[] = [];
-  lines.push(`**Engine:** ${missionS.runtime}`);
-  lines.push(
-    `**Brain:** ${brainS.identity ? `${brainS.identity.name} · ${brainS.identity.mode}` : "—"}`
-  );
-  lines.push(`**Sources:** ${brainS.memorySources.length}`);
-  lines.push(`**Engines:** ${brainS.engines.map((e) => e.kind).join(" · ") || "deterministic"}`);
-  lines.push(`**Receipts:** ${missionS.history.length}`);
-  lines.push(
-    `**In flight:** ${missionS.current ? `${missionS.current.id} · ${missionS.current.stage}` : "none"}`
-  );
-  return { ok: true, output: lines.join("\n") };
+async function status(): Promise<CommandResult> {
+  // Refresh the Ollama probe so /status always reflects truth at call time.
+  await refreshOllamaProbe();
+  const p = readPresence();
+  return { ok: true, output: formatPresenceForTelegram(p) };
 }
 
 function brain(): CommandResult {

@@ -29,6 +29,8 @@ import {
   type WorkflowResumeContext
 } from "@/store/atlas";
 import type { Deliverable } from "@/services/missionRunner";
+import { sendTelegramApprovalRequest, getTelegramBridgeStatus } from "@/services/telegramLive";
+import { sendNotification } from "@/services/telegramBridge";
 
 interface Ctx {
   lastDeliverable?: Deliverable;
@@ -241,6 +243,21 @@ async function resumeRun(
 
 function finish(r: WorkflowRun): WorkflowRun {
   useAtlasStore.getState().recordWorkflowRun(r);
+  // Push events on terminal states. Local notification always · Telegram
+  // only when live · the workflow runner never depends on the network.
+  if (r.status === "awaiting-approval") {
+    sendNotification(
+      `🟡 Workflow awaiting approval · ${r.id} · /approve ${r.id} or /reject ${r.id}`
+    );
+    const tg = getTelegramBridgeStatus();
+    if (tg.live === "live-ready" || tg.live === "live-connected") {
+      void sendTelegramApprovalRequest(r);
+    }
+  } else if (r.status === "completed") {
+    sendNotification(`✅ Workflow completed · ${r.id} · ${r.steps.length} step(s)`);
+  } else if (r.status === "blocked") {
+    sendNotification(`🔴 Workflow blocked · ${r.id}`);
+  }
   return r;
 }
 

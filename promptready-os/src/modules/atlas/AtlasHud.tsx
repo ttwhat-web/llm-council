@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { SpaceSwitcher } from "@/components/SpaceSwitcher";
 import { readPresentationFlags } from "@/components/PresentationModeCard";
+import { PresenceStrip } from "@/components/PresenceStrip";
 
 /**
  * Atlas HUD · top bar always visible on the Atlas surface.
@@ -42,6 +43,7 @@ export function AtlasHud() {
         <Hud Icon={Activity} label="missions" value={String(missionCount)} />
         <Hud Icon={Receipt} label="receipts" value={String(history.length)} />
         <Hud Icon={Archive} label="snapshots" value={String(snapshots.length)} />
+        <PresenceStrip />
       </div>
       <div className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
         <span

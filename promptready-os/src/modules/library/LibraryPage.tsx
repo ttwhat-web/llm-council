@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import clsx from "clsx";
-import { Archive, Download, Inbox, Search, Trash2 } from "lucide-react";
+import { Archive, Copy, Download, Inbox, PlayCircle, Rocket, Search, Trash2 } from "lucide-react";
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { useMissionStore, type MissionReceipt } from "@/store/mission";
 
@@ -158,12 +158,20 @@ function ReceiptRow({
 
       {open && (
         <div className="border-t border-white/6 bg-black/20 px-4 py-3">
+          <ReplayHeader m={m} />
           <div className="mb-2 grid grid-cols-2 gap-2 text-[10.5px] md:grid-cols-4">
             <KV k="id" v={m.id} mono />
             <KV k="quality" v={m.quality} mono />
             <KV k="elapsed" v={m.elapsedMs ? `${m.elapsedMs}ms` : "—"} mono />
             <KV k="memory" v={String(m.memoryMatches ?? 0)} mono />
+            {m.engine && <KV k="engine" v={m.engine} mono />}
+            {m.model && <KV k="model" v={m.model} mono />}
             {m.repoContext && <KV k="repo" v={m.repoContext} mono />}
+            <KV k="started" v={new Date(m.startedAt).toLocaleString()} />
+          </div>
+          <div className="mb-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 text-[11px] text-white/75">
+            <div className="mb-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/40">brief</div>
+            <p className="whitespace-pre-wrap">{m.brief}</p>
           </div>
           {m.deliverables.length > 0 && (
             <div className="mb-2">
@@ -238,4 +246,132 @@ function downloadDeliverable(label: string, format: string, content: string) {
   a.click();
   a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ----------------------------------------------------------------------------
+// Replay Mission · Sprint A
+// ----------------------------------------------------------------------------
+
+function ReplayHeader({ m }: { m: MissionReceipt }) {
+  const [flash, setFlash] = useState<string | null>(null);
+  const dispatch = useMissionStore((s) => s.dispatch);
+  const current = useMissionStore((s) => s.current);
+
+  const replayMd = (): string => {
+    const lines: string[] = [];
+    lines.push(`# Mission Replay · ${m.id}`);
+    lines.push("");
+    lines.push(`- **Started:** ${new Date(m.startedAt).toISOString()}`);
+    if (m.endedAt) lines.push(`- **Ended:** ${new Date(m.endedAt).toISOString()}`);
+    lines.push(`- **Mode:** ${m.mode} · **Quality:** ${m.quality}`);
+    if (m.engine) lines.push(`- **Engine:** ${m.engine}${m.model ? ` · ${m.model}` : ""}`);
+    if (m.score != null) lines.push(`- **Score:** ${m.score}/100`);
+    if (m.elapsedMs) lines.push(`- **Elapsed:** ${m.elapsedMs}ms`);
+    if (m.memoryMatches != null) lines.push(`- **Memory matches:** ${m.memoryMatches}`);
+    if (m.repoContext) lines.push(`- **Repo:** ${m.repoContext}`);
+    lines.push("");
+    lines.push(`## Brief`);
+    lines.push("");
+    lines.push(m.brief);
+    lines.push("");
+    if (m.events.length > 0) {
+      lines.push(`## Timeline (${m.events.length} events)`);
+      lines.push("");
+      for (const e of m.events) {
+        lines.push(
+          `- \`${new Date(e.at).toISOString()}\` · **${e.kind}** · ${e.tag} · ${e.message}`
+        );
+      }
+      lines.push("");
+    }
+    lines.push(`## Deliverables (${m.deliverables.length})`);
+    lines.push("");
+    for (const d of m.deliverables) {
+      lines.push(`### ${d.label}`);
+      lines.push(`*${d.blurb} · format: ${d.format}*`);
+      lines.push("");
+      lines.push("```" + (d.format === "shell" ? "sh" : d.format === "json" ? "json" : ""));
+      lines.push(d.content);
+      lines.push("```");
+      lines.push("");
+    }
+    return lines.join("\n");
+  };
+
+  const onCopy = () => {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    void navigator.clipboard.writeText(replayMd());
+    setFlash("replay summary copied");
+    window.setTimeout(() => setFlash(null), 2500);
+  };
+
+  const onExport = () => {
+    if (typeof window === "undefined") return;
+    const blob = new Blob([replayMd()], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `replay-${m.id}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setFlash(`exported replay-${m.id}.md`);
+    window.setTimeout(() => setFlash(null), 3000);
+  };
+
+  const onFollowUp = async () => {
+    if (current) {
+      setFlash("cancel current mission first");
+      window.setTimeout(() => setFlash(null), 3500);
+      return;
+    }
+    const first = m.deliverables[0];
+    const quoted = first ? first.content.replace(/\n+/g, "\n").slice(0, 300) : m.brief.slice(0, 300);
+    const followUp = `Run a follow-up to mission ${m.id}.\n\nOriginal brief:\n${m.brief}\n\nLast deliverable:\n"""\n${quoted}\n"""\n\nProduce the next operator artifact · justify deviations from the previous step.`;
+    await dispatch(followUp, m.mode, m.quality, m.repoContext ?? null);
+    setFlash("follow-up dispatched");
+    window.setTimeout(() => setFlash(null), 3500);
+  };
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-accent/25 bg-accent/[0.04] px-3 py-2">
+      <div className="flex items-center gap-1.5">
+        <PlayCircle className="h-3.5 w-3.5 text-accent" />
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+          replay mission
+        </span>
+        <span className="font-mono text-[10px] text-white/55">{m.id}</span>
+      </div>
+      <div className="ml-auto flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onCopy}
+          className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/75 hover:bg-white/[0.06]"
+        >
+          <Copy className="h-3 w-3" /> copy replay
+        </button>
+        <button
+          type="button"
+          onClick={onExport}
+          className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/75 hover:bg-white/[0.06]"
+        >
+          <Download className="h-3 w-3" /> export .md
+        </button>
+        <button
+          type="button"
+          onClick={onFollowUp}
+          disabled={!!current}
+          className="inline-flex items-center gap-1 rounded-md bg-accent/85 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Rocket className="h-3 w-3" /> run follow-up
+        </button>
+      </div>
+      {flash && (
+        <p className="basis-full font-mono text-[10px] uppercase tracking-wider text-accent">
+          {flash}
+        </p>
+      )}
+    </div>
+  );
 }

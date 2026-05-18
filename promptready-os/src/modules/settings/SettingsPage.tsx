@@ -41,6 +41,8 @@ import { OperatorModeCard } from "@/components/OperatorModeCard";
 import { RoadmapPanel } from "@/components/RoadmapPanel";
 import { BrainScoreCard } from "@/components/BrainScoreCard";
 import { OperatorSafeModeCard } from "@/components/OperatorSafeModeCard";
+import { TelegramLiveCard } from "@/components/TelegramLiveCard";
+import { RuntimeShieldCard } from "@/components/RuntimeShieldCard";
 import { PresentationModeCard } from "@/components/PresentationModeCard";
 import {
   CloudSyncCard,
@@ -229,6 +231,8 @@ export default function SettingsPage() {
 
       <MobileCompanionCard />
       <TelegramCompanionCard />
+      <TelegramLiveCard />
+      <RuntimeShieldCard />
       <ComplianceCard />
       <AuditLogCard />
       <BrainHealthCard />
