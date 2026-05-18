@@ -36,6 +36,8 @@ import { ReleaseCenter } from "@/components/ReleaseCenter";
 import { TelemetryDashboard } from "@/components/TelemetryDashboard";
 import { AuditLogCard } from "@/components/AuditLogCard";
 import { ComplianceCard } from "@/components/ComplianceCard";
+import { RuntimeBus } from "@/components/RuntimeBus";
+import { OperatorModeCard } from "@/components/OperatorModeCard";
 import { useAtlasStore } from "@/store/atlas";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
@@ -121,6 +123,8 @@ export default function SettingsPage() {
 
       <SetupWizard />
       <DemoWorkspaceCard />
+      <RuntimeBus />
+      <OperatorModeCard />
       <ReleaseCenter />
       <TelemetryDashboard />
       <AutoConfigure />
