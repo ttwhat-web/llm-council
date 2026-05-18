@@ -6,6 +6,7 @@ import {
   Apple,
   Archive,
   BookOpen,
+  Brain as BrainIcon,
   Copy,
   Cpu,
   Download,
@@ -21,6 +22,7 @@ import {
   RefreshCcw,
   Send,
   ShieldCheck,
+  Sparkles,
   Terminal as TerminalIcon,
   Trash2,
   Upload
@@ -38,6 +40,18 @@ import {
 } from "@/services/snapshot";
 import { downloadDiagnostics } from "@/services/diagnostics";
 import { executeCommand, COMMAND_HELP } from "@/services/commandConsole";
+import {
+  measureBrainHealth,
+  optimizeBrain,
+  type OptimizeReport
+} from "@/services/brainHealth";
+import {
+  getBridgeStatus,
+  sendNotification,
+  receiveInbound,
+  clearBridge,
+  BRIDGE_SETUP_NOTES
+} from "@/services/telegramBridge";
 
 /**
  * Settings · Phase 13.
@@ -188,6 +202,7 @@ export default function SettingsPage() {
 
       <MobileCompanionCard />
       <TelegramCompanionCard />
+      <BrainHealthCard />
       <SnapshotsCard />
       <DesktopTrustCard />
       <PackagingCard />
@@ -477,6 +492,7 @@ function TelegramCompanionCard() {
       </div>
 
       <CommandConsole />
+      <BridgeSimulator />
     </section>
   );
 }
@@ -1029,4 +1045,250 @@ function timeAgo(ts: number): string {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
   return `${Math.floor(diff / 86_400_000)}d`;
+}
+
+// ============================================================================
+// Brain Health card
+// ============================================================================
+
+function BrainHealthCard() {
+  // Re-measure on every render so counts stay fresh after edits.
+  const health = measureBrainHealth();
+  const [optReport, setOptReport] = useState<OptimizeReport | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onOptimize = () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = optimizeBrain();
+      setOptReport(r);
+      window.setTimeout(() => setOptReport(null), 6000);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rows: Array<{ k: string; v: string; warn?: boolean }> = [
+    { k: "storage", v: `${(health.storageBytes / 1024).toFixed(1)}KB · ${health.storageKeys} keys` },
+    { k: "memory docs", v: String(health.memoryDocs), warn: health.duplicateDocs > 0 },
+    { k: "duplicates", v: String(health.duplicateDocs), warn: health.duplicateDocs > 0 },
+    { k: "receipts", v: `${health.receipts}${health.oldReceipts ? ` · ${health.oldReceipts} old` : ""}`, warn: health.oldReceipts > 0 },
+    { k: "snapshots", v: String(health.snapshots) },
+    { k: "imports", v: String(health.imports) },
+    { k: "stale repos", v: String(health.staleRepos), warn: health.staleRepos > 0 },
+    { k: "workflow", v: `${health.workflowNodes} nodes · ${health.workflowEdges} edges` },
+    { k: "unused nodes", v: String(health.unusedWorkflowNodes), warn: health.unusedWorkflowNodes > 0 },
+    { k: "orphan files", v: String(health.orphanFiles), warn: health.orphanFiles > 0 },
+    { k: "inbox archived", v: String(health.inboxArchived), warn: health.inboxArchived > 0 }
+  ];
+
+  const totalRemovable =
+    health.duplicateDocs +
+    health.oldReceipts +
+    health.unusedWorkflowNodes +
+    health.orphanFiles +
+    health.inboxArchived;
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+      <header className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BrainIcon className="h-4 w-4 text-accent" />
+          <span className="text-[13px] font-semibold text-white">Brain Health</span>
+        </div>
+        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+          {totalRemovable === 0 ? "clean" : `${totalRemovable} cleanup item${totalRemovable === 1 ? "" : "s"}`}
+        </span>
+      </header>
+
+      <ul className="grid grid-cols-1 gap-1 md:grid-cols-2 lg:grid-cols-3">
+        {rows.map((r) => (
+          <li
+            key={r.k}
+            className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]"
+          >
+            <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/40">
+              {r.k}
+            </span>
+            <span
+              className={
+                r.warn
+                  ? "font-mono text-amber-200/85"
+                  : "font-mono text-white/85"
+              }
+            >
+              {r.v}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOptimize}
+          disabled={busy || totalRemovable === 0}
+          className="inline-flex items-center gap-1.5 rounded-md bg-accent/90 px-3 py-1.5 text-[12px] font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          Optimize Brain
+        </button>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
+          drops duplicates · old receipts · unused workflow nodes · orphan files · archived inbox
+        </span>
+      </div>
+
+      {optReport && (
+        <div className="mt-2 rounded-md border border-emerald-400/25 bg-emerald-500/[0.06] p-2 text-[11px] text-emerald-100/90">
+          <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-emerald-200/85">
+            optimized ·{" "}
+          </span>
+          {optReport.duplicateDocsRemoved > 0 && <span>{optReport.duplicateDocsRemoved} duplicate docs · </span>}
+          {optReport.oldReceiptsRemoved > 0 && <span>{optReport.oldReceiptsRemoved} old receipts · </span>}
+          {optReport.unusedWorkflowNodesRemoved > 0 && <span>{optReport.unusedWorkflowNodesRemoved} workflow nodes · </span>}
+          {optReport.orphanFilesRemoved > 0 && <span>{optReport.orphanFilesRemoved} orphan files · </span>}
+          {optReport.archivedInboxRemoved > 0 && <span>{optReport.archivedInboxRemoved} archived inbox · </span>}
+          {optReport.duplicateDocsRemoved +
+            optReport.oldReceiptsRemoved +
+            optReport.unusedWorkflowNodesRemoved +
+            optReport.orphanFilesRemoved +
+            optReport.archivedInboxRemoved ===
+            0 && <span>nothing to drop</span>}
+        </div>
+      )}
+    </section>
+  );
+}
+
+
+// ============================================================================
+// Telegram Bridge simulator · Phase 18 adapter seam
+// ============================================================================
+
+function BridgeSimulator() {
+  const messages = useAtlasStore((s) => s.bridgeMessages);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
+  const status = getBridgeStatus();
+
+  const onSend = async () => {
+    const v = input.trim();
+    if (!v || busy) return;
+    setBusy(true);
+    await receiveInbound(v);
+    setInput("");
+    setBusy(false);
+  };
+
+  const onSimulateNotification = () => {
+    sendNotification("test · bot → operator notification queued");
+  };
+
+  return (
+    <div className="mt-3 rounded-md border border-white/10 bg-graphite-900/70 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+            bridge simulator
+          </span>
+          <span
+            className={
+              status.wired
+                ? "rounded border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald-200"
+                : "rounded border border-amber-400/30 bg-amber-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200"
+            }
+          >
+            {status.wired ? "wired" : "not connected"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setShowSetup((v) => !v)}
+            className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+          >
+            {showSetup ? "hide setup" : "setup notes"}
+          </button>
+          <button
+            type="button"
+            onClick={onSimulateNotification}
+            className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+          >
+            push test note
+          </button>
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={clearBridge}
+              className="rounded border border-rose-400/25 bg-rose-500/[0.06] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-rose-200 hover:bg-rose-500/[0.12]"
+            >
+              clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      <p className="text-[10.5px] text-white/45">{status.reason}</p>
+
+      {showSetup && (
+        <ol className="mt-2 flex list-decimal flex-col gap-0.5 rounded-md border border-white/8 bg-black/30 px-4 py-2 text-[10.5px] text-white/70">
+          {BRIDGE_SETUP_NOTES.map((n, i) => (
+            <li key={i}>{n.replace(/^\d+\.\s*/, "")}</li>
+          ))}
+        </ol>
+      )}
+
+      <div className="mt-2 max-h-[200px] overflow-auto rounded-md border border-white/8 bg-black/40 p-2">
+        {messages.length === 0 ? (
+          <p className="font-mono text-[10.5px] text-white/45">
+            Simulator empty. Send a /command below to exercise the same handlers a real bot would call.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {messages.map((m) => (
+              <li key={m.id} className="flex items-start gap-2 font-mono text-[10.5px]">
+                <span className="w-16 shrink-0 text-white/30">
+                  {new Date(m.at).toLocaleTimeString()}
+                </span>
+                <span
+                  className={
+                    m.dir === "in"
+                      ? "rounded border border-accent/30 bg-accent/[0.06] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-accent"
+                      : "rounded border border-emerald-400/25 bg-emerald-500/[0.06] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-emerald-200"
+                  }
+                >
+                  {m.dir === "in" ? "in" : "out"}
+                </span>
+                <span className="min-w-0 flex-1 whitespace-pre-wrap text-white/85">{m.text}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-2 flex items-center gap-1.5">
+        <code className="rounded bg-black/40 px-1.5 py-1 font-mono text-[11px] text-accent">in</code>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void onSend();
+          }}
+          placeholder="simulate inbound · e.g. /status · /missions · /run hello"
+          className="flex-1 rounded-md border border-white/8 bg-white/[0.025] px-2 py-1.5 font-mono text-[11.5px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={busy || !input.trim()}
+          className="inline-flex items-center gap-1 rounded-md bg-accent/85 px-2.5 py-1.5 text-[11.5px] font-semibold text-white shadow-glow hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : "Send"}
+        </button>
+      </div>
+    </div>
+  );
 }

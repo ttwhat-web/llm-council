@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Cpu, Loader2, Rocket, X } from "lucide-react";
+import { Copy, Cpu, FileText, Loader2, Rocket, X } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
 import { probeOllama, type OllamaProbeResult } from "@/services/missionRunner";
+import { MISSION_TEMPLATES, TEMPLATE_CATEGORIES } from "@/services/missionTemplates";
 
 const MODES = ["auto", "claude", "chatgpt", "cursor", "gemini", "dev", "terminal", "business", "general"] as const;
 const QUALITIES = ["fast", "smart", "expert", "code", "local"] as const;
@@ -29,6 +30,8 @@ export function DispatchPanel({ onClose }: { onClose: () => void }) {
   const [ollamaModel, setOllamaModel] = useState<string>("gemma2:2b");
   const [probe, setProbe] = useState<OllamaProbeResult | null>(null);
   const [probing, setProbing] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templateCategory, setTemplateCategory] = useState<string>(TEMPLATE_CATEGORIES[0]);
 
   useEffect(() => {
     if (engine !== "ollama" || probe) return;
@@ -82,6 +85,64 @@ export function DispatchPanel({ onClose }: { onClose: () => void }) {
           <X className="h-3 w-3" />
         </button>
       </header>
+
+      {/* Mission templates */}
+      <div className="rounded-md border border-white/8 bg-white/[0.012] p-2">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-accent">
+            mission templates
+          </span>
+          <button
+            type="button"
+            onClick={() => setTemplatesOpen((v) => !v)}
+            className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+          >
+            {templatesOpen ? "hide" : "browse"}
+          </button>
+        </div>
+        {templatesOpen && (
+          <div className="mt-1.5 flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-1">
+              {TEMPLATE_CATEGORIES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setTemplateCategory(c)}
+                  className={
+                    templateCategory === c
+                      ? "rounded border border-accent/40 bg-accent/[0.08] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-accent"
+                      : "rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+                  }
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            <ul className="grid grid-cols-1 gap-1 md:grid-cols-2">
+              {MISSION_TEMPLATES.filter((t) => t.category === templateCategory).map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBrief(t.brief);
+                      setMode(t.mode as (typeof MODES)[number]);
+                      setQuality(t.quality as (typeof QUALITIES)[number]);
+                      setTemplatesOpen(false);
+                    }}
+                    className="flex w-full flex-col items-start gap-0.5 rounded-md border border-white/10 bg-white/[0.025] px-2 py-1.5 text-left hover:bg-white/[0.05]"
+                  >
+                    <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white">
+                      <FileText className="h-3 w-3 text-accent" />
+                      {t.label}
+                    </span>
+                    <span className="text-[10px] text-white/55">{t.blurb}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       <textarea
         value={brief}

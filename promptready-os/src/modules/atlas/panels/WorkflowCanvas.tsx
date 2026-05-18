@@ -22,7 +22,7 @@ import {
   type WorkflowNodeKind,
   type WorkflowRun
 } from "@/store/atlas";
-import { runWorkflow } from "@/services/workflowRunner";
+import { runWorkflow, resumeWorkflowRun } from "@/services/workflowRunner";
 
 /**
  * Workflow Canvas · inside Atlas Workflow Layer detail.
@@ -68,6 +68,17 @@ export function WorkflowCanvas({ onClose }: { onClose: () => void }) {
     setRunning(true);
     try {
       const r = await runWorkflow({});
+      setLastRun(r);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const onResume = async () => {
+    if (running || !lastRun || lastRun.status !== "awaiting-approval") return;
+    setRunning(true);
+    try {
+      const r = await resumeWorkflowRun(lastRun.id);
       setLastRun(r);
     } finally {
       setRunning(false);
@@ -292,15 +303,28 @@ export function WorkflowCanvas({ onClose }: { onClose: () => void }) {
         >
           {connecting ? "click target to link" : "connect mode"}
         </button>
-        <button
-          type="button"
-          onClick={onRun}
-          disabled={running || nodes.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-md bg-accent/90 px-2.5 py-1 text-[11px] font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-          {running ? "Running" : "Run workflow"}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {lastRun?.status === "awaiting-approval" && (
+            <button
+              type="button"
+              onClick={onResume}
+              disabled={running}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/85 px-2.5 py-1 text-[11px] font-semibold text-white shadow-glow transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              Resume after approval
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onRun}
+            disabled={running || nodes.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md bg-accent/90 px-2.5 py-1 text-[11px] font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            {running ? "Running" : "Run workflow"}
+          </button>
+        </div>
         <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/40">
           nodes: {nodes.length} · edges: {edges.length} · runs: {workflowRuns.length}
         </span>

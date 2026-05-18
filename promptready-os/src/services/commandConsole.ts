@@ -14,7 +14,7 @@ import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
 import { probeOllama } from "@/services/missionRunner";
-import { runWorkflow } from "@/services/workflowRunner";
+import { runWorkflow, resumeWorkflowRun } from "@/services/workflowRunner";
 
 export interface CommandResult {
   ok: boolean;
@@ -82,7 +82,7 @@ export async function executeCommand(line: string): Promise<CommandResult> {
           "Workflow resume is gated by `/approve <id>` on paused runs. Missions do not pause."
       };
     case "approve":
-      return approve(arg);
+      return await approve(arg);
     case "reject":
       return reject(arg);
     case "workflows":
@@ -186,35 +186,19 @@ function pause(): CommandResult {
   return { ok: true, output: `Cancelled ${id}.` };
 }
 
-function approve(id: string): CommandResult {
+async function approve(id: string): Promise<CommandResult> {
   if (!id) return { ok: false, output: "Usage: /approve <workflow-run-id>" };
   const runs = useAtlasStore.getState().workflowRuns;
   const target = runs.find((r) => r.id === id);
   if (!target) return { ok: false, output: `No workflow run ${id}.` };
   if (target.status !== "awaiting-approval")
     return { ok: false, output: `Run ${id} is ${target.status}, not awaiting approval.` };
-  // We don't actually resume — approval is acknowledged + run continued
-  // via a follow-up workflow invocation. For now we mark it completed.
-  const updated = {
-    ...target,
-    status: "completed" as const,
-    endedAt: Date.now(),
-    steps: [
-      ...target.steps,
-      {
-        at: Date.now(),
-        nodeId: "",
-        kind: "approval" as const,
-        state: "ok" as const,
-        message: "approved via command console"
-      }
-    ]
+  // Real resume — walks remaining downstream nodes from resumeCursor.
+  const resumed = await resumeWorkflowRun(id);
+  return {
+    ok: resumed.status !== "blocked",
+    output: `Approved ${id} · resumed → ${resumed.status} · ${resumed.steps.length} total step${resumed.steps.length === 1 ? "" : "s"}`
   };
-  // Replace in place
-  useAtlasStore.setState((s) => ({
-    workflowRuns: s.workflowRuns.map((r) => (r.id === id ? updated : r))
-  }));
-  return { ok: true, output: `Approved ${id}.` };
 }
 
 function reject(id: string): CommandResult {

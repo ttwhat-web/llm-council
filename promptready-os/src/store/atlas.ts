@@ -46,12 +46,24 @@ export interface WorkflowRunStep {
   message: string;
 }
 
+export interface WorkflowResumeContext {
+  lastDeliverableContent?: string;
+  lastDeliverableLabel?: string;
+  briefAccumulator?: string;
+}
+
 export interface WorkflowRun {
   id: string;
   startedAt: number;
   endedAt?: number;
   steps: WorkflowRunStep[];
   status: "running" | "completed" | "blocked" | "awaiting-approval";
+  /** Node where the run paused (approval node id). */
+  pausedNodeId?: string;
+  /** Cursor for resume — the node id to execute next after approval. */
+  resumeCursor?: string;
+  /** Brief / deliverable context captured at pause time. */
+  resumeContext?: WorkflowResumeContext;
 }
 
 // ---------- Brain Inbox ----------
@@ -130,6 +142,15 @@ export interface TelegramLink {
   createdAt: number;
 }
 
+// ---------- Telegram bridge (adapter seam — no networking yet) ----------
+export type BridgeMessageDir = "in" | "out";
+export interface BridgeMessage {
+  id: string;
+  at: number;
+  dir: BridgeMessageDir;
+  text: string;
+}
+
 export interface WorkflowEdge {
   from: string;
   to: string;
@@ -159,6 +180,8 @@ interface AtlasState {
   recentSnapshotPayloads: SnapshotPayload[];
   agents: AgentSlot[];
   recovery: RecoveryCheckpoint | null;
+  notificationsViewedAt: number;
+  bridgeMessages: BridgeMessage[];
 
   setHomeMode(m: AtlasHomeMode): void;
   addFiles(files: Array<Omit<AtlasFile, "id" | "addedAt" | "state">>): void;
@@ -170,6 +193,7 @@ interface AtlasState {
   toggleEdge(from: string, to: string): void;
   clearWorkflow(): void;
   recordWorkflowRun(r: WorkflowRun): void;
+  updateWorkflowRun(id: string, patch: Partial<WorkflowRun>): void;
   clearWorkflowRuns(): void;
   togglePin(deliverableId: string): void;
   generatePairingCode(): string;
@@ -187,6 +211,9 @@ interface AtlasState {
   setAgentState(kind: AgentKind, state: AgentState, missionId?: string): void;
   setRecovery(c: RecoveryCheckpoint | null): void;
   clearRecovery(): void;
+  markNotificationsViewed(): void;
+  appendBridgeMessage(m: Omit<BridgeMessage, "id" | "at">): BridgeMessage;
+  clearBridgeMessages(): void;
   hydrate(): void;
   exportAll(): unknown;
   importAll(payload: unknown): boolean;
@@ -216,7 +243,9 @@ const DEFAULT = {
   snapshots: [] as SnapshotMeta[],
   recentSnapshotPayloads: [] as SnapshotPayload[],
   agents: DEFAULT_AGENTS,
-  recovery: null as RecoveryCheckpoint | null
+  recovery: null as RecoveryCheckpoint | null,
+  notificationsViewedAt: 0,
+  bridgeMessages: [] as BridgeMessage[]
 };
 
 const RECENT_PAYLOAD_LIMIT = 5;
@@ -239,7 +268,9 @@ function save(state: AtlasState) {
       snapshots: state.snapshots,
       recentSnapshotPayloads: state.recentSnapshotPayloads,
       agents: state.agents,
-      recovery: state.recovery
+      recovery: state.recovery,
+      notificationsViewedAt: state.notificationsViewedAt,
+      bridgeMessages: state.bridgeMessages.slice(0, 50)
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
   } catch {
@@ -371,9 +402,22 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   },
 
   recordWorkflowRun(r) {
+    // Dedupe by id — resume re-records the same run id with new state.
+    const without = get().workflowRuns.filter((x) => x.id !== r.id);
     const next = {
       ...get(),
-      workflowRuns: [r, ...get().workflowRuns].slice(0, 20)
+      workflowRuns: [r, ...without].slice(0, 20)
+    };
+    set(next);
+    save(next);
+  },
+
+  updateWorkflowRun(id, patch) {
+    const next = {
+      ...get(),
+      workflowRuns: get().workflowRuns.map((r) =>
+        r.id === id ? { ...r, ...patch } : r
+      )
     };
     set(next);
     save(next);
@@ -525,6 +569,33 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
 
   clearRecovery() {
     const next = { ...get(), recovery: null };
+    set(next);
+    save(next);
+  },
+
+  markNotificationsViewed() {
+    const next = { ...get(), notificationsViewedAt: Date.now() };
+    set(next);
+    save(next);
+  },
+
+  appendBridgeMessage(m) {
+    const msg: BridgeMessage = {
+      ...m,
+      id: rid("msg"),
+      at: Date.now()
+    };
+    const next = {
+      ...get(),
+      bridgeMessages: [msg, ...get().bridgeMessages].slice(0, 50)
+    };
+    set(next);
+    save(next);
+    return msg;
+  },
+
+  clearBridgeMessages() {
+    const next = { ...get(), bridgeMessages: [] };
     set(next);
     save(next);
   },

@@ -5,6 +5,7 @@ import { Activity, Archive, Brain, Cpu, Database, Github, Receipt } from "lucide
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
+import { NotificationsBell } from "@/components/NotificationsBell";
 
 /**
  * Atlas HUD · top bar always visible on the Atlas surface.
@@ -39,7 +40,7 @@ export function AtlasHud() {
         <Hud Icon={Receipt} label="receipts" value={String(history.length)} />
         <Hud Icon={Archive} label="snapshots" value={String(snapshots.length)} />
       </div>
-      <div className="flex items-center gap-1 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+      <div className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
         <span
           className={clsx(
             "inline-block h-1.5 w-1.5 rounded-full",
@@ -50,10 +51,11 @@ export function AtlasHud() {
         />
         {runtimeLabel(runtime)}
         {demo && (
-          <span className="ml-1 rounded border border-accent/30 bg-accent/[0.08] px-1 py-px text-accent">
+          <span className="rounded border border-accent/30 bg-accent/[0.08] px-1 py-px text-accent">
             demo
           </span>
         )}
+        <NotificationsBell />
       </div>
     </section>
   );

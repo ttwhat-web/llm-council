@@ -15,10 +15,13 @@ import { useAtlasStore, type MemoryDoc } from "@/store/atlas";
 import { useMissionStore } from "@/store/mission";
 
 export type RepoActionKind =
+  | "audit"
   | "analyze"
   | "roadmap"
-  | "dead-code"
+  | "security"
   | "deploy"
+  | "refactor"
+  | "dead-code"
   | "architecture";
 
 export interface RepoAction {
@@ -34,6 +37,13 @@ function attachmentBlock(repoUrl: string, attachments: string): string {
 
 export const REPO_ACTIONS: RepoAction[] = [
   {
+    kind: "audit",
+    label: "Audit",
+    blurb: "Stack quality, code smells, doc gaps, test coverage.",
+    build: (repoUrl, attachments) =>
+      `Audit this repo end-to-end. Use only what's in the attached files. Score each axis 0-5: dependencies fresh, structure consistent, tests present, docs sufficient, env defined, deployment described, security baseline.\n\n${attachmentBlock(repoUrl, attachments)}\n\nReturn a scored table followed by the three highest-leverage issues to fix this week.`
+  },
+  {
     kind: "analyze",
     label: "Analyze repo",
     blurb: "Explain stack, conventions, architecture from imported files.",
@@ -42,28 +52,42 @@ export const REPO_ACTIONS: RepoAction[] = [
   },
   {
     kind: "roadmap",
-    label: "Generate roadmap",
-    blurb: "Three-horizon roadmap (Now · Next · Later) from the codebase.",
+    label: "Roadmap",
+    blurb: "Three-horizon roadmap (Now · Next · Later).",
     build: (repoUrl, attachments) =>
       `Read the repo and propose a three-horizon roadmap.\n\n${attachmentBlock(repoUrl, attachments)}\n\nReturn:\n## Now\n- ...\n\n## Next\n- ...\n\n## Later\n- ...\n\nFor each item, write a single shippable outcome. Skip anything that isn't grounded in the files you saw.`
   },
   {
+    kind: "security",
+    label: "Security",
+    blurb: "Token leaks, missing rate limits, raw SQL, exposed env.",
+    build: (repoUrl, attachments) =>
+      `Run a security review over the attached files. Look for: hardcoded secrets, missing rate limits, raw SQL with concatenation, env vars referenced but not declared in .env.example, dependencies with known CVEs (only flag those visible in package.json names + versions). Be conservative — call out evidence.\n\n${attachmentBlock(repoUrl, attachments)}\n\nReturn a table:\n| Severity | Where | Evidence | Suggested fix |\n|----------|-------|----------|----------------|\nFollow with a 5-step "harden before ship" checklist.`
+  },
+  {
+    kind: "deploy",
+    label: "Deploy",
+    blurb: "Concrete deployment plan grounded in package.json + env.example.",
+    build: (repoUrl, attachments) =>
+      `Produce a deployment plan for this repo. Use package.json scripts and env.example as ground truth. Don't invent env vars.\n\n${attachmentBlock(repoUrl, attachments)}\n\nReturn:\n1. Required env vars (from .env.example)\n2. Build command + output dir\n3. Recommended host + reason (1-line)\n4. Smoke-test checklist (5 items)\n5. Rollback plan`
+  },
+  {
+    kind: "refactor",
+    label: "Refactor",
+    blurb: "Highest-leverage refactors with clear ROI.",
+    build: (repoUrl, attachments) =>
+      `Propose 3-5 refactors with the highest ROI. Each should reduce LOC, kill a duplication pattern, simplify a hot path, or make types clearer. Reference exact files where you can.\n\n${attachmentBlock(repoUrl, attachments)}\n\nReturn:\n| Title | Files touched | Why | Estimated effort |\n|-------|----------------|-----|-------------------|\nFollow with the suggested order of operations.`
+  },
+  {
     kind: "dead-code",
-    label: "Dead code scan",
+    label: "Dead code",
     blurb: "Suspected unused modules, dead routes, abandoned features.",
     build: (repoUrl, attachments) =>
       `Scan the attached files for dead code candidates. Flag files / routes / components that are likely unused or abandoned. Be conservative — only call out what the evidence supports.\n\n${attachmentBlock(repoUrl, attachments)}\n\nReturn a table:\n| Path | Reason | Confidence |\n|------|--------|------------|\nFollow with a short "deletion order" suggestion.`
   },
   {
-    kind: "deploy",
-    label: "Deploy plan",
-    blurb: "Concrete deployment plan derived from package.json + env.example.",
-    build: (repoUrl, attachments) =>
-      `Produce a deployment plan for this repo. Use package.json scripts and env.example as ground truth. Don't invent env vars.\n\n${attachmentBlock(repoUrl, attachments)}\n\nReturn:\n1. Required env vars (from .env.example)\n2. Build command + output dir\n3. Recommended host + reason (1-line)\n4. Smoke-test checklist (5 items)\n5. Rollback plan`
-  },
-  {
     kind: "architecture",
-    label: "Architecture map",
+    label: "Architecture",
     blurb: "Component / route / data-model ASCII map of the system.",
     build: (repoUrl, attachments) =>
       `Draw an ASCII architecture map of this codebase. Show the top-level modules, where data flows, and any external services declared in env.example.\n\n${attachmentBlock(repoUrl, attachments)}\n\nReturn:\n\`\`\`\n<ASCII map here>\n\`\`\`\n\nFollow with a short "decision log" that records the three structural choices the architect should validate.`
@@ -73,14 +97,24 @@ export const REPO_ACTIONS: RepoAction[] = [
 const REPO_FILE_HINTS = [
   /readme(\.md)?$/i,
   /package\.json$/i,
+  /pnpm-workspace\.yaml$/i,
   /prisma\/schema\.prisma$/i,
+  /(prisma|migrations)\/.+\.sql$/i,
   /\.env\.example$/i,
+  /env\.local\.example$/i,
   /routes?\.(t|j)sx?$/i,
   /components?\.(t|j)sx?$/i,
   /tsconfig\.json$/i,
   /vite\.config\.(t|j)s$/i,
   /next\.config\.(t|j)s$/i,
-  /Dockerfile$/i
+  /Dockerfile$/i,
+  /docker-compose\.ya?ml$/i,
+  /nginx(\.conf)?$/i,
+  /\.github\/workflows\/.+\.ya?ml$/i,
+  /turbo\.json$/i,
+  /pyproject\.toml$/i,
+  /go\.mod$/i,
+  /Cargo\.toml$/i
 ];
 
 /** Heuristic: any imported doc whose name matches a repo-shape pattern. */
