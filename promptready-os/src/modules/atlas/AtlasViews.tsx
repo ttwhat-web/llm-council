@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import clsx from "clsx";
-import { Activity, Brain, Coins, Rocket, Radar, ShieldCheck, Users } from "lucide-react";
+import { Activity, Brain, Coins, Loader2, Play, Rocket, Radar, ShieldCheck, Users } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore, STAGE_META, STAGES } from "@/store/mission";
 import { useAtlasStore, type AgentKind, type AgentState } from "@/store/atlas";
 import { computeCostBoard, formatUsd, PRICING } from "@/services/cost";
+import { tickAgent } from "@/services/agentRuntime";
 
 /**
  * Operations + Live views for the Atlas home-mode toggle.
@@ -352,13 +353,18 @@ function AgentQueuePanel({
   agents: Array<{ kind: AgentKind; state: AgentState }>;
   onCycle: (kind: AgentKind, state: AgentState) => void;
 }) {
-  const cycle = (cur: AgentState): AgentState => {
-    const order: AgentState[] = ["idle", "running", "blocked", "waiting", "approval"];
-    const i = order.indexOf(cur);
-    return order[(i + 1) % order.length];
+  const [busy, setBusy] = useState<AgentKind | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const onTick = async (kind: AgentKind) => {
+    setBusy(kind);
+    setFlash(null);
+    const r = await tickAgent(kind);
+    setFlash(r.message);
+    setBusy(null);
+    window.setTimeout(() => setFlash(null), 5000);
   };
   return (
-    <Card eyebrow="agent queue" title="Status only · no autonomous execution">
+    <Card eyebrow="agent runtime" title="Tick to spawn a follow-up mission">
       <ul className="flex flex-col gap-1 text-[11px]">
         {agents.map((a) => (
           <li
@@ -369,33 +375,54 @@ function AgentQueuePanel({
               <Users className="h-3 w-3 text-accent" />
               <span className="text-white/85">{a.kind}</span>
             </span>
-            <button
-              type="button"
-              onClick={() => onCycle(a.kind, cycle(a.state))}
-              className={
-                a.state === "running"
-                  ? "rounded border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald-200"
-                  : a.state === "blocked"
-                    ? "rounded border border-rose-400/30 bg-rose-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose-200"
-                    : a.state === "approval"
-                      ? "rounded border border-amber-400/30 bg-amber-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200"
-                      : a.state === "waiting"
-                        ? "rounded border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent"
-                        : "rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55"
-              }
-              title="cycle state · runtime ships with desktop"
-            >
-              {a.state}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onTick(a.kind)}
+                disabled={busy === a.kind}
+                className="inline-flex items-center gap-1 rounded border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent hover:bg-accent/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {busy === a.kind ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Play className="h-2.5 w-2.5" />}
+                tick
+              </button>
+              <button
+                type="button"
+                onClick={() => onCycle(a.kind, cycleState(a.state))}
+                className={
+                  a.state === "running"
+                    ? "rounded border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald-200"
+                    : a.state === "blocked"
+                      ? "rounded border border-rose-400/30 bg-rose-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose-200"
+                      : a.state === "approval"
+                        ? "rounded border border-amber-400/30 bg-amber-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200"
+                        : a.state === "waiting"
+                          ? "rounded border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent"
+                          : "rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55"
+                }
+              >
+                {a.state}
+              </button>
+            </div>
           </li>
         ))}
       </ul>
+      {flash && (
+        <p className="rounded-md border border-accent/30 bg-accent/[0.08] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent">
+          {flash}
+        </p>
+      )}
       <p className="text-[10.5px] text-white/45">
-        Owner-only state today. Click a state to cycle through{" "}
-        <span className="font-mono">idle → running → blocked → waiting → approval</span>.
+        Tick reads the last receipt and dispatches a templated follow-up.
+        No autonomous internet · agents only run when you click.
       </p>
     </Card>
   );
+}
+
+function cycleState(cur: AgentState): AgentState {
+  const order: AgentState[] = ["idle", "running", "blocked", "waiting", "approval", "done"];
+  const i = order.indexOf(cur);
+  return order[(i + 1) % order.length];
 }
 
 function Card({

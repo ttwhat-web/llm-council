@@ -128,7 +128,8 @@ export type AgentState =
   | "running"
   | "blocked"
   | "waiting"
-  | "approval";
+  | "approval"
+  | "done";
 
 export interface AgentSlot {
   kind: AgentKind;
