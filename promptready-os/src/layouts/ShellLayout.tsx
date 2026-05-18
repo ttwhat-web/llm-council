@@ -39,14 +39,14 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: "/", label: "Mission Control", Icon: Workflow },
+  { to: "/", label: "Mission Atlas", Icon: MapIcon },
+  { to: "/mission-control", label: "Mission Control", Icon: Workflow },
   { to: "/agents", label: "Agents", Icon: Bot },
   { to: "/memory", label: "Memory", Icon: Activity },
   { to: "/library", label: "Library", Icon: Library },
   { to: "/terminal", label: "Terminal", Icon: TerminalIcon },
   { to: "/workflows", label: "Workflows", Icon: Archive },
   { to: "/brain", label: "Brain", Icon: Brain },
-  { to: "/atlas", label: "Mission Atlas", Icon: MapIcon },
   { to: "/settings", label: "Settings", Icon: SettingsIcon }
 ];
 

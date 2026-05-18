@@ -24,7 +24,8 @@ const router = createBrowserRouter([
     path: "/",
     element: <ShellLayout />,
     children: [
-      { index: true, element: <MissionControlPage /> },
+      { index: true, element: <AtlasPage /> },
+      { path: "mission-control", element: <MissionControlPage /> },
       { path: "agents", element: <AgentsPage /> },
       { path: "memory", element: <MemoryPage /> },
       { path: "library", element: <LibraryPage /> },

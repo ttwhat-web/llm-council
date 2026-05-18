@@ -22,6 +22,7 @@ export { useSettingsStore } from "./settings";
 export { useBrainStore } from "./brain";
 export { useMissionStore } from "./mission";
 export { useThemeStore, THEMES, type ThemeId } from "./theme";
+export { useAtlasStore, WORKFLOW_NODE_META } from "./atlas";
 
 // Phase-2+ stores (declared, implementation lands with their module):
 // export { useFixerStore } from "./fixer";

@@ -4,16 +4,10 @@ import {
   useSettingsStore,
   useBrainStore,
   useMissionStore,
-  useThemeStore
+  useThemeStore,
+  useAtlasStore
 } from "@/store";
 import { BrainBootstrap } from "@/components/BrainBootstrap";
-
-/**
- * App root — hydrates persisted stores then mounts the router. Theme
- * hydration runs first so the visible palette is correct on first
- * paint. The BrainBootstrap overlay renders on top until a brain
- * identity exists.
- */
 
 export function App() {
   useEffect(() => {
@@ -21,6 +15,7 @@ export function App() {
     void useSettingsStore.getState().hydrate();
     useBrainStore.getState().hydrate();
     useMissionStore.getState().hydrate();
+    useAtlasStore.getState().hydrate();
   }, []);
 
   return (

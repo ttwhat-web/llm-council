@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   AlertTriangle,
+  Copy,
   Cpu,
   Eye,
   EyeOff,
@@ -10,12 +11,15 @@ import {
   Palette,
   Phone,
   QrCode,
+  RefreshCcw,
   ShieldCheck,
-  Terminal as TerminalIcon
+  Terminal as TerminalIcon,
+  Trash2
 } from "lucide-react";
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { AutoConfigure } from "@/components/AutoConfigure";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { useAtlasStore } from "@/store/atlas";
 
 /**
  * Settings · Phase 13.
@@ -197,6 +201,17 @@ function Toggle({
 }
 
 function MobileCompanionCard() {
+  const code = useAtlasStore((s) => s.pairingCode);
+  const generate = useAtlasStore((s) => s.generatePairingCode);
+  const clear = useAtlasStore((s) => s.clearPairing);
+
+  const onCopy = () => {
+    if (!code) return;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      void navigator.clipboard.writeText(code);
+    }
+  };
+
   return (
     <section className="rounded-2xl border border-accent/25 bg-accent/[0.04] p-4 shadow-glow">
       <header className="mb-3 flex items-center justify-between">
@@ -214,6 +229,69 @@ function MobileCompanionCard() {
         briefs. Screenshots become context. Destructive actions (cloud
         spend, repo write-back, risky shell) always wait for your tap.
       </p>
+
+      {/* Pairing code */}
+      <div className="mt-3 flex flex-col gap-2 rounded-xl border border-white/10 bg-graphite-900/60 p-3">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+            pairing code
+          </span>
+          {code && (
+            <button
+              type="button"
+              onClick={clear}
+              className="inline-flex items-center gap-1 rounded-md border border-rose-400/25 bg-rose-500/[0.06] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-rose-200 hover:bg-rose-500/[0.12]"
+              title="Revoke pairing code"
+            >
+              <Trash2 className="h-2.5 w-2.5" /> revoke
+            </button>
+          )}
+        </div>
+
+        {code ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <div
+              className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md border border-accent/30 bg-accent/[0.06] font-mono text-[10px] uppercase tracking-wider text-accent/80"
+              title="QR placeholder · networking ships with the desktop runtime"
+            >
+              <QrCode className="h-10 w-10 text-accent" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="font-mono text-[18px] tracking-[0.28em] text-white">
+                {code}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onCopy}
+                  className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/75 hover:bg-white/[0.06]"
+                >
+                  <Copy className="h-2.5 w-2.5" /> copy
+                </button>
+                <button
+                  type="button"
+                  onClick={generate}
+                  className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/75 hover:bg-white/[0.06]"
+                >
+                  <RefreshCcw className="h-2.5 w-2.5" /> regenerate
+                </button>
+              </div>
+              <p className="text-[10px] text-white/45">
+                Code is generated and stored locally. Networking + QR scan
+                land with the desktop runtime — no traffic leaves this machine yet.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={generate}
+            className="inline-flex items-center justify-center gap-1.5 rounded-md bg-accent/85 px-3 py-1.5 text-[12px] font-semibold text-white shadow-glow transition hover:bg-accent"
+          >
+            <QrCode className="h-3.5 w-3.5" /> Generate pairing code
+          </button>
+        )}
+      </div>
 
       <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
         <Capability
@@ -238,12 +316,7 @@ function MobileCompanionCard() {
         />
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[10.5px] uppercase tracking-wider text-white/55">
-        <QrCode className="h-3.5 w-3.5 text-accent" />
-        pair via QR · scoped session token · desktop revocable
-      </div>
-
-      <p className="mt-2 text-[10.5px] text-white/45">
+      <p className="mt-3 text-[10.5px] text-white/45">
         Mobile never runs the full Mission Control, never executes
         unapproved actions, and never pretends Ollama exists on phone.
       </p>

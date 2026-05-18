@@ -21,6 +21,14 @@ import {
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore, type MissionReceipt } from "@/store/mission";
+import { useAtlasStore, type AtlasHomeMode } from "@/store/atlas";
+import { AtlasHud } from "./AtlasHud";
+import { OperationsView, LiveView } from "./AtlasViews";
+import { DispatchPanel } from "./panels/DispatchPanel";
+import { RepoWorkspace } from "./panels/RepoWorkspace";
+import { MemoryVault } from "./panels/MemoryVault";
+import { WorkflowCanvas } from "./panels/WorkflowCanvas";
+import { DeliveryCenter } from "./panels/DeliveryCenter";
 
 /**
  * Mission Atlas · Phase 14.
@@ -164,61 +172,64 @@ export default function AtlasPage() {
     download(`mission-atlas-${stamp()}.md`, md);
   };
 
+  const homeMode = useAtlasStore((s) => s.homeMode);
+  const setHomeMode = useAtlasStore((s) => s.setHomeMode);
+
   return (
     <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-4 px-5 py-5 md:px-7 md:py-7">
       <SurfaceHeader
-        eyebrow="atlas · living business map"
+        eyebrow="atlas · operator home"
         title="Mission Atlas"
-        sub="Living map of your AI business brain. Brain core, mission system, memory, repos, workflows, intelligence, delivery, and the planned mobile companion — on one blueprint wall."
+        sub="Brain, repo hub, mission launcher, workflow wall, delivery center — your operator home screen. Work without leaving Atlas."
         right={
           <div className="flex items-center gap-2">
-            {demo && (
-              <span className="rounded-md border border-accent/30 bg-accent/[0.08] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent">
-                demo data
-              </span>
+            <HomeModeToggle mode={homeMode} onChange={setHomeMode} />
+            {homeMode === "blueprint" && (
+              <ZoomControls zoom={zoom} onZoom={setZoom} />
             )}
-            <ZoomControls zoom={zoom} onZoom={setZoom} />
             <button
               type="button"
               onClick={onExport}
               className="no-drag inline-flex items-center gap-1.5 rounded-md bg-accent/90 px-2.5 py-1.5 text-[12px] font-semibold text-white shadow-glow transition hover:bg-accent"
+              title="Export Atlas blueprint to Markdown"
             >
-              <Download className="h-3.5 w-3.5" /> Export blueprint
+              <Download className="h-3.5 w-3.5" /> Export
             </button>
           </div>
         }
       />
 
-      {/* ============== Canvas ============== */}
-      <div className="relative overflow-auto rounded-3xl border border-white/10 bg-graphite-950 shadow-glass">
-        {/* blueprint grid */}
-        <div
-          className="atlas-grid relative"
-          style={{
-            width: CANVAS_W,
-            height: CANVAS_H,
-            transform: `scale(${zoom})`,
-            transformOrigin: "top left",
-            // pad scroll area so scaled canvas still fits its container
-            margin: 0
-          }}
-        >
-          {/* connecting blueprint lines, SVG overlay */}
-          <ConnectingLines sections={sections} selected={selected} />
+      <AtlasHud />
 
-          {sections.map((s) => (
-            <SectionCard
-              key={s.id}
-              section={s}
-              selected={selected === s.id}
-              onSelect={() => setSelected(s.id)}
-            />
-          ))}
+      {homeMode === "operations" && <OperationsView onOpenSection={(id) => setSelected(id as SectionId)} />}
+      {homeMode === "live" && <LiveView />}
+      {homeMode === "blueprint" && (
+        <div className="relative overflow-auto rounded-3xl border border-white/10 bg-graphite-950 shadow-glass">
+          <div
+            className="atlas-grid relative"
+            style={{
+              width: CANVAS_W,
+              height: CANVAS_H,
+              transform: `scale(${zoom})`,
+              transformOrigin: "top left",
+              margin: 0
+            }}
+          >
+            <ConnectingLines sections={sections} selected={selected} />
+
+            {sections.map((s) => (
+              <SectionCard
+                key={s.id}
+                section={s}
+                selected={selected === s.id}
+                onSelect={() => setSelected(s.id)}
+              />
+            ))}
+          </div>
+
+          <MiniMap selected={selected} sections={sections} />
         </div>
-
-        {/* mini-map */}
-        <MiniMap selected={selected} sections={sections} />
-      </div>
+      )}
 
       {selected && (
         <DetailPanel
@@ -228,6 +239,39 @@ export default function AtlasPage() {
       )}
 
       <style>{atlasCss}</style>
+    </div>
+  );
+}
+
+function HomeModeToggle({
+  mode,
+  onChange
+}: {
+  mode: AtlasHomeMode;
+  onChange: (m: AtlasHomeMode) => void;
+}) {
+  const opts: Array<{ id: AtlasHomeMode; label: string }> = [
+    { id: "blueprint", label: "Blueprint" },
+    { id: "operations", label: "Operations" },
+    { id: "live", label: "Live" }
+  ];
+  return (
+    <div className="inline-flex items-center gap-0.5 rounded-md border border-white/10 bg-white/[0.03] p-0.5">
+      {opts.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          className={clsx(
+            "rounded px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition",
+            mode === o.id
+              ? "bg-accent/[0.12] text-accent shadow-[inset_0_0_0_1px_rgba(124,155,255,0.25)]"
+              : "text-white/65 hover:bg-white/[0.06]"
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -377,6 +421,8 @@ function ConnectingLines({
           const { x, y } = centerOf(s.position);
           const live = s.status.tone === "ok";
           const sel = selected === s.id;
+          const inFlight =
+            s.id === "mission-system" && s.status.label === "in flight";
           return (
             <line
               key={s.id}
@@ -385,10 +431,19 @@ function ConnectingLines({
               x2={x}
               y2={y}
               stroke={live || sel ? "var(--pr-color-accent)" : "rgba(255,255,255,0.12)"}
-              strokeOpacity={sel ? 0.7 : live ? 0.35 : 0.4}
-              strokeDasharray={live || sel ? undefined : "4 5"}
+              strokeOpacity={sel ? 0.7 : live ? 0.4 : 0.4}
+              strokeDasharray={inFlight ? "6 4" : live || sel ? undefined : "4 5"}
               strokeWidth={sel ? 1.25 : 0.75}
-            />
+            >
+              {inFlight && (
+                <animate
+                  attributeName="stroke-dashoffset"
+                  values="0;-20"
+                  dur="0.9s"
+                  repeatCount="indefinite"
+                />
+              )}
+            </line>
           );
         })}
     </svg>
@@ -519,8 +574,21 @@ function DetailPanel({
   section: SectionData;
   onClose: () => void;
 }) {
+  // Sections that ship an inline action panel below the standard
+  // header + status. Each panel runs the real action against the
+  // existing stores — Atlas never leaves itself.
+  const inline = renderInlinePanel(section, onClose);
+  // Widen the panel when an inline workflow / delivery / vault is
+  // mounted so the operator can actually work.
+  const wide = inline.kind === "workflow" || inline.kind === "vault" || inline.kind === "delivery";
+
   return (
-    <aside className="fixed right-5 top-24 z-40 flex w-[360px] flex-col gap-3 rounded-2xl border border-accent/25 bg-graphite-900/95 p-4 shadow-glass backdrop-blur md:right-7">
+    <aside
+      className={clsx(
+        "fixed right-5 top-24 z-40 flex max-h-[calc(100vh-7rem)] flex-col gap-3 overflow-auto rounded-2xl border border-accent/25 bg-graphite-900/95 p-4 shadow-glass backdrop-blur md:right-7",
+        wide ? "w-[580px]" : "w-[380px]"
+      )}
+    >
       <header className="flex items-start justify-between gap-2">
         <div className="flex flex-col gap-0.5">
           <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
@@ -553,26 +621,46 @@ function DetailPanel({
         ))}
       </div>
 
-      <DetailBlock title="What's real" items={section.real} tone="ok" />
-      <DetailBlock title="What's planned" items={section.planned} tone="muted" />
-
-      <div className="rounded-md border border-accent/25 bg-accent/[0.06] p-2.5">
-        <div className="font-mono text-[9px] uppercase tracking-wider text-accent">
-          next action
+      {inline.node ? (
+        <div className="rounded-md border border-white/8 bg-white/[0.012] p-2.5">
+          {inline.node}
         </div>
-        <p className="mt-0.5 text-[11.5px] text-white/85">{section.nextAction}</p>
-      </div>
-
-      {section.missionLink && (
-        <a
-          href={section.missionLink}
-          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11.5px] font-medium text-white/85 hover:bg-white/[0.06]"
-        >
-          {section.missionLink.replace(/^\//, "open /")} →
-        </a>
+      ) : (
+        <>
+          <DetailBlock title="What's real" items={section.real} tone="ok" />
+          <DetailBlock title="What's planned" items={section.planned} tone="muted" />
+          <div className="rounded-md border border-accent/25 bg-accent/[0.06] p-2.5">
+            <div className="font-mono text-[9px] uppercase tracking-wider text-accent">
+              next action
+            </div>
+            <p className="mt-0.5 text-[11.5px] text-white/85">{section.nextAction}</p>
+          </div>
+        </>
       )}
     </aside>
   );
+}
+
+type InlineKind = "dispatch" | "repo" | "vault" | "workflow" | "delivery" | null;
+
+function renderInlinePanel(
+  section: SectionData,
+  onClose: () => void
+): { kind: InlineKind; node: React.ReactNode | null } {
+  switch (section.id) {
+    case "mission-system":
+      return { kind: "dispatch", node: <DispatchPanel onClose={onClose} /> };
+    case "repo-layer":
+      return { kind: "repo", node: <RepoWorkspace onClose={onClose} /> };
+    case "memory-layer":
+      return { kind: "vault", node: <MemoryVault onClose={onClose} /> };
+    case "workflow-layer":
+      return { kind: "workflow", node: <WorkflowCanvas onClose={onClose} /> };
+    case "delivery-layer":
+      return { kind: "delivery", node: <DeliveryCenter onClose={onClose} /> };
+    default:
+      return { kind: null, node: null };
+  }
 }
 
 function DetailBlock({
