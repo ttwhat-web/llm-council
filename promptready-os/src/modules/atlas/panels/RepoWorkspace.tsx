@@ -10,6 +10,7 @@ import {
   dispatchRepoAction,
   type RepoAction
 } from "@/services/repoIntelligence";
+import { auditLog } from "@/services/auditLog";
 
 /**
  * Repo workspace · used inside the Atlas Repo Layer detail.
@@ -53,6 +54,7 @@ export function RepoWorkspace({ onClose }: { onClose: () => void }) {
     const label = labelFor(trimmed, branch);
     if (repos.some((r) => r.label === label)) return;
     addMemorySource({ kind: "github", label, state: "configured" });
+    auditLog("repo.attach", { label });
     setUrl("");
     setBranch("");
     setNote("");

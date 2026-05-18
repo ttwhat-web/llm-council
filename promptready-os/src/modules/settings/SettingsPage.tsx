@@ -34,6 +34,8 @@ import { SetupWizard } from "@/components/SetupWizard";
 import { DemoWorkspaceCard } from "@/components/DemoWorkspaceCard";
 import { ReleaseCenter } from "@/components/ReleaseCenter";
 import { TelemetryDashboard } from "@/components/TelemetryDashboard";
+import { AuditLogCard } from "@/components/AuditLogCard";
+import { ComplianceCard } from "@/components/ComplianceCard";
 import { useAtlasStore } from "@/store/atlas";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
@@ -210,6 +212,8 @@ export default function SettingsPage() {
 
       <MobileCompanionCard />
       <TelegramCompanionCard />
+      <ComplianceCard />
+      <AuditLogCard />
       <BrainHealthCard />
       <SnapshotsCard />
       <DesktopTrustCard />

@@ -13,6 +13,7 @@ import { useBrainStore, type BrainState } from "@/store/brain";
 import { useMissionStore, type MissionReceipt } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
 import { useThemeStore, type ThemeId } from "@/store/theme";
+import { auditLog } from "@/services/auditLog";
 
 export interface BrainSnapshot {
   format: "promptready-os.brainpack";
@@ -80,6 +81,7 @@ export function downloadSnapshot(label: string): { size: number; filename: strin
   const size = snapshotSize(snap);
   // Keep the whole snapshot in memory for Time Machine restore.
   useAtlasStore.getState().recordSnapshot({ label, size }, snap);
+  auditLog("snapshot.export", { label, size, filename });
   return { size, filename };
 }
 
@@ -134,6 +136,7 @@ export async function restoreSnapshotFromFile(file: File): Promise<{
     if (parsed.payload.theme?.id) {
       useThemeStore.getState().set(parsed.payload.theme.id);
     }
+    auditLog("snapshot.restore", { source: "file", createdAt: parsed.createdAt });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "unknown" };

@@ -22,6 +22,7 @@
 import { create } from "zustand";
 import { runMission, type Deliverable, type RunnerEngine } from "@/services/missionRunner";
 import { useBrainStore } from "@/store/brain";
+import { auditLog } from "@/services/auditLog";
 
 export type MissionStage =
   | "idle"
@@ -215,6 +216,13 @@ export const useMissionStore = create<MissionState>((set, get) => ({
       set({ current: finalReceipt, history });
       saveHistory(history);
       useBrainStore.getState().bumpMission();
+      auditLog("mission.dispatch", {
+        id: finalReceipt.id,
+        mode: finalReceipt.mode,
+        quality: finalReceipt.quality,
+        engine: finalReceipt.engine ?? "deterministic",
+        score: finalReceipt.score ?? null
+      });
       return finalReceipt;
     } catch (err) {
       const errReceipt: MissionReceipt = {
