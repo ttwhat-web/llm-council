@@ -47,21 +47,22 @@ export default function AgentsPage() {
       <SurfaceHeader
         eyebrow="agents · operator runtime"
         title="Agents"
-        sub="Long-running operator agents that work on your behalf between missions. None are wired today — the runtime ships after the mission pipeline."
+        sub="Five named agents. Operator-tick dispatch — agents read the last receipt and spawn a templated follow-up mission. Live runtime lives in Atlas → Operations → Agent Queue."
         right={
-          <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/55">
-            0 active · runtime offline
+          <span className="rounded-md border border-accent/30 bg-accent/[0.06] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent">
+            5 slots · operator-tick · no autonomous internet
           </span>
         }
       />
 
-      <section className="rounded-2xl border border-dashed border-white/10 bg-white/[0.012] p-6 text-center">
-        <Bot className="mx-auto h-6 w-6 text-white/35" />
-        <p className="mt-2 text-[13px] text-white/75">No agents installed.</p>
-        <p className="mt-1 text-[11px] text-white/45">
-          The agent runtime arrives after Mission Control is fully wired
-          end-to-end. The slots below describe the first agents we intend to
-          ship — names only, no fake activity.
+      <section className="rounded-2xl border border-accent/25 bg-accent/[0.04] p-6">
+        <Bot className="mx-auto h-6 w-6 text-accent" />
+        <p className="mt-2 text-center text-[13px] text-white/85">
+          Agent runtime is live. Open Atlas → Operations to tick an agent.
+        </p>
+        <p className="mt-1 text-center text-[11px] text-white/55">
+          Each tick reads the last mission receipt and dispatches a real
+          follow-up. No background polling · no autonomous network calls.
         </p>
       </section>
 
