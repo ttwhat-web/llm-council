@@ -64,12 +64,12 @@ export function DeliveryCenter({ onClose }: { onClose: () => void }) {
   };
   const onDownload = (r: Row) => {
     if (typeof window === "undefined") return;
-    const ext = r.format === "shell" ? "sh" : r.format === "json" ? "json" : r.format === "markdown" ? "md" : "txt";
+    const ext = fileExtFor(r.label, r.format);
     const blob = new Blob([r.content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${r.label.toLowerCase().replace(/\s+/g, "-")}.${ext}`;
+    a.download = `${r.label.toLowerCase().replace(/\s+/g, "-")}${ext}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -136,7 +136,7 @@ export function DeliveryCenter({ onClose }: { onClose: () => void }) {
               <header className="flex items-center justify-between gap-2 border-b border-white/8 bg-white/[0.02] px-2 py-1">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="rounded border border-accent/30 bg-accent/[0.08] px-1 py-px font-mono text-[8.5px] uppercase tracking-[0.22em] text-accent">
-                    {r.format}
+                    {fileExtFor(r.label, r.format)}
                   </span>
                   <span className="truncate font-mono text-[12px] font-semibold text-white">
                     {r.label}
@@ -215,6 +215,33 @@ function IconBtn({
       {label}
     </button>
   );
+}
+
+/**
+ * fileExtFor · UX RESET 04.
+ *
+ * Maps deliverable labels to artifact file extensions so deliverables
+ * feel like real files inside the Command Room. Falls back to a
+ * format-based extension when the label doesn't match a known pattern.
+ */
+function fileExtFor(label: string, format: Row["format"]): string {
+  const l = label.toLowerCase();
+  if (l.includes("cursor")) return ".cursor";
+  if (l.includes("claude") || l.includes("chatgpt") || l.includes("clean brief") || l.includes("prompt")) return ".prompt";
+  if (l.includes("linear") || l.includes("github") || l.includes("issue")) return ".issue";
+  if (l.includes("plan") || l.includes("blueprint") || l.includes("strategy")) return ".plan";
+  if (l.includes("receipt") || l.includes("summary")) return ".receipt";
+  if (l.includes("terminal") || l.includes("shell") || l.includes("command")) return ".sh";
+  switch (format) {
+    case "shell":
+      return ".sh";
+    case "json":
+      return ".json";
+    case "markdown":
+      return ".md";
+    default:
+      return ".response";
+  }
 }
 
 function MetaCell({ k, v }: { k: string; v: string }) {

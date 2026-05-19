@@ -26,6 +26,8 @@ import { useAtlasStore, type AtlasHomeMode, type InboxItem, type MemoryDoc } fro
 import { AtlasHud } from "./AtlasHud";
 import { OperationsView, LiveView } from "./AtlasViews";
 import { RuntimeHeatmap } from "@/components/RuntimeHeatmap";
+import { AtlasHero } from "@/components/AtlasHero";
+import { CommandRoomEmptyState } from "@/components/CommandRoomEmptyState";
 import { DispatchPanel } from "./panels/DispatchPanel";
 import { RepoWorkspace } from "./panels/RepoWorkspace";
 import { MemoryVault } from "./panels/MemoryVault";
@@ -220,6 +222,9 @@ export default function AtlasPage() {
 
       <AtlasHud />
 
+      <AtlasHero />
+      <CommandRoomEmptyState />
+
       {homeMode === "operations" && <OperationsView onOpenSection={(id) => setSelected(id as SectionId)} />}
       {homeMode === "live" && <LiveView />}
       {homeMode === "blueprint" && (
@@ -342,6 +347,14 @@ function SectionCard({
           ? "atlas-state-warn"
           : "";
 
+  // Tier · primary cells stay bright · workflow / intelligence / team
+  // are visually demoted on first view (UX RESET 04). Grid position
+  // is unchanged.
+  const secondary =
+    section.id === "workflow-layer" ||
+    section.id === "intelligence-layer" ||
+    section.id === "team-layer";
+
   return (
     <button
       type="button"
@@ -354,6 +367,7 @@ function SectionCard({
           : selected
             ? "border-accent/40 bg-white/[0.04] shadow-glow"
             : "border-white/10 bg-white/[0.018] hover:border-accent/25 hover:bg-white/[0.03]",
+        secondary && !selected && "atlas-secondary",
         stateClass
       )}
       style={{ left: x, top: y, width: CELL_W, height: CELL_H }}
@@ -1313,5 +1327,17 @@ const atlasCss = `
 .atlas-night .atlas-state-core { animation-duration: 11s; }
 .atlas-night .atlas-state-live { animation-duration: 6s; }
 .atlas-night .atlas-state-warn { animation-duration: 4s; }
+
+/* Secondary cells · UX RESET 04 · purely visual demotion of
+   workflow / intelligence / team layers on first view. Hover restores
+   full opacity so the operator can still scan them at a glance.       */
+.atlas-secondary {
+  opacity: 0.55;
+  filter: saturate(0.85);
+}
+.atlas-secondary:hover {
+  opacity: 1;
+  filter: none;
+}
 `;
 

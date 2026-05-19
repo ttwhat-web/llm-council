@@ -47,6 +47,8 @@ import { OperatorIdCard } from "@/components/OperatorIdCard";
 import { BrainPassportCard } from "@/components/BrainPassportCard";
 import { MorningBriefCard } from "@/components/MorningBriefCard";
 import { PresentationModeCard } from "@/components/PresentationModeCard";
+import { Foldable } from "@/components/Foldable";
+import { RemoteTeaser } from "@/components/RemoteTeaser";
 import {
   CloudSyncCard,
   MobileCompanionRoadmapCard,
@@ -136,22 +138,42 @@ export default function SettingsPage() {
         sub="Auto-setup, appearance, BYOK keys, safety, telemetry, mobile companion. Keys you paste stay in memory for this session only — keychain lands with the desktop runtime."
       />
 
-      <RoadmapPanel />
+      <Foldable
+        title="Roadmap"
+        hint="phases · current focus"
+        persistKey="roadmap"
+      >
+        <RoadmapPanel />
+      </Foldable>
 
       <SettingsSection letter="P" label="Presentation" hint="Demo · Safe Mode · Founder" />
-      <MorningBriefCard />
       <PresentationModeCard />
       <OperatorSafeModeCard />
-      <DemoWorkspaceCard />
-      <OperatorIdCard />
+      <Foldable title="Morning Brief" hint="yesterday · today" persistKey="morning-brief">
+        <MorningBriefCard />
+      </Foldable>
+      <Foldable title="Demo Workspace" hint="seeded brain · labelled" persistKey="demo-workspace">
+        <DemoWorkspaceCard />
+      </Foldable>
+      <Foldable title="Operator ID" hint="DNA · founder badge" persistKey="operator-id">
+        <OperatorIdCard />
+      </Foldable>
 
       <SettingsSection letter="S" label="System" hint="Runtime · Policies · Remote" />
       <SetupWizard />
       <RuntimeBus />
-      <OperatorModeCard />
-      <ReleaseCenter />
-      <TelemetryDashboard />
-      <AutoConfigure />
+      <Foldable title="Operator Mode" hint="solo · team · agency · enterprise" persistKey="operator-mode">
+        <OperatorModeCard />
+      </Foldable>
+      <Foldable title="Release Center" hint="version · changelog" persistKey="release-center">
+        <ReleaseCenter />
+      </Foldable>
+      <Foldable title="Telemetry Dashboard" hint="local counts only" persistKey="telemetry-dashboard">
+        <TelemetryDashboard />
+      </Foldable>
+      <Foldable title="Auto-configure" hint="one-tap honest setup" persistKey="auto-configure">
+        <AutoConfigure />
+      </Foldable>
 
       <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
         <header className="flex items-center gap-2">
@@ -238,27 +260,49 @@ export default function SettingsPage() {
         </article>
       </section>
 
-      <MobileCompanionCard />
+      <SettingsSection letter="R" label="Remote" hint="Phone · Telegram · Approvals" />
+      <RemoteTeaser />
       <TelegramCompanionCard />
       <TelegramLiveCard />
       <RuntimeShieldCard />
-      <ComplianceCard />
+      <Foldable title="Mobile Companion" hint="planned · secure pairing" persistKey="mobile-companion">
+        <MobileCompanionCard />
+      </Foldable>
+      <Foldable title="Compliance" hint="local · BYOK · no telemetry" persistKey="compliance">
+        <ComplianceCard />
+      </Foldable>
 
       <SettingsSection letter="B" label="Brain" hint="Health · Snapshots · Restore" />
       <BrainHealthCard />
       <BrainScoreCard />
       <BrainPassportCard />
       <SnapshotsCard />
-      <AuditLogCard />
-      <DesktopTrustCard />
-      <DiagnosticsCard />
+      <Foldable title="Audit Log" hint="local event ledger" persistKey="audit-log">
+        <AuditLogCard />
+      </Foldable>
+      <Foldable title="Desktop Trust" hint="storage · path · reset" persistKey="desktop-trust">
+        <DesktopTrustCard />
+      </Foldable>
+      <Foldable title="Diagnostics" hint="export markdown" persistKey="diagnostics">
+        <DiagnosticsCard />
+      </Foldable>
 
       <SettingsSection letter="O" label="Operator" hint="Team · Marketplace · Audit · Roadmap" />
-      <PackagingCard />
-      <ConnectorHubCard />
-      <CloudSyncCard />
-      <MobileCompanionRoadmapCard />
-      <EnterpriseServerCard />
+      <Foldable title="Packaging" hint="macOS · Windows · Linux" persistKey="packaging">
+        <PackagingCard />
+      </Foldable>
+      <Foldable title="Connector Hub" hint="planned" persistKey="connector-hub">
+        <ConnectorHubCard />
+      </Foldable>
+      <Foldable title="Cloud Sync" hint="planned · opt-in" persistKey="cloud-sync">
+        <CloudSyncCard />
+      </Foldable>
+      <Foldable title="Mobile Companion · roadmap" hint="planned" persistKey="mobile-roadmap">
+        <MobileCompanionRoadmapCard />
+      </Foldable>
+      <Foldable title="Enterprise Server" hint="planned" persistKey="enterprise-server">
+        <EnterpriseServerCard />
+      </Foldable>
     </div>
   );
 }
