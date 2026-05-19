@@ -53,30 +53,58 @@ export default function LandingPage() {
 // ============================================================================
 
 function Hero() {
+  const turnInto = [
+    "Claude tasks",
+    "Cursor work",
+    "GitHub issues",
+    "Deploy plans",
+    "Operator receipts"
+  ];
   return (
-    <section className="flex flex-col items-start gap-6">
-      <div className="inline-flex items-center gap-1.5 rounded-md border border-accent/30 bg-accent/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
+    <section className="flex flex-col items-start gap-8 pt-2">
+      <div className="inline-flex items-center gap-1.5 rounded-md border border-accent/30 bg-accent/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
         <span className="relative inline-block h-1.5 w-1.5 rounded-full bg-accent">
           <span className="absolute inset-0 animate-ping rounded-full bg-accent/55" />
         </span>
-        Operator.Center · AI Mission Control for builders, founders, operators
+        Operator.Center
       </div>
-      <h1 className="max-w-[22ch] text-4xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
-        Mission Control before, during, and after Claude.
-      </h1>
-      <p className="max-w-[60ch] font-mono text-[11px] uppercase tracking-[0.18em] text-accent/85">
-        Desktop is the Brain · Phone is the Remote · Atlas is Home
-      </p>
-      <p className="max-w-[60ch] text-[15px] leading-relaxed text-white/65 md:text-base">
-        Operator Core is the downloadable desktop app for builders, founders
-        and operators who dispatch missions, route across local + cloud models,
-        and keep their brain on their machine. Local-first. No account, no key,
-        no chat window. Desktop is the Brain. Phone is the Remote. Atlas is Home.
-      </p>
+
+      <div className="flex flex-col gap-2">
+        <h1 className="text-5xl font-semibold leading-[1.02] tracking-tight text-white md:text-7xl">
+          AI Mission Control
+        </h1>
+        <p className="text-[15px] tracking-tight text-white/55 md:text-lg">
+          for builders, founders and operators.
+        </p>
+      </div>
+
+      <ul className="flex flex-col gap-1 font-mono text-[11px] uppercase tracking-[0.22em] text-accent/85 md:text-[12px]">
+        <li>· Desktop is the Brain</li>
+        <li>· Phone is the Remote</li>
+        <li>· Atlas is Home</li>
+      </ul>
+
+      <div className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.02] px-5 py-4">
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">
+          Turn ideas into
+        </span>
+        <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {turnInto.map((item) => (
+            <li
+              key={item}
+              className="flex items-center gap-2 text-[15px] text-white/85"
+            >
+              <span className="h-1 w-1 rounded-full bg-accent" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/download"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent/90 px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:bg-accent"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent/90 px-5 py-3 text-sm font-semibold text-white shadow-glow transition hover:bg-accent"
         >
           Download Operator Core
           <ArrowRight className="h-4 w-4" />
@@ -85,28 +113,28 @@ function Hero() {
           href="/docs/demo-script"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white/85 transition hover:bg-white/[0.08]"
         >
-          Watch the 90s demo
+          90-second demo
         </Link>
         <Link
           href="/founders"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/[0.06] px-4 py-2.5 text-sm font-medium text-accent transition hover:bg-accent/[0.12]"
         >
-          Join founder waitlist
+          Founder waitlist
         </Link>
         <Link
           href="/roadmap"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-sm font-medium text-white/65 transition hover:bg-white/[0.06]"
         >
-          Roadmap 30
+          Roadmap
         </Link>
-        <span className="text-[11px] text-white/40">
-          Source build works today · signed installers next.
+      </div>
+
+      <div className="flex items-center gap-3">
+        <FounderCounter variant="cta" />
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
+          Source build today · signed installers next
         </span>
       </div>
-      <FounderCounter variant="cta" />
-      <p className="text-[11px] text-white/35">
-        Desktop is the product. Web is the brochure. Phone is the remote.
-      </p>
     </section>
   );
 }

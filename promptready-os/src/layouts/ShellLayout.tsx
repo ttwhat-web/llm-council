@@ -4,11 +4,11 @@ import { NavLink, Outlet } from "react-router-dom";
 import clsx from "clsx";
 import {
   Activity,
-  Archive,
   Bot,
   Brain,
   Cpu,
-  Library,
+  Database,
+  FileText,
   Map as MapIcon,
   Package,
   Settings as SettingsIcon,
@@ -21,16 +21,17 @@ import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 /**
  * Shell layout · Operator Core frame.
  *
- * Left rail — eight top-level operator surfaces (Phase 11 rebuild):
- *   Mission Control · Agents · Memory · Library · Terminal · Workflows ·
- *   Brain · Settings.
+ * UX RESET 01 · the left rail is now grouped into five operator
+ * sections instead of a flat ten-icon list:
  *
- * Top header — wordmark + global status (engine · route · brain).
+ *   ATLAS    · home
+ *   WORK     · Mission Control · Workflows · Delivery
+ *   BRAIN    · Memory · Brain · Terminal
+ *   OPERATOR · Agents · Marketplace
+ *   SYSTEM   · Settings
  *
- * Body — `<Outlet />` for the active route. The shell owns chrome and
- * navigation only; modules own their own internal layout. No fake
- * telemetry: status chips below are static labels, not animated
- * progress.
+ * Every existing route is preserved · only the visual grouping and a
+ * small mono group letter changed. No new pages.
  */
 
 interface NavItem {
@@ -39,60 +40,111 @@ interface NavItem {
   Icon: typeof Activity;
 }
 
-const NAV: NavItem[] = [
-  { to: "/", label: "Mission Atlas", Icon: MapIcon },
-  { to: "/mission-control", label: "Mission Control", Icon: Workflow },
-  { to: "/agents", label: "Agents", Icon: Bot },
-  { to: "/memory", label: "Memory", Icon: Activity },
-  { to: "/library", label: "Library", Icon: Library },
-  { to: "/terminal", label: "Terminal", Icon: TerminalIcon },
-  { to: "/workflows", label: "Workflows", Icon: Archive },
-  { to: "/brain", label: "Brain", Icon: Brain },
-  { to: "/marketplace", label: "Marketplace", Icon: Package },
-  { to: "/settings", label: "Settings", Icon: SettingsIcon }
+interface NavGroup {
+  id: string;
+  letter: string;
+  label: string;
+  items: NavItem[];
+}
+
+const GROUPS: NavGroup[] = [
+  {
+    id: "atlas",
+    letter: "A",
+    label: "Atlas",
+    items: [{ to: "/", label: "Atlas · home", Icon: MapIcon }]
+  },
+  {
+    id: "work",
+    letter: "W",
+    label: "Work",
+    items: [
+      { to: "/mission-control", label: "Mission Control", Icon: Workflow },
+      { to: "/workflows", label: "Workflows", Icon: Activity },
+      { to: "/library", label: "Delivery · Operations Archive", Icon: FileText }
+    ]
+  },
+  {
+    id: "brain",
+    letter: "B",
+    label: "Brain",
+    items: [
+      { to: "/memory", label: "Memory", Icon: Database },
+      { to: "/brain", label: "Brain · Repos · Health", Icon: Brain },
+      { to: "/terminal", label: "Intelligence Terminal", Icon: TerminalIcon }
+    ]
+  },
+  {
+    id: "operator",
+    letter: "O",
+    label: "Operator",
+    items: [
+      { to: "/agents", label: "Agents", Icon: Bot },
+      { to: "/marketplace", label: "Marketplace", Icon: Package }
+    ]
+  },
+  {
+    id: "system",
+    letter: "S",
+    label: "System",
+    items: [{ to: "/settings", label: "Settings · Runtime · Remote · Policies", Icon: SettingsIcon }]
+  }
 ];
 
 export function ShellLayout() {
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       {/* ---- left rail ---- */}
-      <aside className="flex w-[64px] shrink-0 flex-col items-center justify-between border-r border-white/6 py-3">
-        <div className="flex flex-col items-center gap-3">
+      <aside className="flex w-[68px] shrink-0 flex-col items-center justify-between border-r border-white/6 py-3">
+        <div className="flex flex-col items-center gap-4">
           <div
             className="flex h-9 w-9 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30 shadow-glow"
-            title="Operator Core · Atlas"
+            title="Operator.Center · Core · Atlas"
           >
             <span className="font-mono text-[11px] tracking-wider text-accent">[ ]</span>
           </div>
 
-          <nav className="flex flex-col items-center gap-1">
-            {NAV.map(({ to, label, Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === "/"}
-                title={label}
-                className={({ isActive }) =>
-                  clsx(
-                    "group relative flex h-10 w-10 items-center justify-center rounded-xl transition",
-                    isActive
-                      ? "bg-accent/12 text-accent shadow-[inset_0_0_0_1px_rgba(124,155,255,0.25)]"
-                      : "text-white/55 hover:bg-white/5 hover:text-white/85"
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <Icon className="h-4 w-4" />
-                    {isActive && (
-                      <span
-                        aria-hidden
-                        className="absolute -left-0.5 h-5 w-0.5 rounded-r bg-accent shadow-[0_0_8px_1px_rgba(124,155,255,0.6)]"
-                      />
+          <nav className="flex flex-col items-stretch gap-3">
+            {GROUPS.map((group, gi) => (
+              <div key={group.id} className="flex flex-col items-center gap-1">
+                <span
+                  className="select-none font-mono text-[9px] uppercase tracking-[0.22em] text-white/30"
+                  title={group.label}
+                >
+                  {group.letter}
+                </span>
+                {group.items.map(({ to, label, Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={to === "/"}
+                    title={label}
+                    className={({ isActive }) =>
+                      clsx(
+                        "group relative flex h-10 w-10 items-center justify-center rounded-xl transition",
+                        isActive
+                          ? "bg-accent/12 text-accent shadow-[inset_0_0_0_1px_rgba(124,155,255,0.25)]"
+                          : "text-white/55 hover:bg-white/5 hover:text-white/85"
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon className="h-4 w-4" />
+                        {isActive && (
+                          <span
+                            aria-hidden
+                            className="absolute -left-0.5 h-5 w-0.5 rounded-r bg-accent shadow-[0_0_8px_1px_rgba(124,155,255,0.6)]"
+                          />
+                        )}
+                      </>
                     )}
-                  </>
+                  </NavLink>
+                ))}
+                {gi < GROUPS.length - 1 && (
+                  <span className="mt-2 h-px w-6 bg-white/8" aria-hidden />
                 )}
-              </NavLink>
+              </div>
             ))}
           </nav>
         </div>
@@ -107,7 +159,7 @@ export function ShellLayout() {
             <span className="text-accent">[ ]</span>
             <span>Operator.Center · Core</span>
             <span className="text-white/25">·</span>
-            <span>AI Mission Control for builders, founders, operators</span>
+            <span>AI Mission Control</span>
           </div>
           <div className="flex items-center gap-2">
             <StatusRail />
