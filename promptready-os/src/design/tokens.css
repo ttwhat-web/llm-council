@@ -1,5 +1,5 @@
 /* =============================================================================
- * PromptReady OS — Design Tokens
+ * Operator Core — Design Tokens
  * -----------------------------------------------------------------------------
  * Single source of truth for the visual system. Tailwind reads these via
  * `var(--pr-*)` indirection in tailwind.config.js, and primitives consume

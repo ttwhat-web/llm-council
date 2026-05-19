@@ -5,7 +5,7 @@ import { MarketingShell } from "@/components/MarketingShell";
 export const metadata = {
   title: "Docs · operator.center",
   description:
-    "PromptReady OS documentation. Quickstart, providers, memory connectors, terminal, BYOK, self-host."
+    "Operator.Center documentation. Quickstart, providers, memory connectors, terminal, BYOK, self-host."
 };
 
 /**
@@ -16,7 +16,7 @@ export const metadata = {
 
 const SECTIONS = [
   {
-    title: "Install PromptReady OS",
+    title: "Install Operator Core",
     body: "Three install paths today: download a signed installer (coming soon per OS), pull the Docker runtime (coming soon), or clone the GitHub repo and run `npm run tauri:dev` inside promptready-os/."
   },
   {
@@ -52,7 +52,7 @@ export default function DocsPage() {
         <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
           docs · index
         </span>
-        <h1>PromptReady OS documentation</h1>
+        <h1>Operator.Center documentation</h1>
         <p className="lede">
           A short, honest index. Long-form docs are still being written —
           everything below describes behaviour that&rsquo;s real today.

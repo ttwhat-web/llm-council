@@ -19,7 +19,7 @@ import { KbdHint } from "@/components/primitives/KbdHint";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 /**
- * Shell layout · PromptReady OS frame.
+ * Shell layout · Operator Core frame.
  *
  * Left rail — eight top-level operator surfaces (Phase 11 rebuild):
  *   Mission Control · Agents · Memory · Library · Terminal · Workflows ·
@@ -60,7 +60,7 @@ export function ShellLayout() {
         <div className="flex flex-col items-center gap-3">
           <div
             className="flex h-9 w-9 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30 shadow-glow"
-            title="PromptReady OS"
+            title="Operator Core · Atlas"
           >
             <span className="font-mono text-[11px] tracking-wider text-accent">[ ]</span>
           </div>
@@ -105,9 +105,9 @@ export function ShellLayout() {
         <header className="drag-region flex items-center justify-between border-b border-white/6 px-5 py-2">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
             <span className="text-accent">[ ]</span>
-            <span>PromptReady OS</span>
+            <span>Operator.Center · Core</span>
             <span className="text-white/25">·</span>
-            <span>Mission Control for AI Workflows</span>
+            <span>AI Mission Control for builders, founders, operators</span>
           </div>
           <div className="flex items-center gap-2">
             <StatusRail />

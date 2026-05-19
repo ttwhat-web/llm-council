@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * Shared header for every top-level surface in PromptReady OS.
+ * Shared header for every top-level surface in Operator Core.
  *
  * Eyebrow + title + optional sub line on the left, optional right slot
  * for filters / actions. Mirrors the marketing-side OperatorPageHeader

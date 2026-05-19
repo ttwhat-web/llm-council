@@ -3,7 +3,7 @@ import { ArrowRight, Clock, Film } from "lucide-react";
 import { MarketingShell } from "@/components/MarketingShell";
 
 export const metadata = {
-  title: "Demo script · PromptReady OS",
+  title: "Demo script · Operator.Center",
   description:
     "Ninety-second walkthrough script: from landing page to dispatched mission, repo context, workflow, Telegram approval, and Atlas blueprint export."
 };
@@ -23,11 +23,11 @@ const BEATS: Beat[] = [
       "Land on operator.center · the hero sells one thing: 'Build your own AI Brain'.",
       "Hover the Download CTA. Mention: source build works today · signed installers next."
     ],
-    callout: "set framing · PromptReady OS is a desktop app · the web is just the download"
+    callout: "set framing · Operator Core is the desktop app · the web is just the download"
   },
   {
     at: "00:10 → 00:25",
-    title: "Download · open PromptReady OS",
+    title: "Download · open Operator Core",
     details: [
       "Click Download · pick Source (build from GitHub) · we already have a build open.",
       "Switch to the running desktop window. Show Atlas at the index."
@@ -109,7 +109,7 @@ export default function DemoScriptPage() {
         <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
           docs · 90-second demo script
         </span>
-        <h1>How to demo PromptReady OS in 90 seconds.</h1>
+        <h1>How to demo Operator.Center in 90 seconds.</h1>
         <p className="lede">
           Nine beats. Each beat names what to say, what to click, and what
           the audience should feel. Run it from a clean brain (or seed the

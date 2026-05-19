@@ -24,7 +24,7 @@ import { FounderCounter } from "@/components/FounderCounter";
 /**
  * operator.center landing — Phase 11 marketing/download site.
  *
- * The web is the brochure. The product is PromptReady OS — a
+ * The web is the brochure. The product is Operator Core — a
  * downloadable Mission Control desktop app. /app remains a developer
  * preview of the same engine; the primary CTA points at Download.
  *
@@ -37,6 +37,7 @@ export default function LandingPage() {
     <MarketingShell>
       <Hero />
       <DownloadGrid />
+      <CodeOperatorSection />
       <ProductSections />
       <MissionAtlasSection />
       <ValuePropsSection />
@@ -58,23 +59,26 @@ function Hero() {
         <span className="relative inline-block h-1.5 w-1.5 rounded-full bg-accent">
           <span className="absolute inset-0 animate-ping rounded-full bg-accent/55" />
         </span>
-        Operator.Center · Mission Control for AI Workflows
+        Operator.Center · AI Mission Control for builders, founders, operators
       </div>
-      <h1 className="max-w-[18ch] text-4xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
-        Build your own AI Brain.
+      <h1 className="max-w-[22ch] text-4xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
+        Mission Control before, during, and after Claude.
       </h1>
+      <p className="max-w-[60ch] font-mono text-[11px] uppercase tracking-[0.18em] text-accent/85">
+        Desktop is the Brain · Phone is the Remote · Atlas is Home
+      </p>
       <p className="max-w-[60ch] text-[15px] leading-relaxed text-white/65 md:text-base">
-        PromptReady OS is the downloadable desktop app for operators who
-        dispatch missions, route across local + cloud models, and keep their
-        brain on their machine. Local-first. No account, no key, no chat
-        window. The web sells, the OS runs, the phone is just the remote.
+        Operator Core is the downloadable desktop app for builders, founders
+        and operators who dispatch missions, route across local + cloud models,
+        and keep their brain on their machine. Local-first. No account, no key,
+        no chat window. Desktop is the Brain. Phone is the Remote. Atlas is Home.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/download"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent/90 px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:bg-accent"
         >
-          Download PromptReady OS
+          Download Operator Core
           <ArrowRight className="h-4 w-4" />
         </Link>
         <Link
@@ -231,6 +235,98 @@ function DownloadTile({ card }: { card: DownloadCard }) {
 }
 
 // ============================================================================
+// Code Operator section · positions Operator.Center as the command center
+// before, during, and after Claude / Cursor / GitHub.
+// ============================================================================
+
+function CodeOperatorSection() {
+  const lanes: Array<{ in: string; flow: string; out: string }> = [
+    {
+      in: "Messy idea",
+      flow: "→ Mission Brief",
+      out: "Claude-ready task · Cursor task · GitHub issue draft"
+    },
+    {
+      in: "Repo URL",
+      flow: "→ Atlas Repo Layer",
+      out: "Audit · Roadmap · Security · Deploy · Refactor · Architecture map"
+    },
+    {
+      in: "Stack trace",
+      flow: "→ Mission Control",
+      out: "Triaged plan · Terminal-safe command · Code mission"
+    },
+    {
+      in: "Spec",
+      flow: "→ Workflow Canvas",
+      out: "Mission → Approval → Patch → Receipt"
+    }
+  ];
+  const actions = [
+    "Send to Claude",
+    "Send to Cursor",
+    "Open GitHub Issue Draft",
+    "Create Code Mission",
+    "Review Repo",
+    "Generate Deployment Plan"
+  ];
+  return (
+    <section id="code-operator" className="flex flex-col gap-5">
+      <SectionHeading
+        eyebrow="02 · code operator"
+        title="Mission Control before, during, and after Claude."
+        sub="Operator.Center is the command center for builders. Messy idea in, real artifact out — Claude tasks, Cursor tasks, GitHub issue drafts, repo audits, deployment plans, architecture maps. Honest by design: when we don't own an API, the button says copy + open."
+      />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <article className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+          <header className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+            messy in · real artifact out
+          </header>
+          <ul className="flex flex-col gap-2">
+            {lanes.map((l) => (
+              <li
+                key={l.in}
+                className="grid grid-cols-[110px_110px_1fr] items-start gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 text-[11.5px]"
+              >
+                <span className="font-mono text-white/80">{l.in}</span>
+                <span className="font-mono text-accent/85">{l.flow}</span>
+                <span className="text-white/65">{l.out}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
+        <article className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+          <header className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+            per-deliverable actions
+          </header>
+          <p className="text-[11.5px] text-white/65">
+            Every deliverable card in Operator Core surfaces a row of
+            Send-To actions. They copy the artifact and open the
+            destination in a new tab — honest export, not a connected API.
+          </p>
+          <ul className="grid grid-cols-2 gap-1.5">
+            {actions.map((a) => (
+              <li
+                key={a}
+                className="flex items-center gap-1.5 rounded-md border border-accent/25 bg-accent/[0.06] px-2 py-1 text-[11.5px] text-accent"
+              >
+                <span className="h-1 w-1 rounded-full bg-accent" />
+                {a}
+              </li>
+            ))}
+          </ul>
+          <p className="text-[10px] text-white/45">
+            Direct Claude / Cursor / GitHub API integrations land on the
+            Connector Hub roadmap. Until then: copy + open with a clear
+            tooltip. No fake connected state.
+          </p>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
 // Product sections
 // ============================================================================
 
@@ -277,7 +373,7 @@ function ProductSections() {
   return (
     <section className="flex flex-col gap-5">
       <SectionHeading
-        eyebrow="02 · what's inside"
+        eyebrow="03 · what's inside"
         title="One desktop app. Six operator surfaces."
       />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -316,9 +412,9 @@ function MissionAtlasSection() {
   return (
     <section id="atlas" className="flex flex-col gap-5">
       <SectionHeading
-        eyebrow="03 · mission atlas"
+        eyebrow="04 · mission atlas"
         title="See your business brain as a living map."
-        sub="Brain, memory, repos, missions, workflows, intelligence, delivery, mobile — all on one blueprint wall inside PromptReady OS. Click any cell on the desktop to read the detail panel and export the whole blueprint to Markdown."
+        sub="Brain, memory, repos, missions, workflows, intelligence, delivery, mobile — all on one blueprint wall inside Operator Core. Click any cell on the desktop to read the detail panel and export the whole blueprint to Markdown."
       />
 
       <div className="overflow-hidden rounded-3xl border border-accent/25 bg-accent/[0.04] shadow-glow">
@@ -422,7 +518,7 @@ function ValuePropsSection() {
   return (
     <section className="flex flex-col gap-5">
       <SectionHeading
-        eyebrow="04 · why operators pay"
+        eyebrow="05 · why operators pay"
         title="What you actually get."
       />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

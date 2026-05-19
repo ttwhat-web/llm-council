@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { Copy, Download, Pin, PinOff, Rocket, X } from "lucide-react";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
+import { CodeOperatorActions } from "@/components/CodeOperatorActions";
 import type { Deliverable } from "@/services/missionRunner";
 
 /**
@@ -130,16 +131,19 @@ export function DeliveryCenter({ onClose }: { onClose: () => void }) {
                   {r.format}
                 </span>
               </div>
-              <div className="mt-1 flex items-center justify-end gap-1">
-                <IconBtn label="Copy" onClick={() => onCopy(r)} Icon={Copy} />
-                <IconBtn label="Download" onClick={() => onDownload(r)} Icon={Download} />
-                <IconBtn
-                  label={pinned.includes(r.id) ? "Unpin" : "Pin"}
-                  onClick={() => togglePin(r.id)}
-                  Icon={pinned.includes(r.id) ? PinOff : Pin}
-                  active={pinned.includes(r.id)}
-                />
-                <IconBtn label="Iterate" onClick={() => onSendToMission(r)} Icon={Rocket} accent />
+              <div className="mt-1 flex flex-col gap-1">
+                <CodeOperatorActions label={r.label} content={r.content} />
+                <div className="flex items-center justify-end gap-1">
+                  <IconBtn label="Copy" onClick={() => onCopy(r)} Icon={Copy} />
+                  <IconBtn label="Download" onClick={() => onDownload(r)} Icon={Download} />
+                  <IconBtn
+                    label={pinned.includes(r.id) ? "Unpin" : "Pin"}
+                    onClick={() => togglePin(r.id)}
+                    Icon={pinned.includes(r.id) ? PinOff : Pin}
+                    active={pinned.includes(r.id)}
+                  />
+                  <IconBtn label="Iterate" onClick={() => onSendToMission(r)} Icon={Rocket} accent />
+                </div>
               </div>
             </li>
           ))}

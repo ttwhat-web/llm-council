@@ -79,7 +79,7 @@ export function clearAuditLog() {
 export function exportAuditLogMarkdown(): string {
   const entries = readAuditLog();
   const lines: string[] = [];
-  lines.push(`# PromptReady OS · Audit log`);
+  lines.push(`# Operator.Center · Operations Archive · Audit log`);
   lines.push("");
   lines.push(`*Generated ${new Date().toISOString()} · ${entries.length} entries · local only*`);
   lines.push("");

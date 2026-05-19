@@ -11,9 +11,9 @@ import {
 import { MarketingShell } from "@/components/MarketingShell";
 
 export const metadata = {
-  title: "Download · PromptReady OS",
+  title: "Download · Operator Core · Operator.Center",
   description:
-    "Download PromptReady OS · local-first AI operator console. macOS, Windows, Linux, Docker, or build from source."
+    "Download Operator Core · the local-first AI Mission Control desktop app. macOS, Windows, Linux, Docker, or build from source."
 };
 
 /**
@@ -86,15 +86,15 @@ export default function DownloadPage() {
       <section className="flex flex-col gap-6">
         <header className="flex flex-col gap-2">
           <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-            download · promptready os
+            download · operator core
           </span>
           <h1 className="text-3xl font-semibold leading-[1.05] tracking-tight text-white md:text-5xl">
             Run it on your machine.
           </h1>
           <p className="max-w-[62ch] text-[14px] leading-relaxed text-white/65">
-            PromptReady OS is the downloadable desktop app. Source build
-            works today; signed installers are landing. No account or API
-            key required to open it.
+            Operator Core is the downloadable desktop app for Operator.Center.
+            Source build works today; signed installers are landing. No account
+            or API key required to open it.
           </p>
         </header>
 
@@ -221,7 +221,7 @@ function RequirementsAndOllama() {
           <li>Install: <code className="font-mono text-accent">curl -fsSL https://ollama.com/install.sh | sh</code></li>
           <li>Start: <code className="font-mono text-accent">ollama serve</code></li>
           <li>Pull a starter model: <code className="font-mono text-accent">ollama pull gemma2:2b</code></li>
-          <li>PromptReady OS auto-detects · pick &ldquo;ollama&rdquo; in DispatchPanel.</li>
+          <li>Operator Core auto-detects · pick &ldquo;ollama&rdquo; in the Mission Brief dispatch panel.</li>
         </ol>
         <p className="text-[10.5px] text-white/45">
           Optional · the deterministic engine ships in the box and works

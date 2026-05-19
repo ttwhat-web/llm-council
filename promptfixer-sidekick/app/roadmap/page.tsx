@@ -3,7 +3,7 @@ import { CheckCircle2, Circle, AlertTriangle } from "lucide-react";
 import { MarketingShell } from "@/components/MarketingShell";
 
 export const metadata = {
-  title: "Roadmap 30 · PromptReady OS",
+  title: "Roadmap · Operator.Center",
   description:
     "Honest roadmap from launch readiness (Phase 20) to Operator OS (Phase 30). Shipped · partial · planned · blocked."
 };

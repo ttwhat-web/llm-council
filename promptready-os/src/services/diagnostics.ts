@@ -17,13 +17,13 @@ export function buildDiagnosticsMarkdown(): string {
   const theme = useThemeStore.getState();
 
   const lines: string[] = [];
-  lines.push(`# PromptReady OS · Diagnostics`);
+  lines.push(`# Operator.Center · Core · Diagnostics`);
   lines.push("");
   lines.push(`*Generated ${new Date().toISOString()}*`);
   lines.push("");
 
   lines.push(`## Runtime`);
-  lines.push(`- app: PromptReady OS`);
+  lines.push(`- app: Operator Core (Operator.Center)`);
   lines.push(`- version: 0.1.0`);
   lines.push(`- channel: dev`);
   lines.push(`- platform: ${typeof navigator === "undefined" ? "unknown" : navigator.platform}`);

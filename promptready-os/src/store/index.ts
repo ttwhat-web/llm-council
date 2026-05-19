@@ -6,7 +6,7 @@
  *   usePromptsStore   — Prompt Vault: prompts, folders, tags, search, FTS.
  *   useSessionsStore  — Session Continuity: sessions, drafts, snapshots,
  *                        autosave, recovery.
- *   useFixerStore     — PromptFixer transient state (current input, mode,
+ *   useFixerStore     — Mission Formatter (legacy "PromptFixer") transient state (current input, mode,
  *                        quality, last result). Persisted only via sessions.
  *   useLauncherStore  — Multi-AI Launcher: enabled providers, last targets.
  *   useOverlayStore   — Workspace Overlay: visibility, position, mode.

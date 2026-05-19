@@ -20,6 +20,7 @@ import {
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { BrainGraph } from "@/components/BrainGraph";
 import { RepoContextCard, type RepoContextValue } from "@/components/RepoContextCard";
+import { CodeOperatorActions } from "@/components/CodeOperatorActions";
 import { useBrainStore } from "@/store/brain";
 import {
   useMissionStore,
@@ -396,7 +397,7 @@ function FlightRecorder({ mission }: { mission: MissionReceipt | null }) {
       <div className="rounded-xl border border-white/8 bg-black/30 p-3">
         {!mission ? (
           <ul className="flex flex-col gap-1 font-mono text-[10.5px] text-white/55">
-            <LogLine kind="info" tag="boot" message="PromptReady OS shell ready" />
+            <LogLine kind="info" tag="boot" message="Operator Core shell ready" />
             <LogLine kind="info" tag="brain" message="Brain identity loaded from local store" />
             <LogLine kind="info" tag="route" message="Local-first · deterministic engine standby" />
             <LogLine kind="info" tag="safety" message="Screen armed" />
@@ -514,7 +515,9 @@ function DeliverableCard({
           <pre className="max-h-[180px] overflow-auto rounded-md border border-white/8 bg-black/40 p-2 font-mono text-[10.5px] leading-snug text-white/80">
             {d.content}
           </pre>
-          <div className="mt-2 flex items-center justify-end gap-1.5">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <CodeOperatorActions label={d.label} content={d.content} />
+            <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={onCopy}
@@ -529,6 +532,7 @@ function DeliverableCard({
             >
               <Download className="h-3 w-3" /> Download
             </button>
+            </div>
           </div>
         </div>
       )}

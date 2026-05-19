@@ -59,7 +59,7 @@ export default function FoundersPage() {
             First 100 operators get Founder Lifetime.
           </h1>
           <p className="max-w-[58ch] text-[14px] leading-relaxed text-white/65">
-            PromptReady OS is local-first and source-buildable today. Join
+            Operator Core is local-first and source-buildable today. Join
             the founder list and we&rsquo;ll ship signed installers, the mobile
             companion, and the Telegram bridge first to your machine. No
             recurring fee for you · ever.
@@ -178,7 +178,7 @@ function WaitlistForm({
           <textarea
             value={use}
             onChange={(e) => setUse(e.target.value)}
-            placeholder="What do you want PromptReady OS to do for you? (optional)"
+            placeholder="What do you want Operator.Center to do for you? (optional)"
             rows={3}
             className="rounded-md border border-white/10 bg-white/[0.025] px-3 py-2 text-[13px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
           />

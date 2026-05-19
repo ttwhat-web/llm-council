@@ -117,7 +117,7 @@ function checkRuntime(): CheckResult {
     id: "runtime",
     label: "Runtime",
     state: "partial",
-    detail: "Browser preview · download PromptReady OS desktop for the full runtime",
+    detail: "Browser preview · download Operator Core desktop for the full runtime",
     weight: 5
   };
 }

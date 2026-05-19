@@ -4,6 +4,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { Archive, Copy, Download, Inbox, PlayCircle, Rocket, Search, Trash2 } from "lucide-react";
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
+import { CodeOperatorActions } from "@/components/CodeOperatorActions";
 import { useMissionStore, type MissionReceipt } from "@/store/mission";
 
 /**
@@ -182,19 +183,26 @@ function ReceiptRow({
                 {m.deliverables.map((d) => (
                   <li
                     key={d.id}
-                    className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 text-[11px]"
+                    className="flex flex-col gap-1 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 text-[11px]"
                   >
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-white">{d.label}</span>
-                      <span className="text-[10px] text-white/45">{d.blurb}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-white">{d.label}</span>
+                        <span className="text-[10px] text-white/45">{d.blurb}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => downloadDeliverable(d.label, d.format, d.content)}
+                        className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+                      >
+                        <Download className="h-3 w-3" /> save
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => downloadDeliverable(d.label, d.format, d.content)}
-                      className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
-                    >
-                      <Download className="h-3 w-3" /> save
-                    </button>
+                    <CodeOperatorActions
+                      label={d.label}
+                      content={d.content}
+                      repoUrl={m.repoContext}
+                    />
                   </li>
                 ))}
               </ul>

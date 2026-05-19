@@ -181,7 +181,7 @@ export default function SettingsPage() {
             <span className="text-[13px] font-semibold text-white">Local engine</span>
           </header>
           <p className="text-[11px] text-white/55">
-            PromptReady OS prefers a local Ollama instance when reachable.
+            Operator Core prefers a local Ollama instance when reachable.
             The probe runs on first mission or from Auto-configure above.
           </p>
           <div className="rounded-md border border-white/8 bg-white/[0.015] p-3 font-mono text-[11px]">

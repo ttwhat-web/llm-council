@@ -1,5 +1,6 @@
 /**
- * PromptReady OS — Type registry.
+ * Operator Core — Type registry. (Internal · legacy "PromptReady OS" name
+ * retained in folder paths only · product-facing UI says Operator.Center.)
  *
  * One file, intentionally. These types are shared across modules and the
  * store layer; keeping them co-located avoids accidental coupling.
