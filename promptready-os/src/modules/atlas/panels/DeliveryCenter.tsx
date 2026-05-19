@@ -22,6 +22,10 @@ import type { Deliverable } from "@/services/missionRunner";
 interface Row extends Deliverable {
   missionId: string;
   ts: number;
+  engine?: string;
+  model?: string;
+  score?: number;
+  elapsedMs?: number;
 }
 
 export function DeliveryCenter({ onClose }: { onClose: () => void }) {
@@ -34,7 +38,15 @@ export function DeliveryCenter({ onClose }: { onClose: () => void }) {
   const rows = useMemo<Row[]>(
     () =>
       history.flatMap((m) =>
-        m.deliverables.map((d) => ({ ...d, missionId: m.id, ts: m.startedAt }))
+        m.deliverables.map((d) => ({
+          ...d,
+          missionId: m.id,
+          ts: m.startedAt,
+          engine: m.engine ?? "deterministic",
+          model: m.model,
+          score: m.score,
+          elapsedMs: m.elapsedMs
+        }))
       ),
     [history]
   );
@@ -114,26 +126,36 @@ export function DeliveryCenter({ onClose }: { onClose: () => void }) {
             : "No deliverables match this filter."}
         </p>
       ) : (
-        <ul className="flex max-h-[280px] flex-col gap-1 overflow-auto pr-1">
+        <ul className="flex max-h-[440px] flex-col gap-2 overflow-auto pr-1">
           {filtered.map((r) => (
             <li
               key={`${r.missionId}-${r.id}`}
-              className="rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5"
+              className="overflow-hidden rounded-md border border-white/10 bg-black/30"
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate text-[12px] font-semibold text-white">
+              {/* Title bar · terminal report header */}
+              <header className="flex items-center justify-between gap-2 border-b border-white/8 bg-white/[0.02] px-2 py-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="rounded border border-accent/30 bg-accent/[0.08] px-1 py-px font-mono text-[8.5px] uppercase tracking-[0.22em] text-accent">
+                    {r.format}
+                  </span>
+                  <span className="truncate font-mono text-[12px] font-semibold text-white">
                     {r.label}
                   </span>
-                  <span className="text-[10px] text-white/45">{r.blurb}</span>
                 </div>
-                <span className="shrink-0 rounded border border-white/10 bg-white/[0.03] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-white/55">
-                  {r.format}
+                <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-white/40">
+                  {r.missionId}
                 </span>
-              </div>
-              <div className="mt-1 flex flex-col gap-1">
+              </header>
+
+              {/* Preview · 2-line snippet */}
+              <pre className="line-clamp-2 max-h-[40px] overflow-hidden px-2 py-1 font-mono text-[10.5px] leading-snug text-white/65">
+                {r.content.slice(0, 220)}
+              </pre>
+
+              {/* Actions row · Send-To + Copy / Download / Pin / Iterate */}
+              <div className="flex flex-wrap items-center justify-between gap-1 border-t border-white/6 bg-white/[0.012] px-2 py-1">
                 <CodeOperatorActions label={r.label} content={r.content} />
-                <div className="flex items-center justify-end gap-1">
+                <div className="flex items-center gap-1">
                   <IconBtn label="Copy" onClick={() => onCopy(r)} Icon={Copy} />
                   <IconBtn label="Download" onClick={() => onDownload(r)} Icon={Download} />
                   <IconBtn
@@ -145,6 +167,15 @@ export function DeliveryCenter({ onClose }: { onClose: () => void }) {
                   <IconBtn label="Iterate" onClick={() => onSendToMission(r)} Icon={Rocket} accent />
                 </div>
               </div>
+
+              {/* Footer · engine · model · latency · score · time */}
+              <footer className="grid grid-cols-2 gap-x-3 gap-y-0.5 border-t border-white/6 px-2 py-1 font-mono text-[9.5px] sm:grid-cols-5">
+                <MetaCell k="engine" v={r.engine ?? "—"} />
+                <MetaCell k="model" v={r.model ?? "—"} />
+                <MetaCell k="latency" v={r.elapsedMs ? `${r.elapsedMs}ms` : "—"} />
+                <MetaCell k="score" v={r.score != null ? `${r.score}/100` : "—"} />
+                <MetaCell k="time" v={new Date(r.ts).toLocaleTimeString()} />
+              </footer>
             </li>
           ))}
         </ul>
@@ -183,5 +214,14 @@ function IconBtn({
       <Icon className="h-2.5 w-2.5" />
       {label}
     </button>
+  );
+}
+
+function MetaCell({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-center gap-1.5 overflow-hidden">
+      <span className="uppercase tracking-[0.18em] text-white/35">{k}</span>
+      <span className="truncate text-white/65">{v}</span>
+    </div>
   );
 }

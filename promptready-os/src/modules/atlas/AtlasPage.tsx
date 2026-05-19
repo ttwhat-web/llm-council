@@ -301,17 +301,39 @@ function SectionCard({
 }) {
   const isCore = section.id === "brain-core";
   const { x, y } = positionOf(section.position);
+
+  // State-driven styling · purely visual · driven by real status only.
+  const isInFlight =
+    section.id === "mission-system" && section.status.label === "in flight";
+  const isWaitingApproval = section.status.label.includes("waiting") ||
+    section.status.label.includes("approval") ||
+    section.status.tone === "warn";
+  const isBlocked =
+    section.status.label.toLowerCase().includes("blocked") ||
+    section.status.label.toLowerCase().includes("offline");
+  const stateClass = isCore
+    ? "atlas-state-core"
+    : isBlocked
+      ? "atlas-state-bad"
+      : isInFlight
+        ? "atlas-state-live"
+        : isWaitingApproval
+          ? "atlas-state-warn"
+          : "";
+
   return (
     <button
       type="button"
       onClick={onSelect}
+      data-state={stateClass.replace("atlas-state-", "")}
       className={clsx(
         "atlas-card group absolute flex flex-col gap-2 rounded-2xl border p-3 text-left transition",
         isCore
           ? "border-accent/40 bg-accent/[0.06] shadow-glow"
           : selected
             ? "border-accent/40 bg-white/[0.04] shadow-glow"
-            : "border-white/10 bg-white/[0.018] hover:border-accent/25 hover:bg-white/[0.03]"
+            : "border-white/10 bg-white/[0.018] hover:border-accent/25 hover:bg-white/[0.03]",
+        stateClass
       )}
       style={{ left: x, top: y, width: CELL_W, height: CELL_H }}
     >
@@ -772,8 +794,8 @@ function buildSections(a: BuildArgs): SectionData[] {
   const activeStage = a.current?.stage ?? "idle";
   out.push({
     id: "mission-system",
-    title: "Mission System",
-    eyebrow: "01 · mission system",
+    title: "Mission Runtime",
+    eyebrow: "01 · mission runtime",
     Icon: Rocket,
     position: LAYOUT["mission-system"],
     pills: [
@@ -803,8 +825,8 @@ function buildSections(a: BuildArgs): SectionData[] {
   const memoryDocCount = a.memoryDocs.length;
   out.push({
     id: "memory-layer",
-    title: "Memory Layer",
-    eyebrow: "02 · memory layer",
+    title: "Memory Runtime",
+    eyebrow: "02 · memory runtime",
     Icon: Database,
     position: LAYOUT["memory-layer"],
     pills: [
@@ -835,8 +857,8 @@ function buildSections(a: BuildArgs): SectionData[] {
   const githubLabels = a.githubSources.map((s) => s.label);
   out.push({
     id: "repo-layer",
-    title: "Repo Layer",
-    eyebrow: "03 · repo layer",
+    title: "Repo Runtime",
+    eyebrow: "03 · repo runtime",
     Icon: Github,
     position: LAYOUT["repo-layer"],
     pills: [
@@ -865,8 +887,8 @@ function buildSections(a: BuildArgs): SectionData[] {
   // 5. Workflow Layer
   out.push({
     id: "workflow-layer",
-    title: "Workflow Layer",
-    eyebrow: "04 · workflow layer",
+    title: "Workflow Runtime",
+    eyebrow: "04 · workflow runtime",
     Icon: Workflow,
     position: LAYOUT["workflow-layer"],
     pills: [
@@ -891,8 +913,8 @@ function buildSections(a: BuildArgs): SectionData[] {
   const pinTotal = Object.values(a.pins).reduce((acc, arr) => acc + arr.length, 0);
   out.push({
     id: "intelligence-layer",
-    title: "Intelligence Layer",
-    eyebrow: "05 · intelligence layer",
+    title: "Intelligence Runtime",
+    eyebrow: "05 · intelligence runtime",
     Icon: Eye,
     position: LAYOUT["intelligence-layer"],
     pills: [
@@ -924,8 +946,8 @@ function buildSections(a: BuildArgs): SectionData[] {
   const uniqueFormats = Array.from(new Set(formats));
   out.push({
     id: "delivery-layer",
-    title: "Delivery Layer",
-    eyebrow: "06 · delivery layer",
+    title: "Delivery Runtime",
+    eyebrow: "06 · delivery runtime",
     Icon: FileText,
     position: LAYOUT["delivery-layer"],
     pills: [
@@ -954,8 +976,8 @@ function buildSections(a: BuildArgs): SectionData[] {
   // 8. Mobile Companion
   out.push({
     id: "mobile-companion",
-    title: "Mobile Companion",
-    eyebrow: "07 · mobile companion",
+    title: "Remote Runtime",
+    eyebrow: "07 · remote runtime · mobile companion",
     Icon: Phone,
     position: LAYOUT["mobile-companion"],
     pills: [
@@ -981,8 +1003,8 @@ function buildSections(a: BuildArgs): SectionData[] {
   const activeSpace = spaces.find((s) => s.id === spaces[0]?.id);
   out.push({
     id: "team-layer",
-    title: "Team Layer",
-    eyebrow: "08 · team layer",
+    title: "Operator Runtime",
+    eyebrow: "08 · operator runtime · team",
     Icon: TeamIcon,
     position: LAYOUT["team-layer"],
     pills: [
@@ -1197,7 +1219,13 @@ function centerOf(p: SectionPosition) {
   return { x: x + CELL_W / 2, y: y + CELL_H / 2 };
 }
 
-// Subtle blueprint grid background. Scoped to the atlas canvas only.
+// Atlas ambient · UX RESET 02
+//   · 24px blueprint grid (unchanged · already calm)
+//   · slow breathing on Brain Core (4s · 96% → 100% opacity)
+//   · amber pulse on cells whose status.tone is "warn"
+//   · solid live ring on the mission cell while a mission is in flight
+//   · red edge on blocked cells
+// Every animation is gated by real state · no fake ambient activity.
 const atlasCss = `
 .atlas-grid {
   background-image:
@@ -1208,6 +1236,40 @@ const atlasCss = `
 }
 .atlas-card {
   backdrop-filter: blur(6px);
+}
+
+/* Brain Core · slow breathing · only when a brain exists (parent sets the class) */
+.atlas-state-core {
+  animation: atlasCoreBreathe 4.5s ease-in-out infinite;
+}
+@keyframes atlasCoreBreathe {
+  0%, 100% { box-shadow: 0 0 24px -8px rgba(124,155,255,0.35), inset 0 0 0 1px rgba(124,155,255,0.30); }
+  50%      { box-shadow: 0 0 36px -6px rgba(124,155,255,0.55), inset 0 0 0 1px rgba(124,155,255,0.55); }
+}
+
+/* Live mission cell · edge glow loop */
+.atlas-state-live {
+  animation: atlasEdgeLive 2.4s ease-in-out infinite;
+}
+@keyframes atlasEdgeLive {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(124,155,255,0.45), 0 0 0 0 rgba(124,155,255,0.0); }
+  50%      { box-shadow: inset 0 0 0 1px rgba(124,155,255,0.75), 0 0 18px -4px rgba(124,155,255,0.45); }
+}
+
+/* Approval waiting · amber pulse */
+.atlas-state-warn {
+  animation: atlasEdgeWarn 1.6s ease-in-out infinite;
+  border-color: rgba(251, 191, 36, 0.35) !important;
+}
+@keyframes atlasEdgeWarn {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(251,191,36,0.30), 0 0 0 0 rgba(251,191,36,0.0); }
+  50%      { box-shadow: inset 0 0 0 1px rgba(251,191,36,0.65), 0 0 16px -4px rgba(251,191,36,0.45); }
+}
+
+/* Blocked · red edge · NOT animated (steady red so the operator notices and acts) */
+.atlas-state-bad {
+  border-color: rgba(248, 113, 113, 0.45) !important;
+  box-shadow: inset 0 0 0 1px rgba(248,113,113,0.35), 0 0 14px -6px rgba(248,113,113,0.30);
 }
 `;
 

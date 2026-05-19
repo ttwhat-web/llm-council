@@ -43,6 +43,7 @@ import { BrainScoreCard } from "@/components/BrainScoreCard";
 import { OperatorSafeModeCard } from "@/components/OperatorSafeModeCard";
 import { TelegramLiveCard } from "@/components/TelegramLiveCard";
 import { RuntimeShieldCard } from "@/components/RuntimeShieldCard";
+import { OperatorIdCard } from "@/components/OperatorIdCard";
 import { PresentationModeCard } from "@/components/PresentationModeCard";
 import {
   CloudSyncCard,
@@ -134,10 +135,15 @@ export default function SettingsPage() {
       />
 
       <RoadmapPanel />
+
+      <SettingsSection letter="P" label="Presentation" hint="Demo · Safe Mode · Founder" />
       <PresentationModeCard />
       <OperatorSafeModeCard />
-      <SetupWizard />
       <DemoWorkspaceCard />
+      <OperatorIdCard />
+
+      <SettingsSection letter="S" label="System" hint="Runtime · Policies · Remote" />
+      <SetupWizard />
       <RuntimeBus />
       <OperatorModeCard />
       <ReleaseCenter />
@@ -234,13 +240,17 @@ export default function SettingsPage() {
       <TelegramLiveCard />
       <RuntimeShieldCard />
       <ComplianceCard />
-      <AuditLogCard />
+
+      <SettingsSection letter="B" label="Brain" hint="Health · Snapshots · Restore" />
       <BrainHealthCard />
       <BrainScoreCard />
       <SnapshotsCard />
+      <AuditLogCard />
       <DesktopTrustCard />
-      <PackagingCard />
       <DiagnosticsCard />
+
+      <SettingsSection letter="O" label="Operator" hint="Team · Marketplace · Audit · Roadmap" />
+      <PackagingCard />
       <ConnectorHubCard />
       <CloudSyncCard />
       <MobileCompanionRoadmapCard />
@@ -1372,5 +1382,37 @@ function BridgeSimulator() {
         </button>
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// Settings section header · UX RESET 02
+// Single-letter group marker + label + sub. Purely visual hierarchy.
+// ============================================================================
+
+function SettingsSection({
+  letter,
+  label,
+  hint
+}: {
+  letter: string;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <header className="mt-2 flex items-center gap-3 pl-1 pt-1">
+      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] font-mono text-[12px] font-semibold uppercase tracking-wider text-white/65">
+        {letter}
+      </span>
+      <div className="flex flex-col leading-tight">
+        <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/45">
+          {label}
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">
+          {hint}
+        </span>
+      </div>
+      <span className="ml-1 h-px flex-1 bg-white/8" aria-hidden />
+    </header>
   );
 }

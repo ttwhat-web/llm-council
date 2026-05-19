@@ -1,22 +1,56 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Activity, Archive, Brain, Cpu, Database, Github, Receipt } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
-import { useEffect, useState } from "react";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { SpaceSwitcher } from "@/components/SpaceSwitcher";
 import { readPresentationFlags } from "@/components/PresentationModeCard";
 import { PresenceStrip } from "@/components/PresenceStrip";
+import { measureBrainHealth } from "@/services/brainHealth";
 
 /**
- * Atlas HUD · top bar always visible on the Atlas surface.
+ * Atlas HUD · UX RESET 02.
  *
- * Honest counters only. The "health ring" is a tiny SVG dot: filled
- * accent when an engine is selected, hollow when nothing is set up.
+ * Operator workstation feel · not SaaS dashboard. Large mono numbers,
+ * a compact identity block, terminal-style presence row. Honest:
+ * every value is computed from real local stores.
  */
+
+const OPERATOR_MODE_KEY = "promptready-os.operator-mode";
+
+function readOperatorTier(): string {
+  if (typeof window === "undefined") return "Solo";
+  try {
+    const raw = window.localStorage.getItem(OPERATOR_MODE_KEY);
+    if (raw === "team") return "Team";
+    if (raw === "agency") return "Agency";
+    if (raw === "enterprise") return "Enterprise";
+    return "Solo";
+  } catch {
+    return "Solo";
+  }
+}
+
+/** 0–100 health derived from brainHealth · matches BrainScoreCard formula. */
+function deriveHealthPct(): number {
+  const h = measureBrainHealth();
+  const base = 50;
+  const bonuses =
+    Math.min(20, h.receipts) +
+    Math.min(10, h.memoryDocs) +
+    Math.min(10, h.workflowNodes) +
+    Math.min(10, h.snapshots * 2);
+  const penalties =
+    h.duplicateDocs * 3 +
+    h.staleRepos * 2 +
+    h.unusedWorkflowNodes * 2 +
+    h.orphanFiles * 2 +
+    h.inboxArchived;
+  return Math.max(0, Math.min(100, Math.round(base + bonuses - penalties)));
+}
 
 export function AtlasHud() {
   const identity = useBrainStore((s) => s.identity);
@@ -25,119 +59,144 @@ export function AtlasHud() {
   const missionCount = useBrainStore((s) => s.missionCount);
   const demo = useBrainStore((s) => s.demo);
   const history = useMissionStore((s) => s.history);
-  const current = useMissionStore((s) => s.current);
   const runtime = useMissionStore((s) => s.runtime);
   const snapshots = useAtlasStore((s) => s.snapshots);
+  // snapshots feeds the BrainScore card / health calc; not directly read here
+  // but keeping the subscription so HUD re-renders when snapshot count changes.
+  void snapshots;
 
   const repos = sources.filter((s) => s.kind === "github").length;
-  const engineKinds = engines.map((e) => e.kind).join(" · ") || "deterministic";
+  const health = deriveHealthPct();
+  const tier = readOperatorTier();
+  const brainName = identity?.name ?? "—";
+  const brainMode = identity?.mode ? capitalize(identity.mode) : "—";
+  const runtimeLabel = runtimeShort(runtime);
 
   return (
-    <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-2.5">
-      <div className="flex flex-wrap items-center gap-3">
-        <HealthRing live={!!current} hasEngine={engines.length > 0} runtime={runtime} />
-        <Hud Icon={Brain} label="brain" value={identity?.name ?? "—"} hint={identity?.mode ?? "no brain"} />
-        <Hud Icon={Cpu} label="engines" value={String(engines.length)} hint={engineKinds} />
-        <Hud Icon={Database} label="sources" value={String(sources.length)} />
-        <Hud Icon={Github} label="repos" value={String(repos)} />
-        <Hud Icon={Activity} label="missions" value={String(missionCount)} />
-        <Hud Icon={Receipt} label="receipts" value={String(history.length)} />
-        <Hud Icon={Archive} label="snapshots" value={String(snapshots.length)} />
-        <PresenceStrip />
-      </div>
-      <div className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
-        <span
-          className={clsx(
-            "inline-block h-1.5 w-1.5 rounded-full",
-            runtime === "ready" || runtime === "local-mode"
-              ? "bg-emerald-400 shadow-[0_0_6px_1px_rgba(52,211,153,0.65)]"
-              : "bg-amber-400/80"
-          )}
+    <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3">
+      {/* Top row · identity block + large counters + bell/switcher */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <IdentityBlock
+          operator={tier}
+          brain={brainName}
+          mode={brainMode}
+          runtimeLabel={runtimeLabel}
+          demo={demo}
         />
-        {runtimeLabel(runtime)}
-        {demo && (
-          <span className="rounded border border-accent/30 bg-accent/[0.08] px-1 py-px text-accent">
-            demo
-          </span>
-        )}
-        <PresentationPill />
-        <SpaceSwitcher />
-        <NotificationsBell />
+
+        <div className="flex flex-wrap items-baseline gap-x-7 gap-y-2">
+          <BigNumber label="missions" value={missionCount} />
+          <BigNumber label="receipts" value={history.length} />
+          <BigNumber label="repos" value={repos} />
+          <BigNumber label="health" value={health} suffix="%" tone={healthTone(health)} />
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <PresentationPill />
+          <SpaceSwitcher />
+          <NotificationsBell />
+        </div>
+      </div>
+
+      {/* Bottom row · terminal-style presence strip */}
+      <div className="border-t border-white/6 pt-2">
+        <PresenceStrip />
       </div>
     </section>
   );
 }
 
-function HealthRing({
-  live,
-  hasEngine,
-  runtime
-}: {
-  live: boolean;
-  hasEngine: boolean;
-  runtime: string;
-}) {
-  const color =
-    runtime === "ready" || runtime === "local-mode" ? "var(--pr-color-accent)" : "rgba(255,255,255,0.18)";
-  return (
-    <svg width={26} height={26} className="shrink-0">
-      <circle
-        cx={13}
-        cy={13}
-        r={10}
-        fill="none"
-        stroke="rgba(255,255,255,0.08)"
-        strokeWidth={2}
-      />
-      <circle
-        cx={13}
-        cy={13}
-        r={10}
-        fill="none"
-        stroke={color}
-        strokeWidth={2}
-        strokeDasharray={hasEngine ? "" : "3 3"}
-        opacity={hasEngine ? 0.9 : 0.55}
-      />
-      <circle cx={13} cy={13} r={3} fill={color} opacity={live ? 1 : 0.6}>
-        {live && (
-          <animate attributeName="opacity" values="1;0.3;1" dur="1.4s" repeatCount="indefinite" />
-        )}
-      </circle>
-    </svg>
-  );
-}
+// ============================================================================
+// Identity block
+// ============================================================================
 
-function Hud({
-  Icon,
-  label,
-  value,
-  hint
+function IdentityBlock({
+  operator,
+  brain,
+  mode,
+  runtimeLabel,
+  demo
 }: {
-  Icon: typeof Brain;
-  label: string;
-  value: string;
-  hint?: string;
+  operator: string;
+  brain: string;
+  mode: string;
+  runtimeLabel: string;
+  demo: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <Icon className="h-3.5 w-3.5 text-accent" />
-      <div className="flex flex-col leading-tight">
-        <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
-          {label}
-        </span>
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-[12.5px] font-semibold text-white">{value}</span>
-          {hint && (
-            <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
-              {hint}
-            </span>
-          )}
-        </div>
+    <div className="flex items-center gap-4 font-mono text-[11px]">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/[0.1] ring-1 ring-accent/30 shadow-glow">
+        <span className="text-[11px] tracking-wider text-accent">[ ]</span>
       </div>
+      <dl className="grid grid-cols-2 gap-x-5 gap-y-0.5">
+        <IdRow k="operator" v={operator} />
+        <IdRow k="brain" v={brain} dim={brain === "—"} />
+        <IdRow k="mode" v={mode} dim={mode === "—"} />
+        <IdRow k="runtime" v={runtimeLabel} />
+      </dl>
+      {demo && (
+        <span className="rounded border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 text-[9px] uppercase tracking-[0.22em] text-accent">
+          demo
+        </span>
+      )}
     </div>
   );
 }
+
+function IdRow({ k, v, dim }: { k: string; v: string; dim?: boolean }) {
+  return (
+    <div className="contents">
+      <dt className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/35">{k}</dt>
+      <dd className={clsx("font-mono text-[12px]", dim ? "text-white/40" : "text-white/85")}>
+        {v}
+      </dd>
+    </div>
+  );
+}
+
+// ============================================================================
+// Big number
+// ============================================================================
+
+function BigNumber({
+  label,
+  value,
+  suffix,
+  tone
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+  tone?: "ok" | "warn" | "bad";
+}) {
+  const toneCls =
+    tone === "warn"
+      ? "text-amber-200"
+      : tone === "bad"
+        ? "text-rose-200"
+        : "text-white";
+  return (
+    <div className="flex flex-col items-start">
+      <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-white/40">
+        {label}
+      </span>
+      <span className={clsx("font-mono text-[26px] font-semibold leading-none tabular-nums", toneCls)}>
+        {value}
+        {suffix && <span className="text-[14px] text-white/55">{suffix}</span>}
+      </span>
+    </div>
+  );
+}
+
+function healthTone(pct: number): "ok" | "warn" | "bad" {
+  if (pct >= 75) return "ok";
+  if (pct >= 50) return "warn";
+  return "bad";
+}
+
+// ============================================================================
+// Presentation pill (preserved from prior HUD)
+// ============================================================================
 
 function PresentationPill() {
   const [active, setActive] = useState(false);
@@ -147,7 +206,6 @@ function PresentationPill() {
       setActive(f.silent || f.ghost || f.demoLock);
     };
     refresh();
-    // Poll cheaply so a Settings change reflects without prop wiring.
     const t = window.setInterval(refresh, 1500);
     return () => window.clearInterval(t);
   }, []);
@@ -155,22 +213,31 @@ function PresentationPill() {
   return (
     <span
       title="Presentation mode flags active · Settings → Presentation Mode"
-      className="rounded border border-accent/30 bg-accent/[0.08] px-1 py-px text-accent"
+      className="rounded border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-accent"
     >
       stage
     </span>
   );
 }
 
-function runtimeLabel(r: string) {
+// ============================================================================
+// helpers
+// ============================================================================
+
+function runtimeShort(r: string): string {
   switch (r) {
     case "ready":
-      return "engine ready";
+      return "Ready";
     case "local-mode":
-      return "local · deterministic";
+      return "Local";
     case "offline":
-      return "offline";
+      return "Offline";
     default:
-      return "deterministic standby";
+      return "Standby";
   }
+}
+
+function capitalize(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
