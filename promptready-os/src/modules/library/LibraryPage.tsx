@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { Archive, Copy, Download, Inbox, PlayCircle, Rocket, Search, Trash2 } from "lucide-react";
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { CodeOperatorActions } from "@/components/CodeOperatorActions";
+import { MissionLineage } from "@/components/MissionLineage";
 import { useMissionStore, type MissionReceipt } from "@/store/mission";
 
 /**
@@ -208,6 +209,7 @@ function ReceiptRow({
               </ul>
             </div>
           )}
+          <MissionLineage receipt={m} />
           {m.events.length > 0 && (
             <div>
               <div className="mb-1 font-mono text-[9.5px] uppercase tracking-[0.2em] text-white/40">

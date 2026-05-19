@@ -44,6 +44,8 @@ import { OperatorSafeModeCard } from "@/components/OperatorSafeModeCard";
 import { TelegramLiveCard } from "@/components/TelegramLiveCard";
 import { RuntimeShieldCard } from "@/components/RuntimeShieldCard";
 import { OperatorIdCard } from "@/components/OperatorIdCard";
+import { BrainPassportCard } from "@/components/BrainPassportCard";
+import { MorningBriefCard } from "@/components/MorningBriefCard";
 import { PresentationModeCard } from "@/components/PresentationModeCard";
 import {
   CloudSyncCard,
@@ -137,6 +139,7 @@ export default function SettingsPage() {
       <RoadmapPanel />
 
       <SettingsSection letter="P" label="Presentation" hint="Demo · Safe Mode · Founder" />
+      <MorningBriefCard />
       <PresentationModeCard />
       <OperatorSafeModeCard />
       <DemoWorkspaceCard />
@@ -244,6 +247,7 @@ export default function SettingsPage() {
       <SettingsSection letter="B" label="Brain" hint="Health · Snapshots · Restore" />
       <BrainHealthCard />
       <BrainScoreCard />
+      <BrainPassportCard />
       <SnapshotsCard />
       <AuditLogCard />
       <DesktopTrustCard />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import {
   Brain,
@@ -25,6 +25,7 @@ import { useMissionStore, type MissionReceipt } from "@/store/mission";
 import { useAtlasStore, type AtlasHomeMode, type InboxItem, type MemoryDoc } from "@/store/atlas";
 import { AtlasHud } from "./AtlasHud";
 import { OperationsView, LiveView } from "./AtlasViews";
+import { RuntimeHeatmap } from "@/components/RuntimeHeatmap";
 import { DispatchPanel } from "./panels/DispatchPanel";
 import { RepoWorkspace } from "./panels/RepoWorkspace";
 import { MemoryVault } from "./panels/MemoryVault";
@@ -185,6 +186,14 @@ export default function AtlasPage() {
   const homeMode = useAtlasStore((s) => s.homeMode);
   const setHomeMode = useAtlasStore((s) => s.setHomeMode);
 
+  // Atlas Night Layer · after 20:00 local time, reduce glow & slow
+  // ambient. Re-evaluates every 5 minutes. Pure visual.
+  const [isNight, setIsNight] = useState<boolean>(() => isNightHour());
+  useEffect(() => {
+    const t = window.setInterval(() => setIsNight(isNightHour()), 5 * 60_000);
+    return () => window.clearInterval(t);
+  }, []);
+
   return (
     <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-4 px-5 py-5 md:px-7 md:py-7">
       <SurfaceHeader
@@ -214,7 +223,12 @@ export default function AtlasPage() {
       {homeMode === "operations" && <OperationsView onOpenSection={(id) => setSelected(id as SectionId)} />}
       {homeMode === "live" && <LiveView />}
       {homeMode === "blueprint" && (
-        <div className="relative overflow-auto rounded-3xl border border-white/10 bg-graphite-950 shadow-glass">
+        <div
+          className={clsx(
+            "relative overflow-auto rounded-3xl border border-white/10 bg-graphite-950 shadow-glass",
+            isNight && "atlas-night"
+          )}
+        >
           <div
             className="atlas-grid relative"
             style={{
@@ -238,8 +252,15 @@ export default function AtlasPage() {
           </div>
 
           <MiniMap selected={selected} sections={sections} />
+          {isNight && (
+            <span className="pointer-events-none absolute right-3 top-3 rounded border border-white/10 bg-black/40 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.22em] text-white/45">
+              night layer · 20:00 → 08:00
+            </span>
+          )}
         </div>
       )}
+
+      <RuntimeHeatmap />
 
       {selected && (
         <DetailPanel
@@ -1207,6 +1228,12 @@ function stamp() {
 // helpers
 // ============================================================================
 
+/** Atlas Night Layer · 20:00 → 08:00 local time. Visual only. */
+function isNightHour(): boolean {
+  const h = new Date().getHours();
+  return h >= 20 || h < 8;
+}
+
 function positionOf(p: SectionPosition) {
   return {
     x: 20 + (p.col - 1) * (CELL_W + GAP),
@@ -1271,5 +1298,20 @@ const atlasCss = `
   border-color: rgba(248, 113, 113, 0.45) !important;
   box-shadow: inset 0 0 0 1px rgba(248,113,113,0.35), 0 0 14px -6px rgba(248,113,113,0.30);
 }
+
+/* Atlas Night Layer · 20:00 → 08:00 local time
+   · Slows every running animation by 2.5×
+   · Dims accent glows to ~55%
+   · Drops blueprint grid opacity slightly
+   Purely visual · no behavioural change.                                          */
+.atlas-night .atlas-grid {
+  background-image:
+    linear-gradient(rgba(124,155,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,155,255,0.03) 1px, transparent 1px);
+}
+.atlas-night .atlas-card { filter: brightness(0.85); }
+.atlas-night .atlas-state-core { animation-duration: 11s; }
+.atlas-night .atlas-state-live { animation-duration: 6s; }
+.atlas-night .atlas-state-warn { animation-duration: 4s; }
 `;
 

@@ -9,6 +9,8 @@ import { NotificationsBell } from "@/components/NotificationsBell";
 import { SpaceSwitcher } from "@/components/SpaceSwitcher";
 import { readPresentationFlags } from "@/components/PresentationModeCard";
 import { PresenceStrip } from "@/components/PresenceStrip";
+import { BrainEvolution } from "@/components/BrainEvolution";
+import { OperatorTimeline } from "@/components/OperatorTimeline";
 import { measureBrainHealth } from "@/services/brainHealth";
 
 /**
@@ -92,6 +94,7 @@ export function AtlasHud() {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <BrainEvolution />
           <PresentationPill />
           <SpaceSwitcher />
           <NotificationsBell />
@@ -102,6 +105,9 @@ export function AtlasHud() {
       <div className="border-t border-white/6 pt-2">
         <PresenceStrip />
       </div>
+
+      {/* Operator Timeline · chronological strip from real audit log */}
+      <OperatorTimeline />
     </section>
   );
 }
