@@ -12,17 +12,9 @@ import {
   ShieldCheck,
   TrendingUp
 } from "lucide-react";
-import {
-  fetchCryptoPrices,
-  formatChange,
-  formatPrice,
-  type CryptoFetchResult
-} from "@/services/providers/coingecko";
-import {
-  fetchNewsBest,
-  timeAgo,
-  type NewsFetchResult
-} from "@/services/providers/news";
+import { formatChange, formatPrice } from "@/services/providers/coingecko";
+import { timeAgo } from "@/services/providers/news";
+import { useCryptoFeed, useNewsFeed } from "@/services/marketFeed";
 import { readPresence, type PresenceSnapshot } from "@/services/presence";
 import { computeCostBoard, formatUsd } from "@/services/cost";
 import { adapterSummary } from "@/services/adapters";
@@ -40,47 +32,16 @@ import { useAtlasStore } from "@/store/atlas";
  * that lights when a feed is actually live.
  */
 
-const CRYPTO_REFRESH_MS = 60_000;
-const NEWS_REFRESH_MS = 120_000;
 const PRESENCE_REFRESH_MS = 4_000;
 
 export function BroadcastWall() {
   const history = useMissionStore((s) => s.history);
   const workflowRuns = useAtlasStore((s) => s.workflowRuns);
 
-  const [crypto, setCrypto] = useState<CryptoFetchResult | null>(null);
-  const [news, setNews] = useState<NewsFetchResult | null>(null);
+  // Shared single-poll feeds · no duplicate CoinGecko / HN calls.
+  const crypto = useCryptoFeed();
+  const news = useNewsFeed();
   const [presence, setPresence] = useState<PresenceSnapshot | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    const load = () => {
-      void fetchCryptoPrices().then((r) => {
-        if (alive) setCrypto(r);
-      });
-    };
-    load();
-    const t = window.setInterval(load, CRYPTO_REFRESH_MS);
-    return () => {
-      alive = false;
-      window.clearInterval(t);
-    };
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-    const load = () => {
-      void fetchNewsBest("AI", 8).then((r) => {
-        if (alive) setNews(r);
-      });
-    };
-    load();
-    const t = window.setInterval(load, NEWS_REFRESH_MS);
-    return () => {
-      alive = false;
-      window.clearInterval(t);
-    };
-  }, []);
 
   useEffect(() => {
     setPresence(readPresence());
@@ -93,11 +54,11 @@ export function BroadcastWall() {
   const approvals = workflowRuns.filter((r) => r.status === "awaiting-approval").length;
   const latest = history[0] ?? null;
 
-  const cryptoLive = crypto?.ok === true;
-  const newsLive = news?.ok === true;
+  const cryptoLive = crypto.state === "ok";
+  const newsLive = news.state === "ok";
 
-  const topQuotes = (crypto?.quotes ?? []).filter((q) => q.price != null).slice(0, 5);
-  const headlines = (news?.items ?? []).slice(0, 5);
+  const topQuotes = crypto.quotes.filter((q) => q.price != null).slice(0, 5);
+  const headlines = news.items.slice(0, 5);
 
   return (
     <section className="flex flex-col gap-6 rounded-3xl border border-white/10 bg-gradient-to-b from-black via-zinc-950 to-black p-8 text-white shadow-2xl">
@@ -120,8 +81,8 @@ export function BroadcastWall() {
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {/* 1 · Market Pulse */}
         <Tile Icon={TrendingUp} title="Market Pulse" live={cryptoLive}>
-          {crypto && !crypto.ok ? (
-            <Offline message="feed offline" detail={crypto.error} />
+          {crypto.state === "error" ? (
+            <Offline message="feed offline" detail={crypto.error ?? undefined} />
           ) : topQuotes.length === 0 ? (
             <Dash />
           ) : (
@@ -152,8 +113,8 @@ export function BroadcastWall() {
 
         {/* 2 · News Wire */}
         <Tile Icon={Newspaper} title="News Wire" live={newsLive}>
-          {news && !news.ok ? (
-            <Offline message="wire offline" detail={news.error} />
+          {news.state === "error" ? (
+            <Offline message="wire offline" detail={news.error ?? undefined} />
           ) : headlines.length === 0 ? (
             <Dash />
           ) : (

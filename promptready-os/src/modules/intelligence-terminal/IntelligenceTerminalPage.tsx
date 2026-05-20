@@ -55,7 +55,6 @@ import { BroadcastWall } from "@/components/BroadcastWall";
 import { BusinessCockpitCard } from "@/components/BusinessCockpitCard";
 import { Monitor } from "lucide-react";
 import {
-  fetchCryptoPrices,
   formatPrice,
   formatChange,
   formatMarketCap,
@@ -63,12 +62,12 @@ import {
 } from "@/services/providers/coingecko";
 import {
   fetchNews,
-  fetchNewsBest,
   timeAgo,
   NEWS_CATEGORIES,
   type NewsItem,
   type NewsCategory
 } from "@/services/providers/news";
+import { useCryptoFeed, useNewsFeed, refreshCryptoNow } from "@/services/marketFeed";
 
 /**
  * Intelligence Terminal · Intelligence Expansion 01.
@@ -971,57 +970,19 @@ function GridPanel({
 const PULSE_SYMBOLS = ["BTC", "ETH", "SOL"] as const;
 
 function MarketTheater() {
-  const [quotes, setQuotes] = useState<CryptoQuote[]>([]);
-  const [cryptoState, setCryptoState] = useState<"loading" | "ok" | "error">("loading");
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [newsState, setNewsState] = useState<"loading" | "ok" | "error">("loading");
+  const crypto = useCryptoFeed();
+  const newsFeed = useNewsFeed();
   const [pulseSym, setPulseSym] = useState<string>("BTC");
-  const [, setTick] = useState(0);
 
-  useEffect(() => {
-    let alive = true;
-    const loadCrypto = async () => {
-      const r = await fetchCryptoPrices();
-      if (!alive) return;
-      if (r.ok) {
-        setQuotes(r.quotes);
-        setCryptoState("ok");
-      } else {
-        setCryptoState("error");
-      }
-      setTick((n) => n + 1); // refresh sample-derived chart
-    };
-    void loadCrypto();
-    const t = window.setInterval(loadCrypto, 60_000);
-    return () => {
-      alive = false;
-      window.clearInterval(t);
-    };
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-    const loadNews = async () => {
-      const r = await fetchNewsBest("AI", 10);
-      if (!alive) return;
-      if (r.ok) {
-        setNews(r.items);
-        setNewsState("ok");
-      } else {
-        setNewsState("error");
-      }
-    };
-    void loadNews();
-    const t = window.setInterval(loadNews, 120_000);
-    return () => {
-      alive = false;
-      window.clearInterval(t);
-    };
-  }, []);
+  const quotes = crypto.quotes;
+  const cryptoState = crypto.state;
+  const news = newsFeed.items;
+  const newsState = newsFeed.state;
 
   const samples = getSamples(pulseSym);
   const cryptoOnline = cryptoState === "ok";
   const newsOnline = newsState === "ok";
+  const errorCount = adapterSummary().error;
 
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-graphite-950/40 p-3">
@@ -1032,6 +993,16 @@ function MarketTheater() {
         <span className="ml-auto hidden text-white/35 md:inline">
           press <kbd className="rounded border border-white/15 bg-white/[0.05] px-1 text-white/55">/</kbd> for command bar
         </span>
+      </div>
+
+      {/* Intelligence refresh status · one shared feed per source */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[9px] uppercase tracking-wider text-white/40">
+        <span>crypto refresh · {crypto.at ? new Date(crypto.at).toLocaleTimeString() : "—"}</span>
+        <span>news refresh · {newsFeed.at ? new Date(newsFeed.at).toLocaleTimeString() : "—"}</span>
+        <span className={errorCount > 0 ? "text-amber-200/80" : undefined}>
+          provider errors · {errorCount}
+        </span>
+        <span>{pulseSym} samples · {samples.length}</span>
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -1309,31 +1280,8 @@ function SignalRadar({
 // ============================================================================
 
 function CryptoLivePanel() {
-  const [quotes, setQuotes] = useState<CryptoQuote[]>([]);
-  const [state, setState] = useState<"loading" | "ok" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
-  const [at, setAt] = useState<number | null>(null);
-
-  const load = async () => {
-    setState("loading");
-    const r = await fetchCryptoPrices();
-    if (r.ok) {
-      setQuotes(r.quotes);
-      setState("ok");
-      setError(null);
-      setAt(r.at);
-    } else {
-      setState("error");
-      setError(r.error ?? "fetch failed");
-    }
-  };
-
-  useEffect(() => {
-    void load();
-    // refresh every 60s while the tab is mounted · respects rate limits
-    const t = window.setInterval(() => void load(), 60_000);
-    return () => window.clearInterval(t);
-  }, []);
+  // Reuse the single shared crypto feed · no separate poll loop.
+  const { quotes, state, at, error } = useCryptoFeed();
 
   return (
     <div className="rounded-md border border-white/8 bg-black/30 p-2">
@@ -1349,7 +1297,7 @@ function CryptoLivePanel() {
           )}
           <button
             type="button"
-            onClick={() => void load()}
+            onClick={() => void refreshCryptoNow()}
             className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
           >
             refresh
