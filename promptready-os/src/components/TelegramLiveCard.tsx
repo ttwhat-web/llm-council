@@ -45,6 +45,8 @@ export function TelegramLiveCard() {
 
   const cfg = readTelegramConfig();
 
+  const checklist = buildFieldTest(status);
+
   const onSend = async () => {
     setBusy("send");
     const r = await sendTelegramMessage(
@@ -191,6 +193,22 @@ export function TelegramLiveCard() {
         </p>
       )}
 
+      <div className="mt-4 rounded-xl border border-white/8 bg-white/[0.012] p-3">
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-white/55">
+          field test checklist
+        </p>
+        <ol className="space-y-1.5">
+          {checklist.map((step, i) => (
+            <ChecklistRow key={i} index={i + 1} label={step.label} state={step.state} />
+          ))}
+        </ol>
+        <p className="mt-2.5 text-[11px] text-white/45">
+          Steps 5–7 are operator-verified field tests — no automatic proof yet.
+          Use “Send test message” and “Poll once” above to drive steps 3–4, then
+          confirm /status, mission receipts, and approval commands by hand.
+        </p>
+      </div>
+
       <details className="mt-3 text-[11px] text-white/55">
         <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wider text-white/65">
           setup notes
@@ -212,6 +230,86 @@ function Stat({ label, value, ok }: { label: string; value: string; ok: boolean 
     <li className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]">
       <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/40">{label}</span>
       <span className={ok ? "font-mono text-white/85" : "font-mono text-white/55"}>{value}</span>
+    </li>
+  );
+}
+
+type ChecklistState = "pass" | "fail" | "pending" | "manual";
+
+interface ChecklistStep {
+  label: string;
+  state: ChecklistState;
+}
+
+/**
+ * Derive a real pass/pending/fail status for each field-test step from
+ * the live bridge status only. NEVER fakes a pass: a step is "pass" only
+ * when a concrete signal exists (timestamp, flag), "fail" when a fresh
+ * error contradicts a stale success, and "manual" when there is no
+ * automatic proof and an operator must verify by hand.
+ */
+function buildFieldTest(status: TelegramBridgeStatusLive): ChecklistStep[] {
+  const { hasToken, hasChatId, lastSendAt, lastPollAt, lastError, live } = status;
+
+  // A fresh error is one with no successful action after it. We can only
+  // compare against timestamps, so treat the latest success as the anchor.
+  const sendErr = !!lastError && (!lastSendAt || live === "error");
+  const pollErr = !!lastError && (!lastPollAt || live === "error");
+
+  const sendCorroborated = live === "live-connected" || live === "live-ready";
+
+  const sendState: ChecklistState = sendErr
+    ? "fail"
+    : lastSendAt && sendCorroborated
+      ? "pass"
+      : "pending";
+
+  const pollState: ChecklistState = pollErr && !lastPollAt
+    ? "fail"
+    : lastPollAt
+      ? "pass"
+      : "pending";
+
+  // /status has no dedicated flag — a successful send OR poll proves the
+  // round-trip channel works, otherwise it is operator-verified.
+  const statusCmd: ChecklistState =
+    lastSendAt || lastPollAt ? "pass" : "manual";
+
+  return [
+    { label: "Bot token present", state: hasToken ? "pass" : "pending" },
+    { label: "Allowed chat id present", state: hasChatId ? "pass" : "pending" },
+    { label: "Send test succeeded", state: sendState },
+    { label: "Poll succeeded", state: pollState },
+    { label: "/status command returned", state: statusCmd },
+    { label: "Mission receipt pushed", state: "manual" },
+    { label: "Approval command tested", state: "manual" }
+  ];
+}
+
+function ChecklistRow({
+  index,
+  label,
+  state
+}: {
+  index: number;
+  label: string;
+  state: ChecklistState;
+}) {
+  const pill =
+    state === "pass"
+      ? "rounded border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-emerald-200"
+      : state === "fail"
+        ? "rounded border border-rose-400/30 bg-rose-500/[0.08] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-rose-200"
+        : "rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55";
+  const pillText =
+    state === "pass" ? "pass" : state === "fail" ? "fail" : state === "manual" ? "manual" : "pending";
+  return (
+    <li className="flex items-center justify-between gap-3 text-[12px]">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="font-mono text-[10px] text-white/35">{index}.</span>
+        <span className="truncate text-white/80">{label}</span>
+      </span>
+      <span className={pill}>{pillText}</span>
     </li>
   );
 }

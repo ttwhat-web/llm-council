@@ -55,6 +55,7 @@ import { ModelCostsCard } from "@/components/ModelCostsCard";
 import { OperatorBulletinCard } from "@/components/OperatorBulletinCard";
 import { EmailRuntimeCard } from "@/components/EmailRuntimeCard";
 import { LaunchReadinessCard } from "@/components/LaunchReadinessCard";
+import { ProviderDiagnostics } from "@/components/ProviderDiagnostics";
 import {
   CloudSyncCard,
   MobileCompanionRoadmapCard,
@@ -183,8 +184,9 @@ export default function SettingsPage() {
         <AutoConfigure />
       </Foldable>
 
-      <SettingsSection letter="I" label="Intelligence" hint="Brief · Costs · Models" />
+      <SettingsSection letter="I" label="Intelligence" hint="Brief · Costs · Models · Providers" />
       <OperatorBulletinCard />
+      <ProviderDiagnostics />
       <ModelCostsCard />
       <ModelLabCard />
 

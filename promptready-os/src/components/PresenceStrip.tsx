@@ -128,6 +128,7 @@ export function PresenceStrip() {
 function adapterTone(s: string): Tone {
   if (s === "connected") return "ok";
   if (s === "adapter-ready") return "warn";
+  if (s === "error") return "bad";
   return "muted";
 }
 

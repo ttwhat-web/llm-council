@@ -216,15 +216,23 @@ function intelRow(
 ): RuntimeRow {
   const s = statusForModule(module);
   const state: RuntimeState =
-    s.status === "connected" ? "ready" : s.status === "adapter-ready" ? "partial" : "planned";
+    s.status === "connected"
+      ? "ready"
+      : s.status === "error"
+        ? "offline"
+        : s.status === "adapter-ready"
+          ? "partial"
+          : "planned";
   const detail =
     s.status === "connected"
       ? `live · ${s.providers.join(" · ")}`
-      : s.status === "adapter-ready"
-        ? `adapter ready · ${s.providers.join(" · ") || "awaiting provider"}`
-        : module === "email"
-          ? "read-only adapters · not connected"
-          : "offline · awaiting provider key";
+      : s.status === "error"
+        ? `last fetch failed · ${s.providers.join(" · ")}`
+        : s.status === "adapter-ready"
+          ? `adapter ready · ${s.providers.join(" · ") || "awaiting provider"}`
+          : module === "email"
+            ? "read-only adapters · not connected"
+            : "offline · awaiting provider key";
   return { id: module, label, Icon, state, detail };
 }
 

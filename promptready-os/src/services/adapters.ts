@@ -20,7 +20,9 @@
  * Vite statically inlines each value at build time.
  */
 
-export type AdapterStatus = "offline" | "adapter-ready" | "connected";
+import { healthState } from "@/services/providerHealth";
+
+export type AdapterStatus = "offline" | "adapter-ready" | "connected" | "error";
 
 export type AdapterModule =
   | "markets"
@@ -61,6 +63,7 @@ export const ADAPTERS: AdapterDef[] = [
   // signals (derived from market providers + on-chain)
   { id: "etherscan", provider: "Etherscan", label: "On-chain flow", module: "onchain", keyless: false, envKey: "VITE_ETHERSCAN_API_KEY", note: "Whale watch · wallet flow." },
   // news
+  { id: "hackernews", provider: "Hacker News", label: "AI · tech · markets stories", module: "news", keyless: true, note: "Public HN Algolia search · CORS-friendly · live." },
   { id: "newsapi", provider: "NewsAPI", label: "Headlines", module: "news", keyless: false, envKey: "VITE_NEWSAPI_KEY", note: "General + market news." },
   { id: "cryptopanic", provider: "CryptoPanic", label: "Crypto news", module: "news", keyless: true, envKey: "VITE_CRYPTOPANIC_KEY", note: "Crypto-focused news feed." }
 ];
@@ -106,6 +109,12 @@ export function adapterStatus(a: AdapterDef): AdapterStatus {
   if (Array.isArray(cfg.connectedAdapters) && cfg.connectedAdapters.includes(a.id)) {
     return "connected";
   }
+  // Real call outcomes win: a verified fetch flips to "connected", a
+  // recent failure surfaces as "error". Both are recorded only by the
+  // provider fetchers — never fabricated.
+  const health = healthState(a.id);
+  if (health === "connected") return "connected";
+  if (health === "error") return "error";
   // Keyless public APIs have a usable seam already; key-based providers
   // need a key to be "adapter-ready", otherwise they are offline.
   if (a.keyless) return "adapter-ready";
@@ -129,6 +138,7 @@ export function statusForModule(module: AdapterModule): ModuleStatus {
   const adapters = defs.map((def) => ({ def, status: adapterStatus(def) }));
   let status: AdapterStatus = "offline";
   if (adapters.some((a) => a.status === "connected")) status = "connected";
+  else if (adapters.some((a) => a.status === "error")) status = "error";
   else if (adapters.some((a) => a.status === "adapter-ready")) status = "adapter-ready";
   return {
     module,
@@ -144,26 +154,33 @@ export function adapterSummary(): {
   connected: number;
   ready: number;
   offline: number;
+  error: number;
 } {
   let connected = 0;
   let ready = 0;
   let offline = 0;
+  let error = 0;
   for (const a of ADAPTERS) {
     const s = adapterStatus(a);
     if (s === "connected") connected++;
     else if (s === "adapter-ready") ready++;
+    else if (s === "error") error++;
     else offline++;
   }
-  return { total: ADAPTERS.length, connected, ready, offline };
+  return { total: ADAPTERS.length, connected, ready, offline, error };
 }
 
 /** Human label + tone for a status pill. */
-export function statusMeta(status: AdapterStatus): { label: string; tone: "ok" | "accent" | "muted" } {
+export function statusMeta(
+  status: AdapterStatus
+): { label: string; tone: "ok" | "accent" | "muted" | "bad" } {
   switch (status) {
     case "connected":
       return { label: "connected", tone: "ok" };
     case "adapter-ready":
       return { label: "adapter ready", tone: "accent" };
+    case "error":
+      return { label: "error", tone: "bad" };
     default:
       return { label: "offline", tone: "muted" };
   }

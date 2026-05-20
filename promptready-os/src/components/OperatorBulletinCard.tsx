@@ -19,7 +19,7 @@ import type { AdapterModule } from "@/services/adapters";
  * numbers (mission history, armed alert rules, memory, snapshots).
  */
 
-type Tone = "ok" | "warn" | "planned" | "accent";
+type Tone = "ok" | "warn" | "planned" | "accent" | "bad";
 
 function toneClass(tone: Tone): string {
   switch (tone) {
@@ -29,6 +29,8 @@ function toneClass(tone: Tone): string {
       return "border-amber-400/30 bg-amber-500/[0.08] text-amber-200";
     case "accent":
       return "border-accent/30 bg-accent/[0.08] text-accent";
+    case "bad":
+      return "border-rose-400/30 bg-rose-500/[0.08] text-rose-200";
     case "planned":
     default:
       return "border-white/10 bg-white/[0.03] text-white/55";
@@ -36,21 +38,29 @@ function toneClass(tone: Tone): string {
 }
 
 /** Map the registry's status tone onto this card's local tone scheme. */
-function metaTone(tone: "ok" | "accent" | "muted"): Tone {
-  return tone === "ok" ? "ok" : tone === "accent" ? "accent" : "planned";
+function metaTone(tone: "ok" | "accent" | "muted" | "bad"): Tone {
+  return tone === "ok" ? "ok" : tone === "accent" ? "accent" : tone === "bad" ? "bad" : "planned";
 }
 
 /**
  * Build a row for an external category backed by an adapter module.
  * Honest by design: the value column only ever reports the source state
- * ("adapter ready" / "no feed"), never a fabricated headline or count.
+ * ("connected" / "adapter ready" / "feed error" / "no feed"), never a
+ * fabricated headline or count.
  */
 function adapterRow(section: string, module: AdapterModule): BriefRow {
   const meta = statusMeta(statusForModule(module).status);
-  const ready = meta.tone !== "muted";
+  const value =
+    meta.tone === "ok"
+      ? "connected"
+      : meta.tone === "bad"
+        ? "feed error"
+        : meta.tone === "accent"
+          ? "adapter ready"
+          : "no feed";
   return {
     section,
-    value: ready ? "adapter ready" : "no feed",
+    value,
     pill: meta.label,
     tone: metaTone(meta.tone)
   };

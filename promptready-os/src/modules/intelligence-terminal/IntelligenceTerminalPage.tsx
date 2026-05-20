@@ -36,6 +36,20 @@ import { computeCostBoard, formatUsd } from "@/services/cost";
 import { readPresence, type PresenceSnapshot } from "@/services/presence";
 import { measureBrainHealth } from "@/services/brainHealth";
 import { statusForModule, statusMeta, type AdapterModule } from "@/services/adapters";
+import {
+  fetchCryptoPrices,
+  formatPrice,
+  formatChange,
+  formatMarketCap,
+  type CryptoQuote
+} from "@/services/providers/coingecko";
+import {
+  fetchNews,
+  timeAgo,
+  NEWS_CATEGORIES,
+  type NewsItem,
+  type NewsCategory
+} from "@/services/providers/news";
 
 /**
  * Intelligence Terminal · Intelligence Expansion 01.
@@ -312,10 +326,11 @@ function adapterModuleFor(kind: TabKind): AdapterModule | null {
   return TAB_ADAPTER[kind] ?? null;
 }
 
-const TONE_PILL: Record<"ok" | "accent" | "muted", string> = {
+const TONE_PILL: Record<"ok" | "accent" | "muted" | "bad", string> = {
   ok: "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200",
   accent: "border-accent/30 bg-accent/[0.08] text-accent",
-  muted: "border-white/10 bg-white/[0.03] text-white/55"
+  muted: "border-white/10 bg-white/[0.03] text-white/55",
+  bad: "border-rose-400/30 bg-rose-500/[0.08] text-rose-200"
 };
 
 interface PinnedCard {
@@ -719,6 +734,10 @@ function GridPanel({
         </div>
       )}
 
+      {/* Live providers · real fetch · honest error/offline state */}
+      {meta.kind === "crypto" && <CryptoLivePanel />}
+      {meta.kind === "research" && <NewsLivePanel />}
+
       <div className="flex items-center gap-1.5">
         <input
           type="text"
@@ -799,6 +818,178 @@ function GridPanel({
         )}
       </div>
     </section>
+  );
+}
+
+// ============================================================================
+// Live providers · CoinGecko (crypto) + Hacker News (news) · REAL fetch
+// ============================================================================
+
+function CryptoLivePanel() {
+  const [quotes, setQuotes] = useState<CryptoQuote[]>([]);
+  const [state, setState] = useState<"loading" | "ok" | "error">("loading");
+  const [error, setError] = useState<string | null>(null);
+  const [at, setAt] = useState<number | null>(null);
+
+  const load = async () => {
+    setState("loading");
+    const r = await fetchCryptoPrices();
+    if (r.ok) {
+      setQuotes(r.quotes);
+      setState("ok");
+      setError(null);
+      setAt(r.at);
+    } else {
+      setState("error");
+      setError(r.error ?? "fetch failed");
+    }
+  };
+
+  useEffect(() => {
+    void load();
+    // refresh every 60s while the tab is mounted · respects rate limits
+    const t = window.setInterval(() => void load(), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  return (
+    <div className="rounded-md border border-white/8 bg-black/30 p-2">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+          live · coingecko {state === "loading" && "· loading…"}
+        </span>
+        <div className="flex items-center gap-2">
+          {at && state === "ok" && (
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
+              {new Date(at).toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+          >
+            refresh
+          </button>
+        </div>
+      </div>
+
+      {state === "error" ? (
+        <p className="rounded-md border border-rose-400/25 bg-rose-500/[0.06] px-2 py-1.5 font-mono text-[10.5px] text-rose-100/90">
+          fetch failed · {error} · public API may be rate-limited or blocked by
+          browser CORS · the desktop runtime calls it directly
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {quotes.map((q) => (
+            <li
+              key={q.symbol}
+              className="grid grid-cols-[0.7fr_1fr_0.8fr_1fr] items-center gap-1 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 font-mono text-[11px]"
+            >
+              <span className="font-semibold text-white">{q.symbol}</span>
+              <span className="tabular-nums text-white/85">{formatPrice(q.price)}</span>
+              <span
+                className={clsx(
+                  "tabular-nums",
+                  q.change24h == null
+                    ? "text-white/40"
+                    : q.change24h >= 0
+                      ? "text-emerald-300/90"
+                      : "text-rose-300/90"
+                )}
+              >
+                {formatChange(q.change24h)}
+              </span>
+              <span className="text-right tabular-nums text-white/55">
+                {formatMarketCap(q.marketCap)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function NewsLivePanel() {
+  const [category, setCategory] = useState<NewsCategory>("AI");
+  const [items, setItems] = useState<NewsItem[]>([]);
+  const [state, setState] = useState<"loading" | "ok" | "error">("loading");
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async (cat: NewsCategory) => {
+    setState("loading");
+    const r = await fetchNews(cat);
+    if (r.ok) {
+      setItems(r.items);
+      setState("ok");
+      setError(null);
+    } else {
+      setState("error");
+      setError(r.error ?? "fetch failed");
+    }
+  };
+
+  useEffect(() => {
+    void load(category);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category]);
+
+  return (
+    <div className="rounded-md border border-white/8 bg-black/30 p-2">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-1">
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+          live · hacker news {state === "loading" && "· loading…"}
+        </span>
+        <div className="flex flex-wrap items-center gap-1">
+          {NEWS_CATEGORIES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCategory(c)}
+              className={clsx(
+                "rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition",
+                c === category
+                  ? "border-accent/40 bg-accent/[0.08] text-accent"
+                  : "border-white/10 bg-white/[0.03] text-white/65 hover:bg-white/[0.06]"
+              )}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {state === "error" ? (
+        <p className="rounded-md border border-rose-400/25 bg-rose-500/[0.06] px-2 py-1.5 font-mono text-[10.5px] text-rose-100/90">
+          fetch failed · {error} · the desktop runtime calls this directly
+        </p>
+      ) : items.length === 0 && state === "ok" ? (
+        <p className="px-2 py-1.5 font-mono text-[10.5px] text-white/45">no stories returned</p>
+      ) : (
+        <ul className="flex max-h-[260px] flex-col gap-1 overflow-auto pr-1">
+          {items.map((n) => (
+            <li
+              key={n.id}
+              className="flex items-start justify-between gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]"
+            >
+              <a
+                href={n.url ?? "#"}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="min-w-0 flex-1 truncate text-white/85 hover:text-accent"
+                title={n.title}
+              >
+                {n.title}
+              </a>
+              <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-white/40">
+                {n.source} · {timeAgo(n.time)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

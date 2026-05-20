@@ -39,12 +39,13 @@ interface OllamaModelDef {
   kind: "ollama";
   label: string;
   match: string; // lowercase substring tested against probe.models
+  pullTag: string; // suggested tag for `ollama pull <tag>`
 }
 
 const OLLAMA_MODELS: OllamaModelDef[] = [
-  { kind: "ollama", label: "Gemma", match: "gemma" },
-  { kind: "ollama", label: "Qwen", match: "qwen" },
-  { kind: "ollama", label: "Llama", match: "llama" }
+  { kind: "ollama", label: "Gemma", match: "gemma", pullTag: "gemma2" },
+  { kind: "ollama", label: "Qwen", match: "qwen", pullTag: "qwen2.5" },
+  { kind: "ollama", label: "Llama", match: "llama", pullTag: "llama3.2" }
 ];
 
 const CLOUD_MODELS = ["Claude", "GPT"] as const;
@@ -98,6 +99,25 @@ export function ModelLabCard() {
   const [lastResult, setLastResult] = useState<SavedResult | null>(null);
   const [saved, setSaved] = useState<SavedResult[]>(() => loadResults());
   const [selected, setSelected] = useState<string>("deterministic");
+  const [copiedTag, setCopiedTag] = useState<string | null>(null);
+
+  function copyPull(pullTag: string) {
+    const cmd = `ollama pull ${pullTag}`;
+    const clip =
+      typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+    if (!clip || typeof clip.writeText !== "function") return;
+    clip
+      .writeText(cmd)
+      .then(() => {
+        setCopiedTag(pullTag);
+        window.setTimeout(() => {
+          setCopiedTag((cur) => (cur === pullTag ? null : cur));
+        }, 1500);
+      })
+      .catch(() => {
+        // ignore — honest no-op if clipboard is denied
+      });
+  }
 
   useEffect(() => {
     let alive = true;
@@ -283,6 +303,53 @@ export function ModelLabCard() {
           availability="always"
         />
       </div>
+
+      {/* Installed models · real /api/tags list */}
+      {reachable && (
+        <div className="mt-3">
+          <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/45">
+            installed · /api/tags
+          </span>
+          {probe && probe.models.length > 0 ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {probe.models.map((m) => (
+                <span
+                  key={m}
+                  className="inline-flex items-center rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[10px] text-white/65"
+                >
+                  {m}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-1 text-[10.5px] text-white/40">no models pulled</p>
+          )}
+
+          {/* Pull helpers for known models not yet installed */}
+          {(() => {
+            const missing = OLLAMA_MODELS.filter(
+              (m) => !probeModels.some((pm) => pm.includes(m.match))
+            );
+            if (missing.length === 0) return null;
+            return (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {missing.map((m) => (
+                  <button
+                    key={m.match}
+                    type="button"
+                    onClick={() => copyPull(m.pullTag)}
+                    className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[10px] text-white/55 hover:bg-white/[0.06]"
+                  >
+                    {copiedTag === m.pullTag
+                      ? "copied"
+                      : `copy pull · ${m.pullTag}`}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="mt-3 flex flex-wrap items-center gap-2">

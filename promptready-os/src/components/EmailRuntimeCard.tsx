@@ -13,10 +13,11 @@ import {
 } from "lucide-react";
 import { statusForModule, statusMeta } from "@/services/adapters";
 
-const TONE_PILL: Record<"ok" | "accent" | "muted", string> = {
+const TONE_PILL: Record<"ok" | "accent" | "muted" | "bad", string> = {
   ok: "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200",
   accent: "border-accent/30 bg-accent/[0.08] text-accent",
-  muted: "border-white/10 bg-white/[0.03] text-white/55"
+  muted: "border-white/10 bg-white/[0.03] text-white/55",
+  bad: "border-rose-400/30 bg-rose-500/[0.08] text-rose-200"
 };
 
 /**
@@ -51,6 +52,38 @@ const FLOW: { Icon: typeof Mail; label: string }[] = [
 ];
 
 const ADAPTERS = ["Gmail", "IMAP", "Outlook"];
+
+interface IntegrationPlan {
+  provider: string;
+  steps: string[];
+}
+
+const INTEGRATION_PLAN: IntegrationPlan[] = [
+  {
+    provider: "Gmail",
+    steps: [
+      "OAuth 2.0 · scope gmail.readonly (+ gmail.compose later, draft-only)",
+      "read-only labels first (INBOX + user labels)",
+      "Gmail History API for incremental sync",
+      "draft-only send in a later phase — never auto-send"
+    ]
+  },
+  {
+    provider: "IMAP",
+    steps: [
+      "host + port (993 TLS)",
+      "app password — not the main password",
+      "read-only fetch first"
+    ]
+  },
+  {
+    provider: "Outlook",
+    steps: [
+      "Microsoft Graph · scope Mail.Read (+ Mail.ReadWrite later)",
+      "Graph delta query for incremental sync"
+    ]
+  }
+];
 
 const STORAGE_KEY = "promptready-os.email-runtime.expanded";
 
@@ -194,6 +227,47 @@ export function EmailRuntimeCard() {
               </li>
             ))}
           </ul>
+
+          <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/[0.012] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-wider text-accent">
+                integration plan · design only
+              </span>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
+                no oauth · nothing connects today
+              </span>
+            </div>
+            <p className="text-[11px] text-white/55">
+              How each provider will connect in a later phase. This is planned
+              design — none of it is wired up and no credentials are requested.
+            </p>
+            <ul className="flex flex-col gap-2">
+              {INTEGRATION_PLAN.map((plan) => (
+                <li
+                  key={plan.provider}
+                  className="flex flex-col gap-1.5 rounded-md border border-white/8 bg-white/[0.012] p-2.5"
+                >
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.22em] text-white/55">
+                    <Inbox className="h-3 w-3 text-accent" />
+                    {plan.provider}
+                  </span>
+                  <ul className="flex flex-col gap-1">
+                    {plan.steps.map((step) => (
+                      <li
+                        key={step}
+                        className="flex items-start gap-1.5 text-[11px] text-white/55"
+                      >
+                        <span className="mt-[3px] h-1 w-1 shrink-0 rounded-full bg-accent/50" />
+                        <span className="font-mono text-[10px] leading-snug text-white/55">
+                          {step}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <p className="text-[11px] text-white/55">
             Read-only first &middot; no send &middot; no sync yet.
