@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Palette } from "lucide-react";
-import { useThemeStore, THEMES } from "@/store/theme";
+import { useThemeStore, THEMES, BACKGROUNDS } from "@/store/theme";
 
 /**
  * Theme switcher · Phase 13.
@@ -34,10 +34,13 @@ export function ThemeSwitcher({ variant = "compact" }: Props) {
 
   if (variant === "inline") {
     return (
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        {THEMES.map((t) => (
-          <Swatch key={t.id} t={t} active={t.id === id} onPick={() => set(t.id)} />
-        ))}
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-5">
+          {THEMES.map((t) => (
+            <Swatch key={t.id} t={t} active={t.id === id} onPick={() => set(t.id)} />
+          ))}
+        </div>
+        <BackgroundPicker />
       </div>
     );
   }
@@ -74,6 +77,35 @@ export function ThemeSwitcher({ variant = "compact" }: Props) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function BackgroundPicker() {
+  const bg = useThemeStore((s) => s.bg);
+  const setBackground = useThemeStore((s) => s.setBackground);
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-white/8 pt-3">
+      <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-white/40">
+        background · pure visual
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {BACKGROUNDS.map((b) => (
+          <button
+            key={b.id}
+            type="button"
+            onClick={() => setBackground(b.id)}
+            className={clsx(
+              "rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition",
+              b.id === bg
+                ? "border-accent/40 bg-accent/[0.08] text-accent shadow-glow"
+                : "border-white/10 bg-white/[0.03] text-white/65 hover:bg-white/[0.06]"
+            )}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

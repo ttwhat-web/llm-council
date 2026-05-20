@@ -135,9 +135,9 @@ export default function MarketplacePage() {
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-5 py-5 md:px-7 md:py-7">
       <SurfaceHeader
-        eyebrow="marketplace · operator packs"
-        title="Marketplace"
-        sub="Starter packs · workflows, templates, terminal pins and repo presets that install into the current brain. Local-only. Browse · install · export · share."
+        eyebrow="marketplace · operator brain installer"
+        title="Operator Brain Installer"
+        sub="Not an AI app store — a brain installer. Each pack drops real workflows, mission templates, watchlists, repo maps and terminal presets into the current brain. Local-only. Browse · install · export · share."
         right={
           <div className="flex items-center gap-2">
             <input
@@ -189,6 +189,10 @@ export default function MarketplacePage() {
           ))}
         </div>
       </section>
+
+      <p className="rounded-md border border-white/8 bg-white/[0.015] px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-white/45">
+        marketplace = operator brain installer · not an AI app store
+      </p>
 
       {flash && (
         <p className="rounded-md border border-accent/30 bg-accent/[0.08] px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-wider text-accent">

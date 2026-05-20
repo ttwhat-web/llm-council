@@ -25,6 +25,93 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ---------- Background system · Intelligence Expansion 01 ---------------- *
+ * Pure-visual ambient backdrops selected in Settings → Personalization.
+ * A single fixed overlay layers on top of the base body gradient. No
+ * runtime behaviour changes · the layer is pointer-events:none.         */
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* static · plain (default) — overlay stays hidden */
+body[data-bg="static"]::before { opacity: 0; }
+
+/* grid · blueprint lines */
+body[data-bg="grid"]::before {
+  opacity: 1;
+  background-image:
+    linear-gradient(var(--pr-color-accent-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pr-color-accent-soft) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* blueprint · denser grid + corner vignette */
+body[data-bg="blueprint"]::before {
+  opacity: 1;
+  background-image:
+    linear-gradient(var(--pr-color-accent-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pr-color-accent-soft) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 0%, var(--pr-color-accent-soft), transparent 55%);
+  background-size: 22px 22px, 22px 22px, 100% 100%;
+}
+
+/* market · faint vertical price columns */
+body[data-bg="market"]::before {
+  opacity: 0.6;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--pr-color-accent-soft) 0px,
+    var(--pr-color-accent-soft) 2px,
+    transparent 2px,
+    transparent 14px
+  );
+}
+
+/* glass · soft radial glows */
+body[data-bg="glass"]::before {
+  opacity: 1;
+  background-image:
+    radial-gradient(circle at 20% 20%, var(--pr-color-accent-soft), transparent 35%),
+    radial-gradient(circle at 80% 70%, var(--pr-color-accent-soft), transparent 40%);
+}
+
+/* holo · slow shifting hue sheen */
+body[data-bg="holo"]::before {
+  opacity: 0.5;
+  background-image: conic-gradient(
+    from 0deg,
+    var(--pr-color-accent-soft),
+    transparent 25%,
+    var(--pr-color-accent-soft) 50%,
+    transparent 75%,
+    var(--pr-color-accent-soft)
+  );
+  animation: holoSpin 36s linear infinite;
+}
+@keyframes holoSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* graph · dot grid */
+body[data-bg="graph"]::before {
+  opacity: 1;
+  background-image: radial-gradient(var(--pr-color-accent-soft) 1.4px, transparent 1.4px);
+  background-size: 26px 26px;
+}
+
 /* ---------- Glass utilities --------------------------------------------- */
 
 .glass {

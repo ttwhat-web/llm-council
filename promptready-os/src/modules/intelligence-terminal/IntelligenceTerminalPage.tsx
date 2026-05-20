@@ -3,46 +3,86 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import {
+  Activity,
   AlertTriangle,
   Bell,
   Bitcoin,
+  Boxes,
   Cpu,
+  DollarSign,
+  FileText,
+  Fish,
   GitBranch,
   Globe,
-  Inbox,
+  HeartPulse,
   Loader,
   Newspaper,
   Plus,
+  Receipt,
   Search,
   Star,
   Terminal as TerminalIcon,
+  TrendingUp,
+  Waves,
   X
 } from "lucide-react";
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
+import { useMissionStore } from "@/store/mission";
+import { useAtlasStore } from "@/store/atlas";
+import { useBrainStore } from "@/store/brain";
+import { computeCostBoard, formatUsd } from "@/services/cost";
+import { readPresence, type PresenceSnapshot } from "@/services/presence";
+import { measureBrainHealth } from "@/services/brainHealth";
 
 /**
- * Intelligence Terminal · Phase 13 redesign.
+ * Intelligence Terminal · Intelligence Expansion 01.
  *
- * Four-zone Bloomberg-density layout in the Operator.Center design
- * language:
+ * Bloomberg-density operator terminal organised into four GROUPS:
  *
- *   Top:    command/ticker rail (free-text command → routes to a tab,
- *           displays the queued symbol/keyword across the grid).
- *   Left:   global watchlist (all pinned cards from every tab).
- *   Center: tabbed intelligence grid (Market · Crypto · Repos · Research
- *           · Inbox · System) with honest offline state and manual
- *           pinned cards per tab.
- *   Right:  briefings + alerts (alert rules + briefings inbox).
- *   Bottom: status rail (active tab · pinned card total · last command).
+ *   MARKETS   · Stocks · Crypto · FX · Watchlists
+ *   RESEARCH  · News Feed · Earnings · AI News · Repo Research
+ *   SIGNALS   · Alerts · Whale Watch · Movers · Volatility
+ *   OPERATOR  · Runtime · Costs · Agents · Receipts · Diagnostics
  *
- * No fake data anywhere. Every feed labels itself as offline until the
- * desktop runtime wires in a provider.
+ * Markets are NOT the product identity — Operator.Center is not a
+ * trading app. Market surfaces live under the Intelligence Layer only,
+ * and every external feed is honest about being offline until a real
+ * provider wires in via the desktop runtime. NO fake feeds · NO fake
+ * ticks · NO fake market data.
+ *
+ * The OPERATOR group is different: it renders REAL local state (runtime
+ * presence, cost board, agents, receipts, diagnostics) because that
+ * data already exists on this machine.
  */
 
-type TabKind = "market" | "crypto" | "repo" | "research" | "inbox" | "system";
+type TabGroup = "markets" | "research" | "signals" | "operator";
+
+type TabKind =
+  // markets
+  | "market"
+  | "crypto"
+  | "fx"
+  | "watchlists"
+  // research
+  | "research"
+  | "earnings"
+  | "ai-news"
+  | "repo"
+  // signals
+  | "alerts"
+  | "whale"
+  | "movers"
+  | "volatility"
+  // operator
+  | "runtime"
+  | "costs"
+  | "agents"
+  | "receipts"
+  | "diagnostics";
 
 interface TabMeta {
   kind: TabKind;
+  group: TabGroup;
   label: string;
   Icon: typeof Globe;
   blurb: string;
@@ -50,17 +90,27 @@ interface TabMeta {
   placeholders: string[];
 }
 
+const GROUP_LABEL: Record<TabGroup, string> = {
+  markets: "Markets",
+  research: "Research",
+  signals: "Signals",
+  operator: "Operator"
+};
+
 const TABS: TabMeta[] = [
+  // ---- MARKETS ---------------------------------------------------------
   {
     kind: "market",
-    label: "Market",
+    group: "markets",
+    label: "Stocks",
     Icon: Globe,
-    blurb: "Indices, futures, FX.",
+    blurb: "Indices, equities, futures.",
     inputHint: "Pin a ticker · e.g. AAPL",
-    placeholders: ["S&P 500", "Nasdaq", "Dow", "VIX", "Gold", "USD/EUR"]
+    placeholders: ["S&P 500", "Nasdaq", "Dow", "VIX", "Gold", "Oil"]
   },
   {
     kind: "crypto",
+    group: "markets",
     label: "Crypto",
     Icon: Bitcoin,
     blurb: "Coins, perps, on-chain.",
@@ -68,38 +118,150 @@ const TABS: TabMeta[] = [
     placeholders: ["BTC", "ETH", "SOL", "TON"]
   },
   {
+    kind: "fx",
+    group: "markets",
+    label: "FX",
+    Icon: TrendingUp,
+    blurb: "Currency pairs.",
+    inputHint: "Pin a pair · e.g. EUR/USD",
+    placeholders: ["EUR/USD", "USD/TRY", "USD/JPY", "GBP/USD"]
+  },
+  {
+    kind: "watchlists",
+    group: "markets",
+    label: "Watchlists",
+    Icon: Star,
+    blurb: "Saved baskets.",
+    inputHint: "Name a watchlist",
+    placeholders: ["My equities", "Majors", "Export FX"]
+  },
+  // ---- RESEARCH --------------------------------------------------------
+  {
+    kind: "research",
+    group: "research",
+    label: "News Feed",
+    Icon: Newspaper,
+    blurb: "Headlines, RSS, wires.",
+    inputHint: "Pin a feed or topic",
+    placeholders: ["reuters:markets", "hn:top"]
+  },
+  {
+    kind: "earnings",
+    group: "research",
+    label: "Earnings",
+    Icon: FileText,
+    blurb: "Calendar, prints, guidance.",
+    inputHint: "Pin a ticker's earnings",
+    placeholders: ["AAPL Q?", "NVDA Q?"]
+  },
+  {
+    kind: "ai-news",
+    group: "research",
+    label: "AI News",
+    Icon: Cpu,
+    blurb: "Model releases, papers.",
+    inputHint: "Pin a topic or lab",
+    placeholders: ["arxiv:cs.AI", "model releases"]
+  },
+  {
     kind: "repo",
-    label: "Repos",
+    group: "research",
+    label: "Repo Research",
     Icon: GitBranch,
-    blurb: "Repo activity.",
+    blurb: "Repo activity, releases.",
     inputHint: "Pin owner/repo",
     placeholders: ["ttwhat-web/llm-council"]
   },
+  // ---- SIGNALS ---------------------------------------------------------
   {
-    kind: "research",
-    label: "Research",
-    Icon: Newspaper,
-    blurb: "Feeds, RSS, arXiv.",
-    inputHint: "Pin a feed or topic",
-    placeholders: ["arxiv:cs.AI", "hn:top"]
+    kind: "alerts",
+    group: "signals",
+    label: "Alerts",
+    Icon: Bell,
+    blurb: "Armed alert rules.",
+    inputHint: "Pin an alert thesis",
+    placeholders: ["BTC < 50k", "AAPL +5%"]
   },
   {
-    kind: "inbox",
-    label: "Inbox",
-    Icon: Inbox,
-    blurb: "Mail / DM summaries.",
-    inputHint: "Pin a label or sender",
-    placeholders: ["label:urgent", "sender:investor"]
+    kind: "whale",
+    group: "signals",
+    label: "Whale Watch",
+    Icon: Fish,
+    blurb: "Large flow, on-chain moves.",
+    inputHint: "Pin a wallet or threshold",
+    placeholders: ["whale > $10M", "wallet:0x…"]
   },
   {
-    kind: "system",
-    label: "System",
+    kind: "movers",
+    group: "signals",
+    label: "Movers",
+    Icon: Activity,
+    blurb: "Top gainers / losers.",
+    inputHint: "Pin a universe",
+    placeholders: ["S&P movers", "crypto top10"]
+  },
+  {
+    kind: "volatility",
+    group: "signals",
+    label: "Volatility",
+    Icon: Waves,
+    blurb: "IV, realized vol, regimes.",
+    inputHint: "Pin a vol metric",
+    placeholders: ["VIX", "BTC 30d IV"]
+  },
+  // ---- OPERATOR (real local data) -------------------------------------
+  {
+    kind: "runtime",
+    group: "operator",
+    label: "Runtime",
+    Icon: HeartPulse,
+    blurb: "Live presence rollup.",
+    inputHint: "",
+    placeholders: []
+  },
+  {
+    kind: "costs",
+    group: "operator",
+    label: "Costs",
+    Icon: DollarSign,
+    blurb: "Local cost board.",
+    inputHint: "",
+    placeholders: []
+  },
+  {
+    kind: "agents",
+    group: "operator",
+    label: "Agents",
+    Icon: Boxes,
+    blurb: "Agent slots + state.",
+    inputHint: "",
+    placeholders: []
+  },
+  {
+    kind: "receipts",
+    group: "operator",
+    label: "Receipts",
+    Icon: Receipt,
+    blurb: "Recent missions.",
+    inputHint: "",
+    placeholders: []
+  },
+  {
+    kind: "diagnostics",
+    group: "operator",
+    label: "Diagnostics",
     Icon: Cpu,
-    blurb: "Engine + throughput.",
-    inputHint: "Pin a metric",
-    placeholders: ["ollama:health", "missions:throughput"]
+    blurb: "Brain health snapshot.",
+    inputHint: "",
+    placeholders: []
   }
 ];
+
+const GROUP_ORDER: TabGroup[] = ["markets", "research", "signals", "operator"];
+
+function isOperator(kind: TabKind): boolean {
+  return TABS.find((t) => t.kind === kind)?.group === "operator";
+}
 
 interface PinnedCard {
   id: string;
@@ -113,7 +275,25 @@ const STORAGE_KEY = "promptready-os.intel-terminal";
 const ALERTS_KEY = "promptready-os.intel-terminal.alerts";
 
 function emptyPinned(): Pinned {
-  return { market: [], crypto: [], repo: [], research: [], inbox: [], system: [] };
+  return {
+    market: [],
+    crypto: [],
+    fx: [],
+    watchlists: [],
+    research: [],
+    earnings: [],
+    "ai-news": [],
+    repo: [],
+    alerts: [],
+    whale: [],
+    movers: [],
+    volatility: [],
+    runtime: [],
+    costs: [],
+    agents: [],
+    receipts: [],
+    diagnostics: []
+  };
 }
 
 function loadPinned(): Pinned {
@@ -183,12 +363,10 @@ export default function IntelligenceTerminalPage() {
     const v = command.trim();
     if (!v) return;
     setLastCommand(v);
-    // command grammar: "tab:value" routes to a tab and pins the value;
-    // anything else pins to the active tab.
-    const m = /^(\w+):\s*(.+)$/.exec(v);
+    const m = /^(\w[\w-]*):\s*(.+)$/.exec(v);
     if (m) {
-      const targetTab = (m[1].toLowerCase() as TabKind);
-      if (TABS.some((t) => t.kind === targetTab)) {
+      const targetTab = m[1].toLowerCase() as TabKind;
+      if (TABS.some((t) => t.kind === targetTab) && !isOperator(targetTab)) {
         setActive(targetTab);
         setPinned((prev) => ({
           ...prev,
@@ -198,19 +376,21 @@ export default function IntelligenceTerminalPage() {
         return;
       }
     }
-    updateCards([...cards, { id: rid(), text: v, tab: active }]);
+    if (!isOperator(active)) {
+      updateCards([...cards, { id: rid(), text: v, tab: active }]);
+    }
     setCommand("");
   };
 
   return (
     <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-4 px-5 py-5 md:px-7 md:py-7">
       <SurfaceHeader
-        eyebrow="terminal · ambient intelligence"
+        eyebrow="terminal · intelligence layer"
         title="Intelligence Terminal"
-        sub="Premium operator workspace. Command rail, watchlist, intelligence grid, briefings. No live feeds connected — every panel is honest about it."
+        sub="Markets · Research · Signals · Operator. Market surfaces live under the Intelligence Layer only — Operator.Center is not a trading app. External feeds are honest about being offline; the Operator group shows real local state."
         right={
           <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/55">
-            {totalPinned} pinned · 0 feeds connected
+            {totalPinned} pinned · feeds offline
           </span>
         }
       />
@@ -218,52 +398,59 @@ export default function IntelligenceTerminalPage() {
       {/* ============== Command / ticker rail ============== */}
       <section className="flex items-center gap-2 rounded-2xl border border-accent/25 bg-accent/[0.04] px-3 py-2 shadow-glow">
         <TerminalIcon className="h-3.5 w-3.5 text-accent" />
-        <span className="font-mono text-[10px] uppercase tracking-wider text-accent">
-          cmd
-        </span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-accent">cmd</span>
         <input
           type="text"
           value={command}
           onChange={(e) => setCommand(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onCommand()}
-          placeholder="market:AAPL · crypto:BTC · repo:owner/name · research:arxiv:cs.AI · or free text"
+          placeholder="market:AAPL · crypto:BTC · fx:EUR/USD · repo:owner/name · or free text"
           className="no-drag flex-1 bg-transparent font-mono text-[12px] text-white placeholder:text-white/35 focus:outline-none"
         />
         {lastCommand && (
-          <span className="hidden md:inline rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+          <span className="hidden rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55 md:inline">
             last · {lastCommand.slice(0, 40)}
           </span>
         )}
       </section>
 
-      <nav className="flex flex-wrap items-center gap-1.5 border-b border-white/8 pb-2">
-        {TABS.map((t) => {
-          const on = t.kind === active;
-          return (
-            <button
-              key={t.kind}
-              type="button"
-              onClick={() => setActive(t.kind)}
-              className={clsx(
-                "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-wider transition",
-                on
-                  ? "border-accent/40 bg-accent/[0.08] text-accent shadow-glow"
-                  : "border-white/10 bg-white/[0.03] text-white/65 hover:bg-white/[0.06]"
-              )}
-            >
-              <t.Icon className="h-3 w-3" />
-              {t.label}
-              <span
-                className={clsx(
-                  "rounded px-1 py-px font-mono text-[8.5px]",
-                  on ? "bg-accent/[0.15] text-accent" : "bg-white/[0.06] text-white/55"
-                )}
-              >
-                {pinned[t.kind].length || "offline"}
-              </span>
-            </button>
-          );
-        })}
+      {/* ============== Grouped tab rail ============== */}
+      <nav className="flex flex-col gap-2 border-b border-white/8 pb-2">
+        {GROUP_ORDER.map((g) => (
+          <div key={g} className="flex flex-wrap items-center gap-1.5">
+            <span className="w-[78px] shrink-0 font-mono text-[9px] uppercase tracking-[0.24em] text-white/35">
+              {GROUP_LABEL[g]}
+            </span>
+            {TABS.filter((t) => t.group === g).map((t) => {
+              const on = t.kind === active;
+              const operator = t.group === "operator";
+              return (
+                <button
+                  key={t.kind}
+                  type="button"
+                  onClick={() => setActive(t.kind)}
+                  className={clsx(
+                    "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-mono text-[10.5px] uppercase tracking-wider transition",
+                    on
+                      ? "border-accent/40 bg-accent/[0.08] text-accent shadow-glow"
+                      : "border-white/10 bg-white/[0.03] text-white/65 hover:bg-white/[0.06]"
+                  )}
+                >
+                  <t.Icon className="h-3 w-3" />
+                  {t.label}
+                  <span
+                    className={clsx(
+                      "rounded px-1 py-px font-mono text-[8.5px]",
+                      on ? "bg-accent/[0.15] text-accent" : "bg-white/[0.06] text-white/55"
+                    )}
+                  >
+                    {operator ? "live" : pinned[t.kind].length || "offline"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* ================= main grid ================= */}
@@ -275,11 +462,11 @@ export default function IntelligenceTerminalPage() {
             setPinned({ ...pinned, [tab]: pinned[tab].filter((c) => c.id !== id) })
           }
         />
-        <GridPanel
-          meta={meta}
-          cards={cards}
-          onChange={updateCards}
-        />
+        {meta.group === "operator" ? (
+          <OperatorPanel kind={active} alertCount={alerts.length} />
+        ) : (
+          <GridPanel meta={meta} cards={cards} onChange={updateCards} />
+        )}
         <BriefingsPanel alerts={alerts} setAlerts={setAlerts} />
       </div>
 
@@ -293,8 +480,17 @@ export default function IntelligenceTerminalPage() {
         <span className="text-white/30">·</span>
         <span>alerts: {alerts.length}</span>
         <span className="text-white/30">·</span>
-        <Loader className="h-3 w-3 text-amber-300/80" />
-        <span>all feeds offline · add a provider under settings</span>
+        {meta.group === "operator" ? (
+          <>
+            <HeartPulse className="h-3 w-3 text-emerald-300/80" />
+            <span>operator group · real local state</span>
+          </>
+        ) : (
+          <>
+            <Loader className="h-3 w-3 text-amber-300/80" />
+            <span>external feeds offline · add a provider with the desktop runtime</span>
+          </>
+        )}
       </footer>
     </div>
   );
@@ -313,8 +509,9 @@ function WatchlistPanel({
   onJump: (tab: TabKind) => void;
   onRemove: (tab: TabKind, id: string) => void;
 }) {
-  const all = (Object.entries(pinned) as Array<[TabKind, PinnedCard[]]>)
-    .flatMap(([tab, cards]) => cards.map((c) => ({ ...c, tab })));
+  const all = (Object.entries(pinned) as Array<[TabKind, PinnedCard[]]>).flatMap(([tab, cards]) =>
+    cards.map((c) => ({ ...c, tab }))
+  );
   return (
     <section className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.018] p-3 shadow-glass">
       <header className="flex items-center justify-between border-b border-white/6 pb-2">
@@ -337,7 +534,8 @@ function WatchlistPanel({
       ) : (
         <ul className="flex max-h-[440px] flex-col gap-1 overflow-auto pr-1">
           {all.map((c) => {
-            const tabMeta = TABS.find((t) => t.kind === c.tab)!;
+            const tabMeta = TABS.find((t) => t.kind === c.tab);
+            const Icon = tabMeta?.Icon ?? Star;
             return (
               <li
                 key={c.id}
@@ -348,12 +546,12 @@ function WatchlistPanel({
                   onClick={() => onJump(c.tab)}
                   className="flex min-w-0 items-center gap-1.5 text-left"
                 >
-                  <tabMeta.Icon className="h-3 w-3 text-accent" />
+                  <Icon className="h-3 w-3 text-accent" />
                   <span className="truncate font-mono text-white/85">{c.text}</span>
                 </button>
                 <div className="flex items-center gap-1.5">
                   <span className="rounded border border-white/10 bg-white/[0.03] px-1 py-px font-mono text-[8.5px] uppercase tracking-wider text-white/45">
-                    {c.tab}
+                    {tabMeta?.label ?? c.tab}
                   </span>
                   <button
                     type="button"
@@ -374,7 +572,7 @@ function WatchlistPanel({
 }
 
 // ============================================================================
-// Grid (center)
+// Grid (center) · external feed tabs · offline + manual pins
 // ============================================================================
 
 function GridPanel({
@@ -402,11 +600,11 @@ function GridPanel({
           <meta.Icon className="mt-0.5 h-4 w-4 text-accent" />
           <div className="flex flex-col">
             <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-              {meta.label}
+              {GROUP_LABEL[meta.group]} · {meta.label}
             </span>
             <span className="text-[13px] font-semibold text-white">{meta.blurb}</span>
             <span className="text-[10.5px] text-white/45">
-              feed offline · provider not connected · add source under Brain / Settings
+              feed offline · provider not connected · adapter ready for the desktop runtime
             </span>
           </div>
         </div>
@@ -434,22 +632,24 @@ function GridPanel({
         </button>
       </div>
 
-      <div>
-        <div className="mb-1 font-mono text-[9.5px] uppercase tracking-wider text-white/40">
-          placeholder columns
+      {meta.placeholders.length > 0 && (
+        <div>
+          <div className="mb-1 font-mono text-[9.5px] uppercase tracking-wider text-white/40">
+            placeholder columns
+          </div>
+          <div className="grid grid-cols-2 gap-1 md:grid-cols-3">
+            {meta.placeholders.map((p) => (
+              <div
+                key={p}
+                className="flex items-center justify-between rounded-md border border-white/6 bg-white/[0.012] px-2 py-1 font-mono text-[11px]"
+              >
+                <span className="text-white/85">{p}</span>
+                <span className="text-white/30">—</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-1 md:grid-cols-3">
-          {meta.placeholders.map((p) => (
-            <div
-              key={p}
-              className="flex items-center justify-between rounded-md border border-white/6 bg-white/[0.012] px-2 py-1 font-mono text-[11px]"
-            >
-              <span className="text-white/85">{p}</span>
-              <span className="text-white/30">—</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
 
       <div>
         <div className="mb-1 font-mono text-[9.5px] uppercase tracking-wider text-white/40">
@@ -493,6 +693,161 @@ function GridPanel({
         )}
       </div>
     </section>
+  );
+}
+
+// ============================================================================
+// Operator panel (center) · OPERATOR group · real local state
+// ============================================================================
+
+function OperatorPanel({ kind, alertCount }: { kind: TabKind; alertCount: number }) {
+  const history = useMissionStore((s) => s.history);
+  const runtime = useMissionStore((s) => s.runtime);
+  const agents = useAtlasStore((s) => s.agents);
+  const meta = TABS.find((t) => t.kind === kind)!;
+
+  const [presence, setPresence] = useState<PresenceSnapshot | null>(null);
+  useEffect(() => {
+    if (kind !== "runtime") return;
+    setPresence(readPresence());
+    const t = window.setInterval(() => setPresence(readPresence()), 3500);
+    return () => window.clearInterval(t);
+  }, [kind]);
+
+  const board = useMemo(() => computeCostBoard(history), [history]);
+  const health = useMemo(() => measureBrainHealth(), [history.length]);
+
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.018] p-4 shadow-glass">
+      <header className="flex items-start justify-between gap-3 border-b border-white/6 pb-3">
+        <div className="flex items-start gap-2">
+          <meta.Icon className="mt-0.5 h-4 w-4 text-accent" />
+          <div className="flex flex-col">
+            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+              Operator · {meta.label}
+            </span>
+            <span className="text-[13px] font-semibold text-white">{meta.blurb}</span>
+            <span className="text-[10.5px] text-white/45">real local state · no network</span>
+          </div>
+        </div>
+        <span className="rounded border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-emerald-200">
+          live · local
+        </span>
+      </header>
+
+      {kind === "runtime" && (
+        <ul className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
+          <Metric k="desktop" v={presence?.desktop ?? "online"} ok />
+          <Metric k="ollama" v={presence?.ollama ?? "unknown"} />
+          <Metric k="runtime" v={runtime} />
+          <Metric k="workflow" v={presence?.workflow ?? "idle"} />
+          <Metric k="agents" v={presence?.agents ?? "idle"} />
+          <Metric k="memory" v={presence?.memory ?? "—"} />
+          <Metric k="active mission" v={presence?.activeMission ? "yes" : "no"} />
+          <Metric k="approvals" v={String(presence?.pendingApprovals ?? 0)} warn={(presence?.pendingApprovals ?? 0) > 0} />
+          <Metric k="telegram" v={presence?.telegram ?? "simulator"} />
+        </ul>
+      )}
+
+      {kind === "costs" && (
+        <ul className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
+          <Metric k="local missions" v={String(board.localMissions)} />
+          <Metric k="ollama missions" v={String(board.ollamaMissions)} />
+          <Metric k="deliverables" v={String(board.totalDeliverables)} />
+          <Metric k="ollama tokens" v={String(board.totalOllamaTokens)} />
+          <Metric k="cloud spend" v="$0" ok />
+          <Metric k="cloud avoided" v={formatUsd(board.estimatedCloudCostAvoidedUSD)} ok />
+          {history.length === 0 && (
+            <li className="col-span-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 font-mono text-[10.5px] text-white/55 md:col-span-3">
+              needs data · run a mission to populate the cost board
+            </li>
+          )}
+        </ul>
+      )}
+
+      {kind === "agents" && (
+        <ul className="flex flex-col gap-1">
+          {agents.length === 0 ? (
+            <li className="rounded-md border border-dashed border-white/8 bg-white/[0.008] px-2 py-3 text-center text-[11px] text-white/55">
+              No agent slots configured.
+            </li>
+          ) : (
+            agents.map((a) => (
+              <li
+                key={a.kind}
+                className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 text-[11px]"
+              >
+                <span className="font-mono uppercase tracking-wider text-white/80">{a.kind}</span>
+                <span
+                  className={clsx(
+                    "rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider",
+                    a.state === "idle"
+                      ? "border-white/10 bg-white/[0.03] text-white/55"
+                      : a.state === "blocked"
+                        ? "border-rose-400/30 bg-rose-500/[0.08] text-rose-200"
+                        : "border-amber-400/30 bg-amber-500/[0.08] text-amber-200"
+                  )}
+                >
+                  {a.state}
+                </span>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+
+      {kind === "receipts" && (
+        <ul className="flex max-h-[420px] flex-col gap-1 overflow-auto pr-1">
+          {history.length === 0 ? (
+            <li className="rounded-md border border-dashed border-white/8 bg-white/[0.008] px-2 py-3 text-center text-[11px] text-white/55">
+              No missions archived yet.
+            </li>
+          ) : (
+            history.slice(0, 20).map((m) => (
+              <li
+                key={m.id}
+                className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 text-[11px]"
+              >
+                <span className="min-w-0 flex-1 truncate text-white/80">{m.brief.slice(0, 60)}</span>
+                <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-white/45">
+                  {m.engine ?? "deterministic"} · {m.score != null ? `${m.score}/100` : "—"}
+                </span>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+
+      {kind === "diagnostics" && (
+        <ul className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
+          <Metric k="storage" v={`${(health.storageBytes / 1024).toFixed(1)}KB`} />
+          <Metric k="memory docs" v={String(health.memoryDocs)} warn={health.duplicateDocs > 0} />
+          <Metric k="duplicates" v={String(health.duplicateDocs)} warn={health.duplicateDocs > 0} />
+          <Metric k="receipts" v={String(health.receipts)} />
+          <Metric k="snapshots" v={String(health.snapshots)} />
+          <Metric k="stale repos" v={String(health.staleRepos)} warn={health.staleRepos > 0} />
+          <Metric k="workflow nodes" v={String(health.workflowNodes)} />
+          <Metric k="orphan files" v={String(health.orphanFiles)} warn={health.orphanFiles > 0} />
+          <Metric k="armed alerts" v={String(alertCount)} />
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function Metric({ k, v, ok, warn }: { k: string; v: string; ok?: boolean; warn?: boolean }) {
+  return (
+    <li className="flex flex-col gap-0.5 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5">
+      <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">{k}</span>
+      <span
+        className={clsx(
+          "font-mono text-[12px]",
+          warn ? "text-amber-200/90" : ok ? "text-emerald-200/90" : "text-white/85"
+        )}
+      >
+        {v}
+      </span>
+    </li>
   );
 }
 

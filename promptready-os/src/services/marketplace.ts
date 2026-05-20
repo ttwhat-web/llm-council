@@ -103,10 +103,24 @@ export const STARTER_PACKS: Pack[] = [
     id: "travel-os",
     kind: "brain",
     name: "Travel OS",
-    blurb: "Itinerary scaffold + supplier comms + refund policy.",
+    blurb: "Lead board + travel workflows + CRM notes + ops dashboard.",
     author: "Operator.Center",
-    version: "0.1.0",
+    version: "0.2.0",
     contents: {
+      pinnedTerminal: {
+        watchlists: ["Lead board", "Active trips"]
+      },
+      workflowNodes: [
+        { kind: "mission", label: "Qualify lead", x: 30, y: 30 },
+        { kind: "mission", label: "Draft itinerary", x: 210, y: 30 },
+        { kind: "approval", label: "Client OK", x: 380, y: 80 },
+        { kind: "export", label: "Send packet", x: 510, y: 80 }
+      ],
+      workflowEdges: [
+        { from: 0, to: 1 },
+        { from: 1, to: 2 },
+        { from: 2, to: 3 }
+      ],
       missionTemplates: [
         {
           label: "Travel itinerary",
@@ -114,6 +128,13 @@ export const STARTER_PACKS: Pack[] = [
             "Draft a 7-day itinerary for a client (destination + dates I will provide). Day-by-day plan, supplier ask emails, internal checklist, refund policy block.",
           mode: "business",
           quality: "smart"
+        },
+        {
+          label: "Lead follow-up",
+          brief:
+            "Write a warm follow-up to a travel lead who went quiet. Reference their stated dates/destination, offer two concrete next steps, keep it under 120 words.",
+          mode: "business",
+          quality: "fast"
         }
       ]
     }
@@ -144,15 +165,25 @@ export const STARTER_PACKS: Pack[] = [
     id: "perfume-lab",
     kind: "brain",
     name: "Perfume Lab",
-    blurb: "Creative direction → accord plan (top / heart / base).",
+    blurb: "Batch workflow + inventory + split calculator + community notes.",
     author: "Operator.Center",
-    version: "0.1.0",
+    version: "0.2.0",
     contents: {
+      pinnedTerminal: {
+        watchlists: ["Inventory", "Open batches"]
+      },
       missionTemplates: [
         {
           label: "Perfume accord plan",
           brief:
             "Turn a creative direction into a perfume accord plan. Top / heart / base notes with rationale, 3 prototype splits, 5-question stability brief.",
+          mode: "general",
+          quality: "smart"
+        },
+        {
+          label: "Batch split calculator",
+          brief:
+            "I'll give a target batch size and an accord in percentages. Produce a per-ingredient weight table, a dilution plan, and a maceration/aging checklist.",
           mode: "general",
           quality: "smart"
         }
@@ -163,10 +194,25 @@ export const STARTER_PACKS: Pack[] = [
     id: "carpet-export",
     kind: "brain",
     name: "Carpet Export",
-    blurb: "HS code, Incoterms, sample brief, lead times, QA.",
+    blurb: "Shipment workflow + invoice templates + customer notes + logistics.",
     author: "Operator.Center",
-    version: "0.1.0",
+    version: "0.2.0",
     contents: {
+      pinnedTerminal: {
+        watchlists: ["Open shipments", "Pricing sheet"],
+        fx: ["USD/TRY", "EUR/TRY"]
+      },
+      workflowNodes: [
+        { kind: "mission", label: "Quote + sample", x: 30, y: 30 },
+        { kind: "mission", label: "Invoice + Incoterms", x: 210, y: 30 },
+        { kind: "approval", label: "Logistics OK", x: 380, y: 80 },
+        { kind: "export", label: "Ship + docs", x: 510, y: 80 }
+      ],
+      workflowEdges: [
+        { from: 0, to: 1 },
+        { from: 1, to: 2 },
+        { from: 2, to: 3 }
+      ],
       missionTemplates: [
         {
           label: "Export packet",
@@ -174,6 +220,13 @@ export const STARTER_PACKS: Pack[] = [
             "Build an export packet for hand-knotted wool carpets from Turkey to a European wholesaler. HS code, Incoterms, sample brief, lead times, QA checklist.",
           mode: "business",
           quality: "smart"
+        },
+        {
+          label: "Customer reply",
+          brief:
+            "Reply to a wholesale customer asking about lead times and pricing on a carpet order. Be specific, give a firm timeline range, list what you need from them to confirm.",
+          mode: "business",
+          quality: "fast"
         }
       ]
     }
@@ -214,6 +267,91 @@ export const STARTER_PACKS: Pack[] = [
             "Rewrite this freeform prompt into an operator-grade brief: structured sections, explicit constraints, expected output format, anti-goals, and a quality score rubric the model should self-apply.\n\nOriginal:\n[paste here]",
           mode: "dev",
           quality: "expert"
+        }
+      ]
+    }
+  },
+  {
+    id: "agency-pack",
+    kind: "brain",
+    name: "Agency Pack",
+    blurb: "Client intake → proposal → delivery workflow + status notes.",
+    author: "Operator.Center",
+    version: "0.1.0",
+    contents: {
+      pinnedTerminal: {
+        watchlists: ["Active clients", "Pipeline"]
+      },
+      workflowNodes: [
+        { kind: "mission", label: "Client intake", x: 30, y: 30 },
+        { kind: "mission", label: "Proposal draft", x: 210, y: 30 },
+        { kind: "approval", label: "Scope OK", x: 380, y: 80 },
+        { kind: "mission", label: "Delivery plan", x: 510, y: 30 },
+        { kind: "export", label: "Send", x: 660, y: 80 }
+      ],
+      workflowEdges: [
+        { from: 0, to: 1 },
+        { from: 1, to: 2 },
+        { from: 2, to: 3 },
+        { from: 3, to: 4 }
+      ],
+      missionTemplates: [
+        {
+          label: "Client proposal",
+          brief:
+            "Turn a discovery call summary into a client proposal: scope, deliverables, timeline, milestones, pricing options (good/better/best), and assumptions. End with a clear next step.",
+          mode: "business",
+          quality: "smart"
+        },
+        {
+          label: "Weekly status",
+          brief:
+            "Write a concise weekly client status update: shipped this week, in progress, blocked (with the ask), next week's plan. Keep it skimmable.",
+          mode: "business",
+          quality: "fast"
+        }
+      ]
+    }
+  },
+  {
+    id: "export-ops-pack",
+    kind: "brain",
+    name: "Export Ops Pack",
+    blurb: "Order → invoice → shipment → docs runtime for export businesses.",
+    author: "Operator.Center",
+    version: "0.1.0",
+    contents: {
+      pinnedTerminal: {
+        watchlists: ["Open orders", "Shipments in transit"],
+        fx: ["USD/TRY", "EUR/USD"]
+      },
+      workflowNodes: [
+        { kind: "mission", label: "Order intake", x: 30, y: 30 },
+        { kind: "mission", label: "Proforma invoice", x: 210, y: 30 },
+        { kind: "approval", label: "Payment OK", x: 380, y: 80 },
+        { kind: "mission", label: "Shipping docs", x: 510, y: 30 },
+        { kind: "export", label: "Dispatch", x: 660, y: 80 }
+      ],
+      workflowEdges: [
+        { from: 0, to: 1 },
+        { from: 1, to: 2 },
+        { from: 2, to: 3 },
+        { from: 3, to: 4 }
+      ],
+      missionTemplates: [
+        {
+          label: "Proforma invoice",
+          brief:
+            "Generate a proforma invoice draft from an order summary I provide: line items, Incoterms, currency, payment terms, validity, and bank/contact block placeholders.",
+          mode: "business",
+          quality: "smart"
+        },
+        {
+          label: "Shipment update",
+          brief:
+            "Write a shipment status update for a customer: current stage, ETA range, tracking placeholder, and what (if anything) you need from them. Calm and precise.",
+          mode: "business",
+          quality: "fast"
         }
       ]
     }

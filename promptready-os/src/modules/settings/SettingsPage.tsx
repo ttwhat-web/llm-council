@@ -49,6 +49,12 @@ import { MorningBriefCard } from "@/components/MorningBriefCard";
 import { PresentationModeCard } from "@/components/PresentationModeCard";
 import { Foldable } from "@/components/Foldable";
 import { RemoteTeaser } from "@/components/RemoteTeaser";
+import { PerfectSetupGuide } from "@/components/PerfectSetupGuide";
+import { ModelLabCard } from "@/components/ModelLabCard";
+import { ModelCostsCard } from "@/components/ModelCostsCard";
+import { OperatorBulletinCard } from "@/components/OperatorBulletinCard";
+import { EmailRuntimeCard } from "@/components/EmailRuntimeCard";
+import { LaunchReadinessCard } from "@/components/LaunchReadinessCard";
 import {
   CloudSyncCard,
   MobileCompanionRoadmapCard,
@@ -138,6 +144,8 @@ export default function SettingsPage() {
         sub="Auto-setup, appearance, BYOK keys, safety, telemetry, mobile companion. Keys you paste stay in memory for this session only — keychain lands with the desktop runtime."
       />
 
+      <PerfectSetupGuide />
+
       <Foldable
         title="Roadmap"
         hint="phases · current focus"
@@ -174,6 +182,11 @@ export default function SettingsPage() {
       <Foldable title="Auto-configure" hint="one-tap honest setup" persistKey="auto-configure">
         <AutoConfigure />
       </Foldable>
+
+      <SettingsSection letter="I" label="Intelligence" hint="Brief · Costs · Models" />
+      <OperatorBulletinCard />
+      <ModelCostsCard />
+      <ModelLabCard />
 
       <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
         <header className="flex items-center gap-2">
@@ -260,8 +273,9 @@ export default function SettingsPage() {
         </article>
       </section>
 
-      <SettingsSection letter="R" label="Remote" hint="Phone · Telegram · Approvals" />
+      <SettingsSection letter="R" label="Remote" hint="Phone · Telegram · Email" />
       <RemoteTeaser />
+      <EmailRuntimeCard />
       <TelegramCompanionCard />
       <TelegramLiveCard />
       <RuntimeShieldCard />
@@ -287,7 +301,8 @@ export default function SettingsPage() {
         <DiagnosticsCard />
       </Foldable>
 
-      <SettingsSection letter="O" label="Operator" hint="Team · Marketplace · Audit · Roadmap" />
+      <SettingsSection letter="O" label="Operator" hint="Launch · Team · Packaging" />
+      <LaunchReadinessCard />
       <Foldable title="Packaging" hint="macOS · Windows · Linux" persistKey="packaging">
         <PackagingCard />
       </Foldable>
