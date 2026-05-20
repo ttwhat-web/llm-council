@@ -1072,14 +1072,15 @@ function PackagingCard() {
   const localStatus: Array<{ k: string; v: string; ok: boolean }> = [
     { k: "app name", v: "Operator Core", ok: true },
     { k: "icons present", v: "yes", ok: true },
-    { k: "macOS .app build", v: "ready · tauri:build:app", ok: true },
-    { k: "macOS .dmg", v: "blocked · bundle_dmg.sh", ok: false },
-    { k: "beta artifact", v: ".app (unsigned)", ok: true },
+    { k: "primary beta artifact", v: "Operator Core.app", ok: true },
+    { k: "beta command", v: "npm run tauri:build:app", ok: true },
+    { k: "macOS .app build", v: "ready", ok: true },
+    { k: "macOS .dmg", v: "optional · blocked (Finder styling)", ok: false },
     { k: "signing", v: "missing", ok: false },
     { k: "notarization", v: "missing", ok: false },
     { k: "updater", v: "missing", ok: false },
     {
-      k: "artifact",
+      k: "artifact path",
       v: "bundle/macos/Operator Core.app",
       ok: true
     }
@@ -1165,10 +1166,12 @@ function PackagingCard() {
         </ul>
       </div>
       <p className="mt-3 text-[10.5px] text-white/45">
-        Icons + config are ready. The local{" "}
-        <span className="font-mono">npm run tauri:build</span> needs GTK/WebKit
-        system libraries (Linux) or Xcode/MSVC (mac/win); signing keys land
-        before any public installer. Offline support is built in — the
+        Primary beta build:{" "}
+        <span className="font-mono text-white/65">npm run tauri:build:app</span>{" "}
+        → the unsigned <span className="font-mono">Operator Core.app</span>. The
+        DMG is optional and currently blocked by the Finder styling step in{" "}
+        <span className="font-mono">bundle_dmg.sh</span>; signing + notarization
+        land before any public installer. Offline support is built in — the
         deterministic engine never reaches the network.
       </p>
     </section>

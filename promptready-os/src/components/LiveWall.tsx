@@ -213,6 +213,9 @@ export function LiveWall({
         )}
       </div>
 
+      {/* Data sources legend · honest provenance */}
+      <DataSourcesLegend />
+
       {/* BOTTOM · Ticker Tape */}
       <TickerTape quotes={crypto.quotes} items={items} cryptoOnline={cryptoOnline} newsOnline={newsOnline} />
 
@@ -638,6 +641,26 @@ function TickerTape({
         .tape-track { animation: tapeScroll 40s linear infinite; }
         @keyframes tapeScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       `}</style>
+    </div>
+  );
+}
+
+function DataSourcesLegend() {
+  const items: Array<[string, string]> = [
+    ["Crypto", "CoinGecko"],
+    ["News", "Hacker News / NewsAPI when keyed"],
+    ["Search", "external browser"],
+    ["TV", "no stream · data wall only"]
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-white/8 bg-white/[0.012] px-3 py-1.5 font-mono text-[9px] uppercase tracking-wider text-white/40">
+      <span className="text-white/55">data sources</span>
+      {items.map(([k, v]) => (
+        <span key={k} className="inline-flex items-center gap-1">
+          <span className="text-white/30">{k}:</span>
+          <span className="text-white/60">{v}</span>
+        </span>
+      ))}
     </div>
   );
 }
