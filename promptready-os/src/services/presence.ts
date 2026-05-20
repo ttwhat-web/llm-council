@@ -18,6 +18,7 @@ import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
 import { probeOllama } from "@/services/missionRunner";
 import { getTelegramBridgeStatus, type TelegramLiveStatus } from "@/services/telegramLive";
+import { statusForModule, type AdapterStatus } from "@/services/adapters";
 
 export type OnlineState = "online" | "offline";
 export type OllamaState = "ready" | "offline" | "unknown";
@@ -34,6 +35,10 @@ export interface PresenceSnapshot {
   agents: AgentRollup;
   memory: MemoryState;
   telegram: TelegramLiveStatus;
+  /** Sprint B · Operator Intelligence adapter rollups. */
+  email: AdapterStatus;
+  markets: AdapterStatus;
+  news: AdapterStatus;
   lastHeartbeat: number;
   lastReceipt: number | null;
   pendingApprovals: number;
@@ -125,6 +130,9 @@ export function readPresence(): PresenceSnapshot {
     agents: rollupAgents(),
     memory: rollupMemory(),
     telegram: tg.live,
+    email: statusForModule("email").status,
+    markets: statusForModule("markets").status,
+    news: statusForModule("news").status,
     lastHeartbeat: readHeartbeat(),
     lastReceipt,
     pendingApprovals: atlas.workflowRuns.filter((r) => r.status === "awaiting-approval").length
@@ -140,9 +148,11 @@ export function formatPresenceForTelegram(p: PresenceSnapshot): string {
       case "healthy":
       case "live-connected":
       case "live-ready":
+      case "connected":
         return "🟢";
       case "idle":
       case "simulator":
+      case "adapter-ready":
         return "⚪";
       case "running":
       case "waiting-approval":
@@ -164,6 +174,9 @@ export function formatPresenceForTelegram(p: PresenceSnapshot): string {
     `${dot(p.agents)} agents · ${p.agents}`,
     `${dot(p.memory)} memory · ${p.memory}`,
     `${dot(p.telegram)} telegram · ${p.telegram}`,
+    `${dot(p.email)} email · ${p.email}`,
+    `${dot(p.markets)} markets · ${p.markets}`,
+    `${dot(p.news)} news · ${p.news}`,
     p.activeMission ? `🟢 active mission · ${p.activeMissionId}` : `⚪ no active mission`,
     p.pendingApprovals > 0 ? `🟡 pending approvals · ${p.pendingApprovals}` : `⚪ no pending approvals`
   ];

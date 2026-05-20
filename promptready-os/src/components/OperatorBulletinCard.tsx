@@ -4,6 +4,8 @@ import clsx from "clsx";
 import { Newspaper } from "lucide-react";
 import { useAtlasStore } from "@/store/atlas";
 import { useMissionStore } from "@/store/mission";
+import { statusForModule, statusMeta } from "@/services/adapters";
+import type { AdapterModule } from "@/services/adapters";
 
 /**
  * Morning Operator Brief · honest-by-design bulletin.
@@ -31,6 +33,32 @@ function toneClass(tone: Tone): string {
     default:
       return "border-white/10 bg-white/[0.03] text-white/55";
   }
+}
+
+/** Map the registry's status tone onto this card's local tone scheme. */
+function metaTone(tone: "ok" | "accent" | "muted"): Tone {
+  return tone === "ok" ? "ok" : tone === "accent" ? "accent" : "planned";
+}
+
+/**
+ * Build a row for an external category backed by an adapter module.
+ * Honest by design: the value column only ever reports the source state
+ * ("adapter ready" / "no feed"), never a fabricated headline or count.
+ */
+function adapterRow(section: string, module: AdapterModule): BriefRow {
+  const meta = statusMeta(statusForModule(module).status);
+  const ready = meta.tone !== "muted";
+  return {
+    section,
+    value: ready ? "adapter ready" : "no feed",
+    pill: meta.label,
+    tone: metaTone(meta.tone)
+  };
+}
+
+/** A category with no adapter seam yet · planned, never fabricated. */
+function plannedRow(section: string): BriefRow {
+  return { section, value: "no feed", pill: "planned", tone: "planned" };
 }
 
 function startOfToday(): number {
@@ -84,20 +112,26 @@ export function OperatorBulletinCard() {
     health >= 75 ? "text-emerald-200" : health >= 50 ? "text-amber-200" : "text-rose-200";
 
   const rows: BriefRow[] = [
-    { section: "AI", value: "offline", pill: "planned", tone: "planned" },
-    {
-      section: "Markets",
-      value: alertCount > 0 ? `${alertCount} alert${alertCount === 1 ? "" : "s"}` : "no alerts",
-      pill: "adapter ready",
-      tone: alertCount > 0 ? "warn" : "planned"
-    },
-    { section: "Crypto", value: "feed offline", pill: "planned", tone: "planned" },
-    { section: "Export", value: "offline", pill: "planned", tone: "planned" },
-    { section: "Travel", value: "offline", pill: "planned", tone: "planned" },
-    { section: "Tech", value: "offline", pill: "planned", tone: "planned" },
+    adapterRow("AI", "ai-news"),
+    adapterRow("Markets", "markets"),
+    adapterRow("Crypto", "crypto"),
+    plannedRow("Travel"),
+    adapterRow("Export", "export-ops"),
+    plannedRow("Tech"),
     {
       section: "Operator",
-      value: `${missionsToday} mission${missionsToday === 1 ? "" : "s"} today`,
+      value: `${missionsToday} mission${missionsToday === 1 ? "" : "s"} today · ${
+        alertCount === 1 ? "1 armed alert" : `${alertCount} armed alerts`
+      }`,
+      pill: "live",
+      tone: "ok"
+    },
+    {
+      section: "Operator · approvals",
+      value:
+        pendingApprovals === 0
+          ? "no pending approvals"
+          : `${pendingApprovals} awaiting approval`,
       pill: "live",
       tone: "ok"
     }
@@ -146,14 +180,6 @@ export function OperatorBulletinCard() {
             </div>
           </li>
         ))}
-        <li className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2.5 py-1.5">
-          <span className="text-[12px] text-white">Operator · approvals</span>
-          <span className="font-mono text-[11px] text-white/55">
-            {pendingApprovals === 0
-              ? "no pending approvals"
-              : `${pendingApprovals} awaiting approval`}
-          </span>
-        </li>
       </ul>
 
       <div className="flex items-center justify-between gap-2 rounded-xl border border-white/8 bg-white/[0.02] px-3 py-2">

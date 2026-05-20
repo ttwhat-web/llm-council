@@ -11,6 +11,13 @@ import {
   Receipt,
   Target
 } from "lucide-react";
+import { statusForModule, statusMeta } from "@/services/adapters";
+
+const TONE_PILL: Record<"ok" | "accent" | "muted", string> = {
+  ok: "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200",
+  accent: "border-accent/30 bg-accent/[0.08] text-accent",
+  muted: "border-white/10 bg-white/[0.03] text-white/55"
+};
 
 /**
  * Email Runtime · adapter only.
@@ -28,23 +35,22 @@ interface Category {
 }
 
 const CATEGORIES: Category[] = [
-  { key: "unread", label: "Unread" },
-  { key: "waiting-reply", label: "Waiting Reply" },
-  { key: "invoices", label: "Invoices" },
-  { key: "orders", label: "Orders" },
+  { key: "inbox", label: "Inbox" },
   { key: "leads", label: "Leads" },
+  { key: "orders", label: "Orders" },
+  { key: "invoices", label: "Invoices" },
   { key: "support", label: "Support" },
   { key: "urgent", label: "Urgent", urgent: true }
 ];
 
 const FLOW: { Icon: typeof Mail; label: string }[] = [
   { Icon: Mail, label: "Mail" },
-  { Icon: Bot, label: "AI summarize" },
-  { Icon: Target, label: "Mission" },
-  { Icon: Receipt, label: "Receipt" }
+  { Icon: Bot, label: "classify" },
+  { Icon: Target, label: "mission" },
+  { Icon: Receipt, label: "receipt" }
 ];
 
-const ADAPTERS = ["Gmail", "IMAP", "Mail (generic)"];
+const ADAPTERS = ["Gmail", "IMAP", "Outlook"];
 
 const STORAGE_KEY = "promptready-os.email-runtime.expanded";
 
@@ -60,6 +66,9 @@ function loadExpanded(): boolean {
 
 export function EmailRuntimeCard() {
   const [expanded, setExpanded] = useState<boolean>(() => loadExpanded());
+
+  const emailStatus = statusForModule("email").status;
+  const emailMeta = statusMeta(emailStatus);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -77,8 +86,13 @@ export function EmailRuntimeCard() {
           <Mail className="h-4 w-4 text-accent" />
           <span className="text-[13px] font-semibold text-white">Email Runtime</span>
         </div>
-        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
-          adapter only
+        <span
+          className={clsx(
+            "rounded border px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider",
+            TONE_PILL[emailMeta.tone]
+          )}
+        >
+          {emailMeta.label}
         </span>
       </header>
 
@@ -169,12 +183,21 @@ export function EmailRuntimeCard() {
                   <Inbox className="h-3.5 w-3.5 text-accent" />
                   {name}
                 </span>
-                <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+                <span
+                  className={clsx(
+                    "rounded border px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider",
+                    TONE_PILL.muted
+                  )}
+                >
                   not connected
                 </span>
               </li>
             ))}
           </ul>
+
+          <p className="text-[11px] text-white/55">
+            Read-only first &middot; no send &middot; no sync yet.
+          </p>
 
           <footer className="border-t border-white/6 pt-2 font-mono text-[9.5px] uppercase tracking-wider text-white/45">
             No mailbox sync today. Adapters wire in with the desktop runtime.

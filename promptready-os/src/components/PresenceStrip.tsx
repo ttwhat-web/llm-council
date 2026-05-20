@@ -101,7 +101,10 @@ export function PresenceStrip() {
             : p.telegram === "error"
               ? "bad"
               : "muted"
-    }
+    },
+    { label: "email", value: p.email, tone: adapterTone(p.email) },
+    { label: "markets", value: p.markets, tone: adapterTone(p.markets) },
+    { label: "news", value: p.news, tone: adapterTone(p.news) }
   ];
 
   return (
@@ -120,6 +123,12 @@ export function PresenceStrip() {
       ))}
     </ul>
   );
+}
+
+function adapterTone(s: string): Tone {
+  if (s === "connected") return "ok";
+  if (s === "adapter-ready") return "warn";
+  return "muted";
 }
 
 function Dot({ tone }: { tone: Tone }) {

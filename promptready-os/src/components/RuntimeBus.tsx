@@ -17,11 +17,13 @@ import {
   Workflow,
   Zap
 } from "lucide-react";
+import { LineChart, Mail, Newspaper } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
 import { probeOllama } from "@/services/missionRunner";
 import { listInstalledPacks } from "@/services/marketplace";
+import { statusForModule } from "@/services/adapters";
 
 /**
  * Runtime Bus · Phase 25 (Operator OS).
@@ -142,8 +144,11 @@ export function RuntimeBus() {
       label: "Marketplace Runtime",
       Icon: Package,
       state: listInstalledPacks().length > 0 ? "ready" : "partial",
-      detail: `${listInstalledPacks().length} installed packs · 8 starter packs bundled`
-    }
+      detail: `${listInstalledPacks().length} installed packs · starter packs bundled`
+    },
+    intelRow("markets", "Markets Runtime", LineChart),
+    intelRow("news", "News Runtime", Newspaper),
+    intelRow("email", "Email Runtime", Mail)
   ];
 
   return (
@@ -202,6 +207,25 @@ export function RuntimeBus() {
       </span>
     </section>
   );
+}
+
+function intelRow(
+  module: "markets" | "news" | "email",
+  label: string,
+  Icon: typeof Brain
+): RuntimeRow {
+  const s = statusForModule(module);
+  const state: RuntimeState =
+    s.status === "connected" ? "ready" : s.status === "adapter-ready" ? "partial" : "planned";
+  const detail =
+    s.status === "connected"
+      ? `live · ${s.providers.join(" · ")}`
+      : s.status === "adapter-ready"
+        ? `adapter ready · ${s.providers.join(" · ") || "awaiting provider"}`
+        : module === "email"
+          ? "read-only adapters · not connected"
+          : "offline · awaiting provider key";
+  return { id: module, label, Icon, state, detail };
 }
 
 function StatePill({ state }: { state: RuntimeState }) {

@@ -30,12 +30,19 @@ export interface PackTemplate {
   quality: string;
 }
 
+export interface PackNote {
+  name: string;
+  body: string;
+}
+
 export interface PackContents {
   workflowNodes?: Array<{ kind: WorkflowNodeKind; label: string; x: number; y: number }>;
   workflowEdges?: Array<{ from: number; to: number }>; // indexes into workflowNodes
   missionTemplates?: PackTemplate[];
   repoLabels?: string[];
   pinnedTerminal?: Record<string, string[]>;
+  /** Brain notes seeded into the Memory layer on install (Sprint B). */
+  notes?: PackNote[];
 }
 
 export interface Pack {
@@ -84,9 +91,9 @@ export const STARTER_PACKS: Pack[] = [
     id: "claude-coding",
     kind: "template",
     name: "Claude Coding",
-    blurb: "Messy ask → Claude-ready coding prompt.",
+    blurb: "Messy ask → Claude-ready prompt + repo audit + deploy notes.",
     author: "Operator.Center",
-    version: "0.1.0",
+    version: "0.2.0",
     contents: {
       missionTemplates: [
         {
@@ -95,6 +102,19 @@ export const STARTER_PACKS: Pack[] = [
             "Turn this messy coding ask into a Claude-ready prompt: explicit task, constraints first, file paths, acceptance criteria, 3-bullet trade-off discussion at the end.\n\nMessy ask:\n[paste here]",
           mode: "claude",
           quality: "code"
+        },
+        {
+          label: "Repo audit",
+          brief:
+            "Audit the attached repo context: architecture summary, top 5 risks, dead code / duplication, test gaps, and a prioritized cleanup list. End with the single highest-leverage change.",
+          mode: "claude",
+          quality: "code"
+        }
+      ],
+      notes: [
+        {
+          name: "Claude Coding · deploy checklist",
+          body: "# Deploy checklist\n\n- Tests green locally\n- Typecheck + lint clean\n- Changelog / PR body written\n- Migrations reviewed\n- Rollback plan noted\n- Tag + release notes"
         }
       ]
     }
@@ -135,6 +155,16 @@ export const STARTER_PACKS: Pack[] = [
             "Write a warm follow-up to a travel lead who went quiet. Reference their stated dates/destination, offer two concrete next steps, keep it under 120 words.",
           mode: "business",
           quality: "fast"
+        }
+      ],
+      notes: [
+        {
+          name: "Travel OS · refund policy",
+          body: "# Refund policy\n\n- 30+ days before departure: full refund minus supplier fees.\n- 14–29 days: 50% refund.\n- <14 days: non-refundable; offer date change where supplier allows.\n- Document every exception in the client note."
+        },
+        {
+          name: "Travel OS · lead intake",
+          body: "# Lead intake checklist\n\n- Destination + flexible/fixed dates\n- Party size + ages\n- Budget band\n- Must-haves vs nice-to-haves\n- Source (referral / ad / repeat)"
         }
       ]
     }
@@ -310,6 +340,12 @@ export const STARTER_PACKS: Pack[] = [
           mode: "business",
           quality: "fast"
         }
+      ],
+      notes: [
+        {
+          name: "Agency · pricing tiers",
+          body: "# Pricing tiers\n\n- Good: fixed scope, async only.\n- Better: + weekly call, 2 revision rounds.\n- Best: + retainer, priority turnaround.\n- Always anchor on outcomes, not hours."
+        }
       ]
     }
   },
@@ -365,11 +401,13 @@ export function installPack(pack: Pack): {
   templatesAdded: number;
   reposAdded: number;
   pinsAdded: number;
+  notesAdded: number;
 } {
   let workflowNodesAdded = 0;
   let workflowEdgesAdded = 0;
   let reposAdded = 0;
   let pinsAdded = 0;
+  let notesAdded = 0;
 
   // Workflow nodes + edges
   if (pack.contents.workflowNodes && pack.contents.workflowNodes.length > 0) {
@@ -430,13 +468,30 @@ export function installPack(pack: Pack): {
     }
   }
 
+  // Brain notes → real memory docs in the Memory layer.
+  if (pack.contents.notes && pack.contents.notes.length > 0) {
+    const existing = new Set(useAtlasStore.getState().memoryDocs.map((d) => d.name));
+    const fresh = pack.contents.notes.filter((n) => !existing.has(n.name));
+    if (fresh.length > 0) {
+      useAtlasStore.getState().addMemoryDocs(
+        fresh.map((n) => ({
+          name: n.name,
+          ext: "md",
+          size: n.body.length,
+          body: n.body
+        }))
+      );
+      notesAdded = fresh.length;
+    }
+  }
+
   // Mission templates: stored locally in the packs install log so the
   // operator can re-bind them later. The user can also paste the
   // template's brief into Mission System directly.
   const templatesAdded = pack.contents.missionTemplates?.length ?? 0;
   if (templatesAdded > 0) {
     recordInstalledPack(pack);
-  } else if (workflowNodesAdded + reposAdded + pinsAdded > 0) {
+  } else if (workflowNodesAdded + reposAdded + pinsAdded + notesAdded > 0) {
     recordInstalledPack(pack);
   }
 
@@ -445,7 +500,8 @@ export function installPack(pack: Pack): {
     workflowEdgesAdded,
     templatesAdded,
     reposAdded,
-    pinsAdded
+    pinsAdded,
+    notesAdded
   };
 }
 

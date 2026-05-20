@@ -40,7 +40,8 @@ export function ModelCostsCard() {
 
   const rows: Row[] = [
     { name: "Claude", tokens: "—", cost: "$0", note: "BYOK · not used", muted: true },
-    { name: "OpenAI", tokens: "—", cost: "$0", note: "BYOK · not used", muted: true },
+    { name: "GPT", tokens: "—", cost: "$0", note: "BYOK · not used", muted: true },
+    { name: "Gemini", tokens: "—", cost: "$0", note: "BYOK · not used", muted: true },
     {
       name: "Ollama",
       tokens: board.totalOllamaTokens > 0 ? board.totalOllamaTokens.toLocaleString() : "—",

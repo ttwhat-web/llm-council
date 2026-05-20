@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
 import { Check, ChevronDown, ChevronUp, Compass } from "lucide-react";
@@ -8,16 +8,19 @@ import { useBrainStore } from "@/store/brain";
 import { useAtlasStore } from "@/store/atlas";
 import { useMissionStore } from "@/store/mission";
 import { listInstalledPacks } from "@/services/marketplace";
+import { probeOllama } from "@/services/missionRunner";
+import { getTelegramBridgeStatus } from "@/services/telegramLive";
 
 /**
- * Perfect Setup guide.
+ * Perfect Setup guide · V2.
  *
- * Six onboarding steps, each marked done strictly from real local
- * state — store slices and the installed-packs registry. Nothing is
- * faked: a step only completes when the operator has actually wired
- * that piece of the brain. A progress bar + pill reflect the honest
- * count, and the step list collapses (persisted to localStorage)
- * without ever hiding the header or progress.
+ * Ten onboarding steps, each marked done strictly from real local
+ * state — store slices, the installed-packs registry, a live Ollama
+ * probe, the Telegram bridge status, and actual mission receipts.
+ * Nothing is faked: a step only completes when the operator has truly
+ * wired that piece of the brain. Two engine steps are "optional" but
+ * still count toward the honest n/10 progress. The step list collapses
+ * (persisted to localStorage) without hiding the header or progress.
  */
 
 const COLLAPSE_KEY = "promptready-os.setup-guide.collapsed";
@@ -27,6 +30,7 @@ interface Step {
   hint: string;
   to: string;
   done: boolean;
+  optional?: boolean;
 }
 
 export function PerfectSetupGuide() {
@@ -34,9 +38,37 @@ export function PerfectSetupGuide() {
   const memorySources = useBrainStore((s) => s.memorySources);
   const memoryDocs = useAtlasStore((s) => s.memoryDocs);
   const telegram = useAtlasStore((s) => s.telegram);
+  const snapshots = useAtlasStore((s) => s.snapshots);
   const history = useMissionStore((s) => s.history);
 
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
+
+  // Live, async Ollama probe — never assumed reachable until the real
+  // round-trip resolves. Same safe-unmount pattern as ModelLabCard.
+  const [ollamaReachable, setOllamaReachable] = useState(false);
+  const [ollamaModelCount, setOllamaModelCount] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    probeOllama()
+      .then((res) => {
+        if (!alive) return;
+        setOllamaReachable(res.reachable);
+        setOllamaModelCount(res.models.length);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setOllamaReachable(false);
+        setOllamaModelCount(0);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Telegram counts as connected via the persisted link OR a real
+  // bridge that has moved past the simulator.
+  const telegramLive = getTelegramBridgeStatus().live !== "simulator";
 
   const steps: Step[] = [
     {
@@ -44,6 +76,20 @@ export function PerfectSetupGuide() {
       hint: "identity · mode · engines",
       to: "/",
       done: Boolean(identity)
+    },
+    {
+      label: "Install Ollama",
+      hint: "local engine · optional",
+      to: "/settings",
+      done: ollamaReachable,
+      optional: true
+    },
+    {
+      label: "Choose model",
+      hint: "pull a model · optional",
+      to: "/settings",
+      done: ollamaModelCount > 0,
+      optional: true
     },
     {
       label: "Import Notes",
@@ -58,22 +104,34 @@ export function PerfectSetupGuide() {
       done: memorySources.some((s) => s.kind === "github")
     },
     {
-      label: "Install Pack",
+      label: "Install marketplace pack",
       hint: "operator brain pack",
       to: "/marketplace",
       done: listInstalledPacks().length > 0
     },
     {
-      label: "Connect Remote",
-      hint: "Telegram link code",
+      label: "Connect Telegram",
+      hint: "link code · live bridge",
       to: "/settings",
-      done: Boolean(telegram)
+      done: Boolean(telegram) || telegramLive
     },
     {
-      label: "Run Mission",
+      label: "Enable replay",
+      hint: "receipt with events",
+      to: "/mission-control",
+      done: history.some((r) => (r.events?.length ?? 0) > 0)
+    },
+    {
+      label: "Run mission",
       hint: "first dispatch",
       to: "/mission-control",
       done: history.length > 0
+    },
+    {
+      label: "Create passport",
+      hint: "brain snapshot",
+      to: "/",
+      done: snapshots.length > 0
     }
   ];
 
@@ -159,13 +217,20 @@ export function PerfectSetupGuide() {
               </span>
 
               <div className="flex min-w-0 flex-col">
-                <span
-                  className={clsx(
-                    "text-[12.5px] font-semibold",
-                    step.done ? "text-white/45 line-through" : "text-white"
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className={clsx(
+                      "text-[12.5px] font-semibold",
+                      step.done ? "text-white/45 line-through" : "text-white"
+                    )}
+                  >
+                    {step.label}
+                  </span>
+                  {step.optional && (
+                    <span className="rounded border border-white/10 bg-white/[0.03] px-1 py-0.5 font-mono text-[8px] uppercase tracking-wider text-white/45">
+                      optional
+                    </span>
                   )}
-                >
-                  {step.label}
                 </span>
                 <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/40">
                   {step.hint}

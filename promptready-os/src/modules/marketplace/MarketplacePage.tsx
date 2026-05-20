@@ -95,6 +95,7 @@ export default function MarketplacePage() {
       if (r.templatesAdded) parts.push(`${r.templatesAdded} mission template${r.templatesAdded === 1 ? "" : "s"}`);
       if (r.reposAdded) parts.push(`${r.reposAdded} repo source${r.reposAdded === 1 ? "" : "s"}`);
       if (r.pinsAdded) parts.push(`${r.pinsAdded} terminal pin${r.pinsAdded === 1 ? "" : "s"}`);
+      if (r.notesAdded) parts.push(`${r.notesAdded} brain note${r.notesAdded === 1 ? "" : "s"}`);
       setFlash(
         parts.length > 0
           ? `installed · ${parts.join(" · ")}`
@@ -235,7 +236,8 @@ export default function MarketplacePage() {
                 {p.contents.missionTemplates?.length ? (
                   <Chip label={`${p.contents.missionTemplates.length} templates`} />
                 ) : null}
-                {p.contents.pinnedTerminal ? <Chip label="terminal pins" /> : null}
+                {p.contents.pinnedTerminal ? <Chip label="watchlists · pins" /> : null}
+                {p.contents.notes?.length ? <Chip label={`${p.contents.notes.length} notes`} /> : null}
                 {p.contents.repoLabels?.length ? <Chip label={`${p.contents.repoLabels.length} repos`} /> : null}
               </ul>
 

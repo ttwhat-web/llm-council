@@ -8,6 +8,7 @@ import {
   Bell,
   Bitcoin,
   Boxes,
+  Coins,
   Cpu,
   DollarSign,
   FileText,
@@ -23,6 +24,7 @@ import {
   Star,
   Terminal as TerminalIcon,
   TrendingUp,
+  Truck,
   Waves,
   X
 } from "lucide-react";
@@ -33,6 +35,7 @@ import { useBrainStore } from "@/store/brain";
 import { computeCostBoard, formatUsd } from "@/services/cost";
 import { readPresence, type PresenceSnapshot } from "@/services/presence";
 import { measureBrainHealth } from "@/services/brainHealth";
+import { statusForModule, statusMeta, type AdapterModule } from "@/services/adapters";
 
 /**
  * Intelligence Terminal · Intelligence Expansion 01.
@@ -62,7 +65,9 @@ type TabKind =
   | "market"
   | "crypto"
   | "fx"
+  | "commodities"
   | "watchlists"
+  | "export-ops"
   // research
   | "research"
   | "earnings"
@@ -127,6 +132,15 @@ const TABS: TabMeta[] = [
     placeholders: ["EUR/USD", "USD/TRY", "USD/JPY", "GBP/USD"]
   },
   {
+    kind: "commodities",
+    group: "markets",
+    label: "Commodities",
+    Icon: Coins,
+    blurb: "Metals, energy.",
+    inputHint: "Pin a commodity · e.g. Gold",
+    placeholders: ["Gold", "Oil", "Copper", "Nat Gas"]
+  },
+  {
     kind: "watchlists",
     group: "markets",
     label: "Watchlists",
@@ -134,6 +148,15 @@ const TABS: TabMeta[] = [
     blurb: "Saved baskets.",
     inputHint: "Name a watchlist",
     placeholders: ["My equities", "Majors", "Export FX"]
+  },
+  {
+    kind: "export-ops",
+    group: "markets",
+    label: "Export Ops",
+    Icon: Truck,
+    blurb: "Orders, shipments, FX exposure.",
+    inputHint: "Pin an ops item",
+    placeholders: ["Open orders", "Shipments", "USD/TRY"]
   },
   // ---- RESEARCH --------------------------------------------------------
   {
@@ -263,6 +286,38 @@ function isOperator(kind: TabKind): boolean {
   return TABS.find((t) => t.kind === kind)?.group === "operator";
 }
 
+/**
+ * Map each external (non-operator) tab to its adapter seam. `null` means
+ * the tab has no wired adapter yet (e.g. repo research). Operator-group
+ * tabs render real local state and intentionally have no adapter module.
+ */
+const TAB_ADAPTER: Partial<Record<TabKind, AdapterModule | null>> = {
+  market: "markets",
+  crypto: "crypto",
+  fx: "fx",
+  commodities: "commodities",
+  watchlists: "watchlists",
+  "export-ops": "export-ops",
+  research: "news",
+  earnings: "earnings",
+  "ai-news": "ai-news",
+  repo: null,
+  alerts: "signals",
+  whale: "onchain",
+  movers: "signals",
+  volatility: "signals"
+};
+
+function adapterModuleFor(kind: TabKind): AdapterModule | null {
+  return TAB_ADAPTER[kind] ?? null;
+}
+
+const TONE_PILL: Record<"ok" | "accent" | "muted", string> = {
+  ok: "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200",
+  accent: "border-accent/30 bg-accent/[0.08] text-accent",
+  muted: "border-white/10 bg-white/[0.03] text-white/55"
+};
+
 interface PinnedCard {
   id: string;
   text: string;
@@ -279,7 +334,9 @@ function emptyPinned(): Pinned {
     market: [],
     crypto: [],
     fx: [],
+    commodities: [],
     watchlists: [],
+    "export-ops": [],
     research: [],
     earnings: [],
     "ai-news": [],
@@ -593,6 +650,10 @@ function GridPanel({
     setInput("");
   };
 
+  const module = adapterModuleFor(meta.kind);
+  const moduleStatus = module ? statusForModule(module) : null;
+  const headerMeta = moduleStatus ? statusMeta(moduleStatus.status) : null;
+
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.018] p-4 shadow-glass">
       <header className="flex items-start justify-between gap-3 border-b border-white/6 pb-3">
@@ -604,14 +665,59 @@ function GridPanel({
             </span>
             <span className="text-[13px] font-semibold text-white">{meta.blurb}</span>
             <span className="text-[10.5px] text-white/45">
-              feed offline · provider not connected · adapter ready for the desktop runtime
+              {moduleStatus
+                ? "no live data · seam wired · the desktop runtime makes the verified call"
+                : "feed offline · no adapter seam yet · awaiting a provider integration"}
             </span>
           </div>
         </div>
-        <span className="rounded border border-amber-400/25 bg-amber-500/[0.05] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-amber-200/85">
-          feed offline
-        </span>
+        {headerMeta ? (
+          <span
+            className={clsx(
+              "rounded border px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider",
+              TONE_PILL[headerMeta.tone]
+            )}
+          >
+            {headerMeta.label}
+          </span>
+        ) : (
+          <span className="rounded border border-amber-400/25 bg-amber-500/[0.05] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-amber-200/85">
+            feed offline
+          </span>
+        )}
       </header>
+
+      {moduleStatus && (
+        <div>
+          <div className="mb-1 font-mono text-[9.5px] uppercase tracking-wider text-white/40">
+            adapters
+          </div>
+          {moduleStatus.adapters.length === 0 ? (
+            <p className="rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 font-mono text-[10.5px] text-white/55">
+              no adapters registered for this module yet
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {moduleStatus.adapters.map(({ def, status }) => {
+                const m = statusMeta(status);
+                return (
+                  <span
+                    key={def.id}
+                    className={clsx(
+                      "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider",
+                      TONE_PILL[m.tone]
+                    )}
+                  >
+                    <span className="text-white/85">{def.provider}</span>
+                    <span className="opacity-50">·</span>
+                    <span>{m.label}</span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-1.5">
         <input
