@@ -12,7 +12,7 @@ Source of truth: `src-tauri/tauri.conf.json` + `src-tauri/icons/`.
 
 | Platform | State | Detail |
 |---|---|---|
-| macOS (Apple Silicon) | **ready (.app) / partial (.dmg)** | `.app` builds + **opens** (verified, unsigned) at `bundle/macos/Operator Core.app`. `.dmg` fails at `bundle_dmg.sh` Finder styling — use `npm run tauri:build:ci` (CI=true) to skip it. Not signed/notarized. |
+| macOS (Apple Silicon) | **ready (.app + .dmg, unsigned)** | `.app` builds + **opens**; `.dmg` builds with `CI=true` at `bundle/dmg/Operator Core_0.1.0_aarch64.dmg` (verified). Both **unsigned / not notarized**. |
 | Windows (x86_64) | partial | NSIS/MSI buildable via Tauri; **no code-signing cert**; WiX/NSIS toolchain needed on CI. |
 | Linux (AppImage / deb) | planned | Targets available; not yet produced/tested. |
 
@@ -37,18 +37,25 @@ Windows Store logos), generated from `brand/operator-core.png` via
   titles + Cargo description + index.html title updated. Brand stays
   Operator.Center. Folders/routes/package id unchanged.
 
-### Local tauri build — macOS .app WORKS (Sprint E2)
-- On macOS (Apple Silicon) `npm run tauri:build` produces a working, openable
-  `Operator Core.app`. The `.dmg` step fails at `bundle_dmg.sh` (AppleScript
-  Finder styling) — `npm run tauri:build:ci` (CI=true) skips that step and
-  emits a plain DMG. See `TAURI_BUILD_REPORT.md`.
+### Local tauri build — macOS .app + .dmg WORK (Sprint E2 → E3, verified)
+- On macOS (Apple Silicon), `CI=true npm run tauri:build` (alias
+  `npm run tauri:build:ci`) produces both a working `Operator Core.app` and an
+  unsigned `Operator Core_0.1.0_aarch64.dmg`. Plain `npm run tauri:build` builds
+  the `.app` but the `.dmg` Finder-styling step needs `CI=true`. See
+  `TAURI_BUILD_REPORT.md`.
 - On the Linux CI box the build still needs GTK/WebKit dev libs (host setup).
 
+### Remaining macOS distribution steps
+- **Code signing** (Developer ID) — missing.
+- **Notarization** (notarytool + staple) — missing.
+- **Updater feed** — missing.
+- Until signed + notarized, the `.dmg` triggers Gatekeeper warnings.
+
 ## Readiness summary
-- **Ready:** Tauri config (productName Operator Core), icon set (generated), dev/build wiring, window + tray setup.
-- **Blocked before a local artifact:** GTK/WebKit (Linux) or Xcode/MSVC (mac/win) system libraries.
-- **Blocked before public distribution:** code signing (mac + win), notarization, updater feed.
-- **Not started:** Linux packaging artifacts, CI signing pipeline.
+- **Ready:** Tauri config (productName Operator Core), icon set (generated), dev/build wiring, window + tray setup, **macOS `.app` + unsigned `.dmg` (verified via `CI=true`)**.
+- **Blocked before public distribution:** code signing (mac + win), notarization (mac), updater feed.
+- **Blocked on host setup:** Linux (GTK/WebKit dev libs), Windows (MSVC + WebView2).
+- **Not started:** Linux/Windows packaging artifacts, CI signing pipeline.
 
 ## Exact commands
 ```bash

@@ -1,14 +1,16 @@
 # TAURI_BUILD_REPORT — Operator Core
 
-## macOS (verified on Apple Silicon, Sprint E2)
+## macOS (verified on Apple Silicon, Sprint E2 → E3)
 
 - Frontend build (`npm run build`): **pass**
 - Rust release build: **pass**
 - App bundle: **pass** — opens successfully
   - `src-tauri/target/release/bundle/macos/Operator Core.app`
-- DMG bundling: **FAILED** at `bundle_dmg.sh`
-  - leftover temp image: `src-tauri/target/release/bundle/macos/rw.Operator Core_0.1.0_aarch64.dmg`
-  - no final `.dmg` produced
+- DMG bundling: **PASS with `CI=true`** (unsigned)
+  - `src-tauri/target/release/bundle/dmg/Operator Core_0.1.0_aarch64.dmg`
+  - command: `CI=true npm run tauri:build` (or `npm run tauri:build:ci`)
+- Plain `npm run tauri:build` (no CI): DMG step fails at the `bundle_dmg.sh`
+  AppleScript Finder styling (leaves a `rw.*.dmg`); `CI=true` skips that step.
 
 ### DMG failure — cause
 Tauri's `bundle_dmg.sh` creates a read-write `rw.*.dmg`, then runs an
@@ -37,10 +39,14 @@ If a styled DMG is wanted later, grant the terminal app "Automation → Finder"
 permission (System Settings → Privacy & Security → Automation) and re-run the
 normal `npm run tauri:build` in an interactive session.
 
-### Current valid Mac artifact
-`src-tauri/target/release/bundle/macos/Operator Core.app` — **the `.app` is the
-valid, working Mac artifact today.** It is unsigned (Gatekeeper will warn;
-right-click → Open, or `xattr -dr com.apple.quarantine "Operator Core.app"`).
+### Current valid Mac artifacts
+- `src-tauri/target/release/bundle/macos/Operator Core.app` — working app.
+- `src-tauri/target/release/bundle/dmg/Operator Core_0.1.0_aarch64.dmg` —
+  working **unsigned** DMG (built with `CI=true`).
+
+Both are **unsigned / not notarized** — Gatekeeper will warn. Open via
+right-click → Open, or `xattr -dr com.apple.quarantine "Operator Core.app"`.
+Signing + notarization are the remaining steps before public distribution.
 
 ## Linux (CI box, Sprint E)
 - Blocked at `gdk-sys` — missing GTK/WebKit dev libs. Install
@@ -53,8 +59,9 @@ right-click → Open, or `xattr -dr com.apple.quarantine "Operator Core.app"`).
 | Icons present | yes | yes |
 | Rust release build | pass | blocked (host libs) |
 | `.app` / binary | **pass · opens** | blocked |
-| DMG / installer | blocked (Finder styling · use `CI=true`) | n/a |
+| DMG / installer | **pass · unsigned (`CI=true`)** | n/a |
 | Signing | missing | missing |
+| Notarization | missing | n/a |
 | Updater | missing | missing |
 
 ## Commands

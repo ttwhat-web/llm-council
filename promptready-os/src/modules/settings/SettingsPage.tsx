@@ -1069,13 +1069,13 @@ function PackagingCard() {
     { k: "app name", v: "Operator Core", ok: true },
     { k: "icons present", v: "yes", ok: true },
     { k: "macOS .app build", v: "ready · opens", ok: true },
-    { k: "app opens", v: "yes (verified)", ok: true },
-    { k: "macOS .dmg", v: "blocked · use CI=true", ok: false },
+    { k: "macOS .dmg", v: "ready · unsigned (CI=true)", ok: true },
     { k: "signing", v: "missing", ok: false },
+    { k: "notarization", v: "missing", ok: false },
     { k: "updater", v: "missing", ok: false },
     {
       k: "artifact",
-      v: "bundle/macos/Operator Core.app",
+      v: "bundle/dmg/Operator Core_0.1.0_aarch64.dmg",
       ok: true
     }
   ];
@@ -1150,7 +1150,7 @@ function PackagingCard() {
           <ReadinessRow label="Tauri config" state="ready" detail="src-tauri/tauri.conf.json · productName Operator Core" />
           <ReadinessRow label="App icons" state="ready" detail="generated · 32/128/@2x · icns · ico" />
           <ReadinessRow label="macOS .app build" state="ready" detail="builds + opens · unsigned · bundle/macos/Operator Core.app" />
-          <ReadinessRow label="macOS .dmg" state="partial" detail="bundle_dmg.sh Finder styling fails · `npm run tauri:build:ci` (CI=true) skips it" />
+          <ReadinessRow label="macOS .dmg" state="ready" detail="unsigned · `npm run tauri:build:ci` → bundle/dmg/Operator Core_0.1.0_aarch64.dmg" />
           <ReadinessRow label="Windows MSI build" state="partial" detail="needs MSVC + WebView2 · unsigned" />
           <ReadinessRow label="Linux AppImage / deb" state="planned" detail="install libgtk-3-dev + libwebkit2gtk-4.0-dev, then build" />
           <ReadinessRow label="Code signing · macOS" state="unknown" detail="developer ID + notarization not yet configured" />

@@ -80,14 +80,15 @@ status and Presence "markets"/"news" rollups. **No fake prices, no fake headline
 
 - macOS `.app`: **builds + opens** (verified, Apple Silicon, unsigned) at
   `src-tauri/target/release/bundle/macos/Operator Core.app`.
-- macOS `.dmg`: **blocked** at `bundle_dmg.sh` Finder styling → use
-  `npm run tauri:build:ci` (CI=true) to skip it and emit a plain DMG.
+- macOS `.dmg`: **builds (unsigned)** with `CI=true npm run tauri:build` at
+  `src-tauri/target/release/bundle/dmg/Operator Core_0.1.0_aarch64.dmg` (verified).
 - Signing / notarization / updater: still missing.
 - Linux: needs GTK/WebKit dev libs; Windows: MSVC + WebView2.
 
 ## What blocks launch
 
-1. Signed + notarized installers (macOS `.dmg`/Windows MSI); `.app` works unsigned today.
+1. Signing + notarization of the macOS `.dmg` (and Windows MSI); the unsigned
+   `.app` + `.dmg` build and open today.
 2. Tauri runtime fetch path (CORS-free) + secure key storage for keyed/CORS providers.
 3. Gmail/Outlook OAuth + IMAP server piece (design done, not built).
 4. Mobile companion, Cloud sync, Connector Hub, Payments.

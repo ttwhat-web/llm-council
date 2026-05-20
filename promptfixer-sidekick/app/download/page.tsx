@@ -40,7 +40,7 @@ const PLATFORMS: PlatformCard[] = [
     arch: "Apple Silicon (M1+)",
     Icon: Apple,
     status: "source",
-    hint: "Local `.app` builds + opens (unsigned). `.dmg` styling needs CI=true. Build from source today."
+    hint: "Local `.app` + `.dmg` build and open (unsigned · `CI=true npm run tauri:build`). Signed/notarized installer coming soon."
   },
   {
     os: "macOS",
@@ -255,7 +255,10 @@ npm run tauri:build   # unsigned native build for your platform`}
         <code className="font-mono text-white/65"> tauri:build</code> requires the
         platform system libraries above; it emits an unsigned binary in
         <code className="font-mono text-white/65"> src-tauri/target/release/bundle</code>.
-        No verified/signed artifact is published yet — source build only.
+        No verified/signed artifact is published yet — source build only. On
+        macOS, <code className="font-mono text-white/65">CI=true npm run tauri:build</code>{" "}
+        produces a working unsigned <code className="font-mono text-white/65">.app</code> and{" "}
+        <code className="font-mono text-white/65">.dmg</code>.
       </p>
     </section>
   );
@@ -270,8 +273,8 @@ function KnownLimitations() {
         </span>
       </header>
       <ul className="grid grid-cols-1 gap-1 text-[12px] text-white/75 md:grid-cols-2">
-        <li>· macOS `.app` builds + opens locally (unsigned) · no signed installer published yet</li>
-        <li>· macOS `.dmg` bundling needs `CI=true` (skips the fragile Finder styling step)</li>
+        <li>· macOS `.app` + `.dmg` build and open locally (unsigned · `CI=true`); not signed/notarized yet</li>
+        <li>· No signed/notarized public installer published yet · no auto-updater</li>
         <li>· Linux/Windows local build needs GTK/WebKit or MSVC+WebView2 system deps</li>
         <li>· Mobile companion is planned · capture/approve over QR pairing</li>
         <li>· Telegram bridge is adapter-ready · networking ships with desktop runtime</li>
