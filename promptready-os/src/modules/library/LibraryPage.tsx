@@ -266,6 +266,22 @@ function ReplayHeader({ m }: { m: MissionReceipt }) {
   const [flash, setFlash] = useState<string | null>(null);
   const dispatch = useMissionStore((s) => s.dispatch);
   const current = useMissionStore((s) => s.current);
+  const history = useMissionStore((s) => s.history);
+
+  // Replay v2 · read-only derivations from the receipt + history. No rerun.
+  const usedMemory = m.memoryMatches ?? 0;
+  const repoCount = m.repoContext ? 1 : 0;
+  const followUps = history.filter((r) => r.id !== m.id && r.brief.includes(m.id)).length;
+  const chainLength = 1 + followUps;
+
+  const markReplayTested = () => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem("promptready-os.replay.tested", "true");
+    } catch {
+      // ignore
+    }
+  };
 
   const replayMd = (): string => {
     const lines: string[] = [];
@@ -311,6 +327,7 @@ function ReplayHeader({ m }: { m: MissionReceipt }) {
   const onCopy = () => {
     if (typeof navigator === "undefined" || !navigator.clipboard) return;
     void navigator.clipboard.writeText(replayMd());
+    markReplayTested();
     setFlash("replay summary copied");
     window.setTimeout(() => setFlash(null), 2500);
   };
@@ -326,6 +343,7 @@ function ReplayHeader({ m }: { m: MissionReceipt }) {
     a.click();
     a.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    markReplayTested();
     setFlash(`exported replay-${m.id}.md`);
     window.setTimeout(() => setFlash(null), 3000);
   };
@@ -377,11 +395,32 @@ function ReplayHeader({ m }: { m: MissionReceipt }) {
           <Rocket className="h-3 w-3" /> run follow-up
         </button>
       </div>
+
+      {/* Replay v2 · read-only lineage stats · no rerun */}
+      <div className="basis-full flex flex-wrap items-center gap-1.5">
+        <ReplayStat k="used memory" v={String(usedMemory)} />
+        <ReplayStat k="repos" v={String(repoCount)} />
+        <ReplayStat k="workflow" v={m.repoContext ? "linked" : "—"} />
+        <ReplayStat k="receipt chain" v={String(chainLength)} />
+        <ReplayStat k="follow-ups" v={String(followUps)} />
+        <ReplayStat k="deliverables" v={String(m.deliverables.length)} />
+        <ReplayStat k="events" v={String(m.events.length)} />
+      </div>
+
       {flash && (
         <p className="basis-full font-mono text-[10px] uppercase tracking-wider text-accent">
           {flash}
         </p>
       )}
     </div>
+  );
+}
+
+function ReplayStat({ k, v }: { k: string; v: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
+      <span className="text-white/40">{k}</span>
+      <span className="text-white/85">{v}</span>
+    </span>
   );
 }

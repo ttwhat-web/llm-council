@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { BookOpen, Download } from "lucide-react";
+import { useRef, useState } from "react";
+import { BookOpen, Download, Upload, X } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
@@ -112,8 +112,41 @@ function readOperatorTier(): string {
   }
 }
 
+function isPassportFile(value: unknown): value is PassportFile {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return v.format === "operator.center.passport" && v.version === 1;
+}
+
 export function BrainPassportCard() {
   const [flash, setFlash] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PassportFile | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // reset so the same file can be re-picked later
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed: unknown = JSON.parse(text);
+      if (!isPassportFile(parsed)) {
+        setPreview(null);
+        setFlash("not a valid passport file");
+        window.setTimeout(() => setFlash(null), 4000);
+        return;
+      }
+      // Preview only · NO store mutation.
+      setPreview(parsed);
+      setFlash(null);
+    } catch {
+      setPreview(null);
+      setFlash("not a valid passport file");
+      window.setTimeout(() => setFlash(null), 4000);
+    }
+  };
+
   const onExport = () => {
     const passport = build();
     const blob = new Blob([JSON.stringify(passport, null, 2)], {
@@ -183,12 +216,75 @@ export function BrainPassportCard() {
         >
           <Download className="h-3.5 w-3.5" /> Export Passport
         </button>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-white/12 bg-white/[0.03] px-3 py-1.5 text-[12px] font-semibold text-white/85 transition hover:bg-white/[0.06]"
+        >
+          <Upload className="h-3.5 w-3.5" /> Import Passport
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".brain,application/json"
+          onChange={onPickFile}
+          className="hidden"
+        />
         {flash && (
           <span className="font-mono text-[10px] uppercase tracking-wider text-accent">
             {flash}
           </span>
         )}
       </div>
+
+      {preview && (
+        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.015] p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-accent">
+              passport preview · read only
+            </span>
+            <button
+              type="button"
+              onClick={() => setPreview(null)}
+              className="inline-flex items-center gap-1 rounded-md border border-white/12 px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55 transition hover:bg-white/[0.06]"
+            >
+              <X className="h-3 w-3" /> Clear preview
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 md:grid-cols-3">
+            {[
+              ["identity", preview.brain.name ?? "—"],
+              ["mode", preview.brain.mode ?? "—"],
+              ["tier", preview.operator.tier],
+              ["rank", preview.operator.rank],
+              ["level", preview.operator.level],
+              ["missions", String(preview.counters.missions)],
+              ["receipts", String(preview.counters.receipts)],
+              ["repos", String(preview.counters.repos)],
+              ["notes / docs", String(preview.counters.imports)],
+              ["snapshots", String(preview.counters.snapshots)],
+              ["workflow refs", String(preview.counters.workflows)],
+              ["templates", String(preview.runtime.templates)],
+              ["sources", String(preview.runtime.sources.length)]
+            ].map(([k, val]) => (
+              <div key={k} className="flex flex-col">
+                <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
+                  {k}
+                </span>
+                <span className="truncate text-[12px] text-white/85">{val}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-3 border-t border-white/8 pt-2 text-[10.5px] leading-relaxed text-white/55">
+            Preview only · a passport is a portable identity summary · it does
+            not overwrite your brain. Full state restore uses{" "}
+            <span className="font-mono text-accent">.brainpack</span> in the
+            Snapshots card.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

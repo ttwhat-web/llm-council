@@ -56,6 +56,8 @@ import { OperatorBulletinCard } from "@/components/OperatorBulletinCard";
 import { EmailRuntimeCard } from "@/components/EmailRuntimeCard";
 import { LaunchReadinessCard } from "@/components/LaunchReadinessCard";
 import { ProviderDiagnostics } from "@/components/ProviderDiagnostics";
+import { FounderBetaCard } from "@/components/FounderBetaCard";
+import { FieldTestModeCard } from "@/components/FieldTestModeCard";
 import {
   CloudSyncCard,
   MobileCompanionRoadmapCard,
@@ -303,8 +305,10 @@ export default function SettingsPage() {
         <DiagnosticsCard />
       </Foldable>
 
-      <SettingsSection letter="O" label="Operator" hint="Launch · Team · Packaging" />
+      <SettingsSection letter="O" label="Operator" hint="Launch · Founder · Field Test" />
       <LaunchReadinessCard />
+      <FounderBetaCard />
+      <FieldTestModeCard />
       <Foldable title="Packaging" hint="macOS · Windows · Linux" persistKey="packaging">
         <PackagingCard />
       </Foldable>
