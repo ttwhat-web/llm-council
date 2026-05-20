@@ -5,6 +5,7 @@ import AgentsPage from "@/modules/agents/AgentsPage";
 import MemoryPage from "@/modules/memory/MemoryPage";
 import LibraryPage from "@/modules/library/LibraryPage";
 import IntelligenceTerminalPage from "@/modules/intelligence-terminal/IntelligenceTerminalPage";
+import MarketLabPage from "@/modules/market-lab/MarketLabPage";
 import WorkflowsPage from "@/modules/workflows/WorkflowsPage";
 import BrainPage from "@/modules/brain/BrainPage";
 import AtlasPage from "@/modules/atlas/AtlasPage";
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
       { path: "memory", element: <MemoryPage /> },
       { path: "library", element: <LibraryPage /> },
       { path: "terminal", element: <IntelligenceTerminalPage /> },
+      { path: "market-lab", element: <MarketLabPage /> },
       { path: "workflows", element: <WorkflowsPage /> },
       { path: "brain", element: <BrainPage /> },
       { path: "atlas", element: <AtlasPage /> },

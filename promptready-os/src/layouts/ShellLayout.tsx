@@ -9,6 +9,7 @@ import {
   Cpu,
   Database,
   FileText,
+  LineChart,
   Map as MapIcon,
   Package,
   Settings as SettingsIcon,
@@ -72,7 +73,8 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: "/memory", label: "Memory", Icon: Database },
       { to: "/brain", label: "Brain · Repos · Health", Icon: Brain },
-      { to: "/terminal", label: "Intelligence Terminal", Icon: TerminalIcon }
+      { to: "/terminal", label: "Intelligence Terminal", Icon: TerminalIcon },
+      { to: "/market-lab", label: "Market Lab · MIC", Icon: LineChart }
     ]
   },
   {
