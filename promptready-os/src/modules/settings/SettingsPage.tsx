@@ -1068,11 +1068,16 @@ function PackagingCard() {
   const localStatus: Array<{ k: string; v: string; ok: boolean }> = [
     { k: "app name", v: "Operator Core", ok: true },
     { k: "icons present", v: "yes", ok: true },
-    { k: "tauri config", v: "valid", ok: true },
-    { k: "tauri build passed", v: "no · host libs missing", ok: false },
-    { k: "artifact path", v: "none", ok: false },
+    { k: "macOS .app build", v: "ready · opens", ok: true },
+    { k: "app opens", v: "yes (verified)", ok: true },
+    { k: "macOS .dmg", v: "blocked · use CI=true", ok: false },
     { k: "signing", v: "missing", ok: false },
-    { k: "updater", v: "missing", ok: false }
+    { k: "updater", v: "missing", ok: false },
+    {
+      k: "artifact",
+      v: "bundle/macos/Operator Core.app",
+      ok: true
+    }
   ];
 
   return (
@@ -1144,8 +1149,8 @@ function PackagingCard() {
         <ul className="grid grid-cols-1 gap-1 md:grid-cols-2">
           <ReadinessRow label="Tauri config" state="ready" detail="src-tauri/tauri.conf.json · productName Operator Core" />
           <ReadinessRow label="App icons" state="ready" detail="generated · 32/128/@2x · icns · ico" />
-          <ReadinessRow label="Local tauri build" state="planned" detail="blocked on GTK/WebKit host libs — see TAURI_BUILD_REPORT.md" />
-          <ReadinessRow label="macOS build" state="partial" detail="needs Xcode CLT · unsigned .app/.dmg" />
+          <ReadinessRow label="macOS .app build" state="ready" detail="builds + opens · unsigned · bundle/macos/Operator Core.app" />
+          <ReadinessRow label="macOS .dmg" state="partial" detail="bundle_dmg.sh Finder styling fails · `npm run tauri:build:ci` (CI=true) skips it" />
           <ReadinessRow label="Windows MSI build" state="partial" detail="needs MSVC + WebView2 · unsigned" />
           <ReadinessRow label="Linux AppImage / deb" state="planned" detail="install libgtk-3-dev + libwebkit2gtk-4.0-dev, then build" />
           <ReadinessRow label="Code signing · macOS" state="unknown" detail="developer ID + notarization not yet configured" />

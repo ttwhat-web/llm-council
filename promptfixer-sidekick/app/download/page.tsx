@@ -39,8 +39,8 @@ const PLATFORMS: PlatformCard[] = [
     os: "macOS",
     arch: "Apple Silicon (M1+)",
     Icon: Apple,
-    status: "coming-soon",
-    hint: "Signed .dmg in QA. For now: build from source · `npm run tauri:build`."
+    status: "source",
+    hint: "Local `.app` builds + opens (unsigned). `.dmg` styling needs CI=true. Build from source today."
   },
   {
     os: "macOS",
@@ -270,8 +270,9 @@ function KnownLimitations() {
         </span>
       </header>
       <ul className="grid grid-cols-1 gap-1 text-[12px] text-white/75 md:grid-cols-2">
-        <li>· No signed public installers yet · source build only · no verified artifact published</li>
-        <li>· Local `tauri:build` needs GTK/WebKit (Linux) or Xcode/MSVC (mac/win)</li>
+        <li>· macOS `.app` builds + opens locally (unsigned) · no signed installer published yet</li>
+        <li>· macOS `.dmg` bundling needs `CI=true` (skips the fragile Finder styling step)</li>
+        <li>· Linux/Windows local build needs GTK/WebKit or MSVC+WebView2 system deps</li>
         <li>· Mobile companion is planned · capture/approve over QR pairing</li>
         <li>· Telegram bridge is adapter-ready · networking ships with desktop runtime</li>
         <li>· Agent runtime cycles state but does not execute autonomously</li>

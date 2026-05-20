@@ -76,12 +76,21 @@ status and Presence "markets"/"news" rollups. **No fake prices, no fake headline
   documented in the Email Runtime card. No OAuth implemented.
 - Signed installers, auto-update, keychain token storage.
 
+## Desktop packaging (Sprint E2)
+
+- macOS `.app`: **builds + opens** (verified, Apple Silicon, unsigned) at
+  `src-tauri/target/release/bundle/macos/Operator Core.app`.
+- macOS `.dmg`: **blocked** at `bundle_dmg.sh` Finder styling → use
+  `npm run tauri:build:ci` (CI=true) to skip it and emit a plain DMG.
+- Signing / notarization / updater: still missing.
+- Linux: needs GTK/WebKit dev libs; Windows: MSVC + WebView2.
+
 ## What blocks launch
 
-1. Tauri runtime fetch path (CORS-free) + secure key storage for keyed/CORS providers.
-2. Gmail/Outlook OAuth + IMAP server piece (design done, not built).
-3. Mobile companion, Cloud sync, Connector Hub, Payments.
-4. Signed installers.
+1. Signed + notarized installers (macOS `.dmg`/Windows MSI); `.app` works unsigned today.
+2. Tauri runtime fetch path (CORS-free) + secure key storage for keyed/CORS providers.
+3. Gmail/Outlook OAuth + IMAP server piece (design done, not built).
+4. Mobile companion, Cloud sync, Connector Hub, Payments.
 
 ## What to test manually
 

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "PromptReady OS — the operating system for serious AI users.",
+  "description": "Operator Core — desktop app for Operator.Center.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,7 +12,8 @@
     "lint": "eslint . --ext .ts,.tsx",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:build:ci": "CI=true tauri build"
   },
   "dependencies": {
     "react": "18.3.1",

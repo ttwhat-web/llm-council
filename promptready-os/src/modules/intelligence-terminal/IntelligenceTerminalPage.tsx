@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import {
   Activity,
@@ -35,7 +35,16 @@ import { useBrainStore } from "@/store/brain";
 import { computeCostBoard, formatUsd } from "@/services/cost";
 import { readPresence, type PresenceSnapshot } from "@/services/presence";
 import { measureBrainHealth } from "@/services/brainHealth";
-import { statusForModule, statusMeta, type AdapterModule } from "@/services/adapters";
+import {
+  statusForModule,
+  statusMeta,
+  adapterSummary,
+  ADAPTERS,
+  adapterStatus,
+  type AdapterModule
+} from "@/services/adapters";
+import { getHealth } from "@/services/providerHealth";
+import { RepoImportBox } from "@/components/RepoImportBox";
 import {
   fetchCryptoPrices,
   formatPrice,
@@ -412,6 +421,24 @@ export default function IntelligenceTerminalPage() {
   const [alerts, setAlerts] = useState<string[]>(() => loadAlerts());
   const [command, setCommand] = useState("");
   const [lastCommand, setLastCommand] = useState<string | null>(null);
+  const cmdRef = useRef<HTMLInputElement | null>(null);
+
+  // Keyboard command bar · "/" focuses it (unless already typing somewhere).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/") return;
+      const el = document.activeElement;
+      const typing =
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        (el instanceof HTMLElement && el.isContentEditable);
+      if (typing) return;
+      e.preventDefault();
+      cmdRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const meta = useMemo(() => TABS.find((t) => t.kind === active)!, [active]);
   const cards = pinned[active];
@@ -472,6 +499,7 @@ export default function IntelligenceTerminalPage() {
         <TerminalIcon className="h-3.5 w-3.5 text-accent" />
         <span className="font-mono text-[10px] uppercase tracking-wider text-accent">cmd</span>
         <input
+          ref={cmdRef}
           type="text"
           value={command}
           onChange={(e) => setCommand(e.target.value)}
@@ -479,6 +507,9 @@ export default function IntelligenceTerminalPage() {
           placeholder="market:AAPL · crypto:BTC · fx:EUR/USD · repo:owner/name · or free text"
           className="no-drag flex-1 bg-transparent font-mono text-[12px] text-white placeholder:text-white/35 focus:outline-none"
         />
+        <kbd className="hidden rounded border border-white/15 bg-white/[0.05] px-1.5 py-0.5 font-mono text-[9px] text-white/45 md:inline">
+          /
+        </kbd>
         {lastCommand && (
           <span className="hidden rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55 md:inline">
             last · {lastCommand.slice(0, 40)}
@@ -539,8 +570,15 @@ export default function IntelligenceTerminalPage() {
         ) : (
           <GridPanel meta={meta} cards={cards} onChange={updateCards} />
         )}
-        <BriefingsPanel alerts={alerts} setAlerts={setAlerts} />
+        <div className="flex flex-col gap-4">
+          <ProviderHealthRail />
+          <CostRuntimeMini />
+          <BriefingsPanel alerts={alerts} setAlerts={setAlerts} />
+        </div>
       </div>
+
+      {/* ============== GitHub repo import / code-operator box ============== */}
+      <RepoImportBox />
 
       {/* ================= status rail ================= */}
       <footer className="flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-white/[0.015] px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-white/45">
@@ -1238,6 +1276,128 @@ function BriefingsPanel({
           </p>
         </div>
       </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// Provider Health rail (right) · live registry + provider-health rollup
+// ============================================================================
+
+function ProviderHealthRail() {
+  // Re-read periodically so a successful Crypto/News fetch flips status here.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setTick((n) => n + 1), 4000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  const sum = adapterSummary();
+
+  return (
+    <section className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.018] p-3 shadow-glass">
+      <header className="flex items-center justify-between border-b border-white/6 pb-2">
+        <div className="flex items-center gap-2">
+          <Activity className="h-3.5 w-3.5 text-accent" />
+          <span className="text-[12.5px] font-semibold text-white">Provider Health</span>
+        </div>
+        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
+          {sum.connected}/{sum.total} live
+        </span>
+      </header>
+
+      <div className="flex flex-wrap gap-1 font-mono text-[9px] uppercase tracking-wider">
+        <span className="rounded border border-emerald-400/30 bg-emerald-500/[0.08] px-1.5 py-0.5 text-emerald-200">
+          {sum.connected} connected
+        </span>
+        <span className="rounded border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 text-accent">
+          {sum.ready} ready
+        </span>
+        {sum.error > 0 && (
+          <span className="rounded border border-rose-400/30 bg-rose-500/[0.08] px-1.5 py-0.5 text-rose-200">
+            {sum.error} error
+          </span>
+        )}
+        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 text-white/55">
+          {sum.offline} offline
+        </span>
+      </div>
+
+      <ul className="flex max-h-[300px] flex-col gap-0.5 overflow-auto pr-1">
+        {ADAPTERS.map((a) => {
+          const status = adapterStatus(a);
+          const m = statusMeta(status);
+          const h = getHealth(a.id);
+          return (
+            <li
+              key={a.id}
+              className="flex items-center justify-between gap-2 rounded border border-white/6 bg-white/[0.012] px-2 py-1 font-mono text-[10px]"
+            >
+              <span className="min-w-0 truncate text-white/80" title={a.note}>
+                {a.provider}
+              </span>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {h.lastSuccess && (
+                  <span className="text-white/35">{new Date(h.lastSuccess).toLocaleTimeString()}</span>
+                )}
+                <span className={clsx("rounded border px-1 py-px uppercase tracking-wider", TONE_PILL[m.tone])}>
+                  {m.label}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+// ============================================================================
+// Cost + Runtime mini (right rail) · real local cost board + presence
+// ============================================================================
+
+function CostRuntimeMini() {
+  const history = useMissionStore((s) => s.history);
+  const runtime = useMissionStore((s) => s.runtime);
+  const board = useMemo(() => computeCostBoard(history), [history]);
+
+  const rows: Array<{ k: string; v: string; ok?: boolean }> = [
+    { k: "runtime", v: runtime },
+    { k: "missions", v: String(board.localMissions + board.ollamaMissions) },
+    { k: "ollama", v: String(board.ollamaMissions) },
+    { k: "cloud spend", v: "$0", ok: true },
+    { k: "cloud avoided", v: formatUsd(board.estimatedCloudCostAvoidedUSD), ok: true }
+  ];
+
+  return (
+    <section className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.018] p-3 shadow-glass">
+      <header className="flex items-center justify-between border-b border-white/6 pb-2">
+        <div className="flex items-center gap-2">
+          <DollarSign className="h-3.5 w-3.5 text-accent" />
+          <span className="text-[12.5px] font-semibold text-white">Cost + Runtime</span>
+        </div>
+        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
+          local
+        </span>
+      </header>
+      <ul className="grid grid-cols-2 gap-1">
+        {rows.map((r) => (
+          <li
+            key={r.k}
+            className="flex flex-col gap-0.5 rounded border border-white/6 bg-white/[0.012] px-2 py-1"
+          >
+            <span className="font-mono text-[8.5px] uppercase tracking-[0.18em] text-white/40">{r.k}</span>
+            <span className={clsx("font-mono text-[11px]", r.ok ? "text-emerald-200/90" : "text-white/85")}>
+              {r.v}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {history.length === 0 && (
+        <p className="font-mono text-[9.5px] uppercase tracking-wider text-white/40">
+          needs data · run a mission
+        </p>
+      )}
     </section>
   );
 }

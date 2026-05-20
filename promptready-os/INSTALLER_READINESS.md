@@ -12,7 +12,7 @@ Source of truth: `src-tauri/tauri.conf.json` + `src-tauri/icons/`.
 
 | Platform | State | Detail |
 |---|---|---|
-| macOS (Apple Silicon / Intel) | partial | Builds locally via `npm run tauri:build`; **not signed/notarized**; universal target not configured. |
+| macOS (Apple Silicon) | **ready (.app) / partial (.dmg)** | `.app` builds + **opens** (verified, unsigned) at `bundle/macos/Operator Core.app`. `.dmg` fails at `bundle_dmg.sh` Finder styling — use `npm run tauri:build:ci` (CI=true) to skip it. Not signed/notarized. |
 | Windows (x86_64) | partial | NSIS/MSI buildable via Tauri; **no code-signing cert**; WiX/NSIS toolchain needed on CI. |
 | Linux (AppImage / deb) | planned | Targets available; not yet produced/tested. |
 
@@ -37,10 +37,12 @@ Windows Store logos), generated from `brand/operator-core.png` via
   titles + Cargo description + index.html title updated. Brand stays
   Operator.Center. Folders/routes/package id unchanged.
 
-### Local tauri build — BLOCKED on host libs (Sprint E)
-- `npm run tauri:build` fails at `gdk-sys` (missing GTK/WebKit dev libs on this
-  host). See `TAURI_BUILD_REPORT.md` for the exact error + install commands.
-  Config + icons are valid; this is a host-provisioning step, not a config bug.
+### Local tauri build — macOS .app WORKS (Sprint E2)
+- On macOS (Apple Silicon) `npm run tauri:build` produces a working, openable
+  `Operator Core.app`. The `.dmg` step fails at `bundle_dmg.sh` (AppleScript
+  Finder styling) — `npm run tauri:build:ci` (CI=true) skips that step and
+  emits a plain DMG. See `TAURI_BUILD_REPORT.md`.
+- On the Linux CI box the build still needs GTK/WebKit dev libs (host setup).
 
 ## Readiness summary
 - **Ready:** Tauri config (productName Operator Core), icon set (generated), dev/build wiring, window + tray setup.

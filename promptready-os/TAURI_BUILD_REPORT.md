@@ -1,61 +1,67 @@
-# TAURI_BUILD_REPORT — Operator Core (Sprint E)
+# TAURI_BUILD_REPORT — Operator Core
 
-Attempted: `cd promptready-os && npm run tauri:build` on Linux x86_64.
+## macOS (verified on Apple Silicon, Sprint E2)
 
-## Result: FAILED (host system libraries missing)
+- Frontend build (`npm run build`): **pass**
+- Rust release build: **pass**
+- App bundle: **pass** — opens successfully
+  - `src-tauri/target/release/bundle/macos/Operator Core.app`
+- DMG bundling: **FAILED** at `bundle_dmg.sh`
+  - leftover temp image: `src-tauri/target/release/bundle/macos/rw.Operator Core_0.1.0_aarch64.dmg`
+  - no final `.dmg` produced
 
-- Frontend build (`npm run build`, the `beforeBuildCommand`): **succeeded**.
-- Icon set: **present** (generated this sprint via `tauri icon`).
-- Rust shell compile: **failed** while building `gdk-sys v0.15.1`.
+### DMG failure — cause
+Tauri's `bundle_dmg.sh` creates a read-write `rw.*.dmg`, then runs an
+**AppleScript `tell application "Finder"`** step to set the volume window
+size, icon positions and background. That styling step is the failure point:
+the read-write image is created (hence the leftover `rw.…dmg`) but the
+finalize/convert step never runs. The Finder AppleScript fails when:
+- the build host can't send Apple events to Finder (automation permission
+  not granted / no interactive GUI session / SSH or CI context), or
+- `hdiutil` can't detach the volume because Finder still holds it.
 
-### Exact error
-```
-error: failed to run custom build command for `gdk-sys v0.15.1`
-  pkg-config exited with status code 1
-  > PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1 pkg-config --libs --cflags gdk-3.0 'gdk-3.0 >= 3.22'
-  Package gdk-3.0 was not found in the pkg-config search path.
-  Package 'gdk-3.0', required by 'virtual:world', not found
-  The system library `gdk-3.0` required by crate `gdk-sys` was not found.
-```
+This is an **environment/automation** issue, not a config bug, and **not**
+caused by the space in "Operator Core" (the leftover temp image already
+contains the space and was created fine).
 
-### Diagnosis
-This is **not** a Tauri config problem — `tauri.conf.json` and the icon set are
-valid and cargo fetched/compiled crates fine up to `gdk-sys`. The Linux Tauri
-toolchain requires GTK3 + WebKit2GTK **development** system packages, which are
-not installed in this build environment. No safe config patch applies; this is
-a host-provisioning step.
+### Safe fix — skip the fragile Finder styling
+Tauri's `bundle_dmg.sh` skips the AppleScript window-styling block when the
+`CI` environment variable is set. That produces a plain (un-styled but valid)
+DMG. Added an npm script:
 
-### Fix (Linux) — install system deps, then rebuild
-Debian/Ubuntu:
 ```bash
-sudo apt-get update
-sudo apt-get install -y \
-  libgtk-3-dev libwebkit2gtk-4.0-dev librsvg2-dev \
-  libayatana-appindicator3-dev patchelf build-essential curl wget file
-cd promptready-os && npm run tauri:build
-```
-Fedora:
-```bash
-sudo dnf install -y gtk3-devel webkit2gtk4.0-devel librsvg2-devel \
-  libappindicator-gtk3-devel patchelf
+npm run tauri:build:ci      # = CI=true tauri build  → DMG without Finder styling
 ```
 
-### macOS / Windows
-- macOS: `npm run tauri:build` needs Xcode command-line tools; produces an
-  unsigned `.app`/`.dmg` (signing/notarization still missing).
-- Windows: needs WebView2 + MSVC build tools; produces an unsigned MSI/NSIS.
+If a styled DMG is wanted later, grant the terminal app "Automation → Finder"
+permission (System Settings → Privacy & Security → Automation) and re-run the
+normal `npm run tauri:build` in an interactive session.
+
+### Current valid Mac artifact
+`src-tauri/target/release/bundle/macos/Operator Core.app` — **the `.app` is the
+valid, working Mac artifact today.** It is unsigned (Gatekeeper will warn;
+right-click → Open, or `xattr -dr com.apple.quarantine "Operator Core.app"`).
+
+## Linux (CI box, Sprint E)
+- Blocked at `gdk-sys` — missing GTK/WebKit dev libs. Install
+  `libgtk-3-dev libwebkit2gtk-4.0-dev librsvg2-dev …` then `npm run tauri:build`.
 
 ## Status summary
-| Stage | Status |
-|---|---|
-| Frontend build | pass |
-| Icons present | yes |
-| Tauri config valid | yes |
-| Rust shell compile | blocked — missing GTK/WebKit system libs |
-| Artifact produced | none |
-| Signing | missing |
-| Updater | missing |
+| Stage | macOS | Linux |
+|---|---|---|
+| Frontend build | pass | pass |
+| Icons present | yes | yes |
+| Rust release build | pass | blocked (host libs) |
+| `.app` / binary | **pass · opens** | blocked |
+| DMG / installer | blocked (Finder styling · use `CI=true`) | n/a |
+| Signing | missing | missing |
+| Updater | missing | missing |
 
-## No config changes were made
-The build config is correct; the only blocker is host system libraries.
-Re-run after installing the packages above on a provisioned build host/CI.
+## Commands
+```bash
+cd promptready-os
+npm run tauri:build         # builds .app (works on Mac); DMG step may fail on Finder styling
+npm run tauri:build:ci      # CI=true → skips Finder styling, produces a plain DMG
+# open the app directly:
+open "src-tauri/target/release/bundle/macos/Operator Core.app"
+```
