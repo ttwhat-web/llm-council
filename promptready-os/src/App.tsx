@@ -8,6 +8,7 @@ import {
   useAtlasStore
 } from "@/store";
 import { useSpacesStore } from "@/store/spaces";
+import { useUiModeStore } from "@/store/uiMode";
 import { BrainBootstrap } from "@/components/BrainBootstrap";
 import { RecoveryBanner } from "@/components/RecoveryBanner";
 import { bumpCrashCounter } from "@/services/telemetry";
@@ -21,6 +22,7 @@ export function App() {
     useMissionStore.getState().hydrate();
     useAtlasStore.getState().hydrate();
     useSpacesStore.getState().hydrate();
+    useUiModeStore.getState().hydrate();
 
     // Crash detection: a recovery checkpoint that survived a reload
     // means the previous session shut down before the mission finished.

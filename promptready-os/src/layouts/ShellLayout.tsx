@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { KbdHint } from "@/components/primitives/KbdHint";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { useUiModeStore } from "@/store/uiMode";
 
 /**
  * Shell layout · Operator Core frame.
@@ -92,9 +93,11 @@ const GROUPS: NavGroup[] = [
 ];
 
 export function ShellLayout() {
+  const secondScreen = useUiModeStore((s) => s.secondScreen);
   return (
     <div className="flex h-screen w-screen overflow-hidden">
-      {/* ---- left rail ---- */}
+      {/* ---- left rail (hidden in Second Screen mode) ---- */}
+      {!secondScreen && (
       <aside className="flex w-[68px] shrink-0 flex-col items-center justify-between border-r border-white/6 py-3">
         <div className="flex flex-col items-center gap-4">
           <div
@@ -151,9 +154,11 @@ export function ShellLayout() {
 
         <KbdHint keys={["cmd", "k"]} />
       </aside>
+      )}
 
       {/* ---- main column ---- */}
       <main className="flex flex-1 flex-col overflow-hidden">
+        {!secondScreen && (
         <header className="drag-region flex items-center justify-between border-b border-white/6 px-5 py-2">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
             <span className="text-accent">[ ]</span>
@@ -166,6 +171,7 @@ export function ShellLayout() {
             <ThemeSwitcher />
           </div>
         </header>
+        )}
 
         <div className="flex-1 overflow-auto scrollbar-thin">
           <Outlet />

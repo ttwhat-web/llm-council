@@ -45,8 +45,15 @@ import {
 } from "@/services/adapters";
 import { getHealth } from "@/services/providerHealth";
 import { getSamples, type Sample } from "@/services/marketSamples";
+import { parseQuickFind, openExternalSearch, QUICK_FIND_EXAMPLES } from "@/services/search";
+import { useUiModeStore } from "@/store/uiMode";
 import { RepoImportBox } from "@/components/RepoImportBox";
 import { CommunicationsRuntimeCard } from "@/components/CommunicationsRuntimeCard";
+import { SearchRuntimeCard } from "@/components/SearchRuntimeCard";
+import { NewsChannelMode } from "@/components/NewsChannelMode";
+import { BroadcastWall } from "@/components/BroadcastWall";
+import { BusinessCockpitCard } from "@/components/BusinessCockpitCard";
+import { Monitor } from "lucide-react";
 import {
   fetchCryptoPrices,
   formatPrice,
@@ -424,7 +431,15 @@ export default function IntelligenceTerminalPage() {
   const [alerts, setAlerts] = useState<string[]>(() => loadAlerts());
   const [command, setCommand] = useState("");
   const [lastCommand, setLastCommand] = useState<string | null>(null);
+  const [cmdFlash, setCmdFlash] = useState<string | null>(null);
   const cmdRef = useRef<HTMLInputElement | null>(null);
+  const secondScreen = useUiModeStore((s) => s.secondScreen);
+  const toggleSecondScreen = useUiModeStore((s) => s.toggleSecondScreen);
+
+  const flash = (msg: string) => {
+    setCmdFlash(msg);
+    window.setTimeout(() => setCmdFlash(null), 4000);
+  };
 
   // Keyboard command bar · "/" focuses it (unless already typing somewhere).
   useEffect(() => {
@@ -465,6 +480,46 @@ export default function IntelligenceTerminalPage() {
     const v = command.trim();
     if (!v) return;
     setLastCommand(v);
+
+    // Quick-find verbs · search/news/repo/mail/cost/mission
+    const qf = parseQuickFind(v);
+    if (qf) {
+      switch (qf.kind) {
+        case "search":
+          openExternalSearch(qf.value, "web");
+          flash(`opened browser search · "${qf.value}"`);
+          setCommand("");
+          return;
+        case "news":
+          setActive("research");
+          flash(`news wire · ${qf.value} · open the News Feed / Channel`);
+          setCommand("");
+          return;
+        case "repo": {
+          const slug = qf.value.replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "");
+          useBrainStore.getState().addMemorySource({ kind: "github", label: slug, state: "configured" });
+          flash(`repo attached · not indexed · ${slug}`);
+          setCommand("");
+          return;
+        }
+        case "mail":
+          flash("email is adapter-only · Settings → Remote → Email Runtime");
+          setCommand("");
+          return;
+        case "cost":
+          setActive("costs");
+          flash("cost board · operator group");
+          setCommand("");
+          return;
+        case "mission":
+          void useMissionStore.getState().dispatch(qf.value, "general", "smart", null);
+          flash(`mission dispatched · ${qf.value.slice(0, 40)}`);
+          setCommand("");
+          return;
+      }
+    }
+
+    // tab:value → route + pin
     const m = /^(\w[\w-]*):\s*(.+)$/.exec(v);
     if (m) {
       const targetTab = m[1].toLowerCase() as TabKind;
@@ -491,9 +546,25 @@ export default function IntelligenceTerminalPage() {
         title="Intelligence Terminal"
         sub="Markets · Research · Signals · Operator. Market surfaces live under the Intelligence Layer only — Operator.Center is not a trading app. External feeds are honest about being offline; the Operator group shows real local state."
         right={
-          <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/55">
-            {totalPinned} pinned · feeds offline
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleSecondScreen}
+              className={clsx(
+                "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition",
+                secondScreen
+                  ? "border-accent/40 bg-accent/[0.1] text-accent shadow-glow"
+                  : "border-white/10 bg-white/[0.03] text-white/65 hover:bg-white/[0.06]"
+              )}
+              title="Second Screen / TV mode · hides nav, full-width broadcast wall"
+            >
+              <Monitor className="h-3 w-3" />
+              {secondScreen ? "exit second screen" : "second screen"}
+            </button>
+            <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/55">
+              {totalPinned} pinned · feeds offline
+            </span>
+          </div>
         }
       />
 
@@ -520,6 +591,25 @@ export default function IntelligenceTerminalPage() {
         )}
       </section>
 
+      {/* quick-find hint + flash */}
+      <div className="flex flex-wrap items-center gap-2 font-mono text-[9.5px] uppercase tracking-wider text-white/35">
+        {QUICK_FIND_EXAMPLES.map((ex) => (
+          <button
+            key={ex}
+            type="button"
+            onClick={() => setCommand(ex)}
+            className="rounded border border-white/8 bg-white/[0.02] px-1.5 py-0.5 text-white/45 hover:bg-white/[0.05]"
+          >
+            {ex}
+          </button>
+        ))}
+        {cmdFlash && <span className="text-accent">· {cmdFlash}</span>}
+      </div>
+
+      {secondScreen ? (
+        <BroadcastWall />
+      ) : (
+        <>
       {/* ============== Cockpit theater ============== */}
       <MarketTheater />
 
@@ -585,6 +675,15 @@ export default function IntelligenceTerminalPage() {
 
       {/* ============== GitHub repo import / code-operator box ============== */}
       <RepoImportBox />
+
+      {/* ============== Channel mode + search + business cockpit ============== */}
+      <NewsChannelMode />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <SearchRuntimeCard />
+        <BusinessCockpitCard />
+      </div>
+        </>
+      )}
 
       {/* ================= status rail ================= */}
       <footer className="flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-white/[0.015] px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-white/45">
