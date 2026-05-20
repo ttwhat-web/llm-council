@@ -165,6 +165,10 @@ export const STARTER_PACKS: Pack[] = [
         {
           name: "Travel OS · lead intake",
           body: "# Lead intake checklist\n\n- Destination + flexible/fixed dates\n- Party size + ages\n- Budget band\n- Must-haves vs nice-to-haves\n- Source (referral / ad / repeat)"
+        },
+        {
+          name: "Travel OS · comms categories",
+          body: "# Communication categories (planned adapters)\n\n- WhatsApp · inbound leads → classify → lead mission\n- Gmail · reservations + supplier confirmations (read-only first)\n- Supplier follow-up workflow · draft reply requires approval\n\nNo provider is connected yet — these are the categories to wire when the desktop comms runtime ships."
         }
       ]
     }
@@ -217,6 +221,16 @@ export const STARTER_PACKS: Pack[] = [
           mode: "general",
           quality: "smart"
         }
+      ],
+      notes: [
+        {
+          name: "Perfume Lab · inventory",
+          body: "# Inventory tracking\n\n- Raw materials: name · supplier · CAS · qty · reorder point\n- Accords in progress · maceration start date\n- Finished stock by SKU\n- Low-stock review weekly"
+        },
+        {
+          name: "Perfume Lab · comms categories",
+          body: "# Communication categories (planned adapters)\n\n- Community inbox · DMs/feedback → classify → reply mission\n- Supplier email · raw-material quotes (read-only first)\n\nAdapters are planned — nothing connects today."
+        }
       ]
     }
   },
@@ -257,6 +271,16 @@ export const STARTER_PACKS: Pack[] = [
             "Reply to a wholesale customer asking about lead times and pricing on a carpet order. Be specific, give a firm timeline range, list what you need from them to confirm.",
           mode: "business",
           quality: "fast"
+        }
+      ],
+      notes: [
+        {
+          name: "Carpet Export · logistics",
+          body: "# Shipment + logistics notes\n\n- DHL / TNT account refs + service levels\n- Per-shipment: tracking · ETA · Incoterms · docs status\n- Customs: HS code, origin cert, packing list\n- Escalate stuck shipments after 48h"
+        },
+        {
+          name: "Carpet Export · comms categories",
+          body: "# Communication categories (planned adapters)\n\n- Invoice email category · proforma + final invoices (read-only first)\n- Customer reply mission · lead-time/pricing questions → draft reply (approval required)\n- FX watch · USD/TRY, EUR/TRY already pinned in the terminal\n\nNo email/WhatsApp provider connected yet — categories are presets to wire later."
         }
       ]
     }

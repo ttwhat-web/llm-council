@@ -55,6 +55,7 @@ interface HnHit {
 export async function fetchNews(category: NewsCategory, limit = 8): Promise<NewsFetchResult> {
   const q = CATEGORY_QUERY[category];
   const url = `${ENDPOINT}?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=${limit}`;
+  const startedAt = Date.now();
   try {
     const r = await fetch(url, { headers: { accept: "application/json" } });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -70,7 +71,7 @@ export async function fetchNews(category: NewsCategory, limit = 8): Promise<News
         category
       }))
       .filter((i) => i.title !== "(untitled)");
-    recordSuccess(NEWS_ADAPTER_ID);
+    recordSuccess(NEWS_ADAPTER_ID, Date.now() - startedAt);
     return { ok: true, items, at: Date.now() };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "fetch failed";

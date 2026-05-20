@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Inbox,
   Mail,
+  PenLine,
   Receipt,
   Target
 } from "lucide-react";
@@ -41,17 +42,19 @@ const CATEGORIES: Category[] = [
   { key: "orders", label: "Orders" },
   { key: "invoices", label: "Invoices" },
   { key: "support", label: "Support" },
-  { key: "urgent", label: "Urgent", urgent: true }
+  { key: "urgent", label: "Urgent", urgent: true },
+  { key: "waiting-reply", label: "Waiting Reply" }
 ];
 
 const FLOW: { Icon: typeof Mail; label: string }[] = [
-  { Icon: Mail, label: "Mail" },
+  { Icon: Mail, label: "Message" },
   { Icon: Bot, label: "classify" },
   { Icon: Target, label: "mission" },
-  { Icon: Receipt, label: "receipt" }
+  { Icon: Receipt, label: "receipt" },
+  { Icon: PenLine, label: "draft reply" }
 ];
 
-const ADAPTERS = ["Gmail", "IMAP", "Outlook"];
+const ADAPTERS = ["Gmail", "IMAP", "Outlook", "Apple Mail"];
 
 interface IntegrationPlan {
   provider: string;
@@ -62,25 +65,29 @@ const INTEGRATION_PLAN: IntegrationPlan[] = [
   {
     provider: "Gmail",
     steps: [
-      "OAuth 2.0 · scope gmail.readonly (+ gmail.compose later, draft-only)",
-      "read-only labels first (INBOX + user labels)",
-      "Gmail History API for incremental sync",
-      "draft-only send in a later phase — never auto-send"
+      "OAuth read-only labels first",
+      "History API later",
+      "draft-only reply later"
     ]
   },
   {
     provider: "IMAP",
     steps: [
-      "host + port (993 TLS)",
-      "app password — not the main password",
-      "read-only fetch first"
+      "host / port / app password",
+      "read-only first"
     ]
   },
   {
-    provider: "Outlook",
+    provider: "Outlook / Microsoft 365",
     steps: [
-      "Microsoft Graph · scope Mail.Read (+ Mail.ReadWrite later)",
-      "Graph delta query for incremental sync"
+      "Microsoft Graph read-only",
+      "draft later"
+    ]
+  },
+  {
+    provider: "Apple Mail",
+    steps: [
+      "local desktop import planned (no API; reads local mail store via the desktop runtime later)"
     ]
   }
 ];

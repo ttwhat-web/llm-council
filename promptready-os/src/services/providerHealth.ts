@@ -14,6 +14,7 @@ export interface ProviderHealth {
   lastSuccess: number | null;
   lastError: number | null;
   lastErrorMsg: string | null;
+  lastLatencyMs: number | null;
 }
 
 export type HealthState = "connected" | "error" | "none";
@@ -43,19 +44,19 @@ function write(s: Store) {
 }
 
 export function getHealth(id: string): ProviderHealth {
-  return read()[id] ?? { lastSuccess: null, lastError: null, lastErrorMsg: null };
+  return read()[id] ?? { lastSuccess: null, lastError: null, lastErrorMsg: null, lastLatencyMs: null };
 }
 
-export function recordSuccess(id: string): void {
+export function recordSuccess(id: string, latencyMs?: number): void {
   const s = read();
-  const cur = s[id] ?? { lastSuccess: null, lastError: null, lastErrorMsg: null };
-  s[id] = { ...cur, lastSuccess: Date.now() };
+  const cur = s[id] ?? { lastSuccess: null, lastError: null, lastErrorMsg: null, lastLatencyMs: null };
+  s[id] = { ...cur, lastSuccess: Date.now(), lastLatencyMs: latencyMs ?? cur.lastLatencyMs };
   write(s);
 }
 
 export function recordError(id: string, msg: string): void {
   const s = read();
-  const cur = s[id] ?? { lastSuccess: null, lastError: null, lastErrorMsg: null };
+  const cur = s[id] ?? { lastSuccess: null, lastError: null, lastErrorMsg: null, lastLatencyMs: null };
   s[id] = { ...cur, lastError: Date.now(), lastErrorMsg: msg.slice(0, 200) };
   write(s);
 }

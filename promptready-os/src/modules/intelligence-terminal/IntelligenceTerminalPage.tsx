@@ -44,7 +44,9 @@ import {
   type AdapterModule
 } from "@/services/adapters";
 import { getHealth } from "@/services/providerHealth";
+import { getSamples, type Sample } from "@/services/marketSamples";
 import { RepoImportBox } from "@/components/RepoImportBox";
+import { CommunicationsRuntimeCard } from "@/components/CommunicationsRuntimeCard";
 import {
   fetchCryptoPrices,
   formatPrice,
@@ -517,6 +519,9 @@ export default function IntelligenceTerminalPage() {
         )}
       </section>
 
+      {/* ============== Cockpit theater ============== */}
+      <MarketTheater />
+
       {/* ============== Grouped tab rail ============== */}
       <nav className="flex flex-col gap-2 border-b border-white/8 pb-2">
         {GROUP_ORDER.map((g) => (
@@ -860,6 +865,346 @@ function GridPanel({
 }
 
 // ============================================================================
+// Market Theater · cockpit overview · REAL data only (CoinGecko + HN)
+// ============================================================================
+
+const PULSE_SYMBOLS = ["BTC", "ETH", "SOL"] as const;
+
+function MarketTheater() {
+  const [quotes, setQuotes] = useState<CryptoQuote[]>([]);
+  const [cryptoState, setCryptoState] = useState<"loading" | "ok" | "error">("loading");
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [newsState, setNewsState] = useState<"loading" | "ok" | "error">("loading");
+  const [pulseSym, setPulseSym] = useState<string>("BTC");
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    const loadCrypto = async () => {
+      const r = await fetchCryptoPrices();
+      if (!alive) return;
+      if (r.ok) {
+        setQuotes(r.quotes);
+        setCryptoState("ok");
+      } else {
+        setCryptoState("error");
+      }
+      setTick((n) => n + 1); // refresh sample-derived chart
+    };
+    void loadCrypto();
+    const t = window.setInterval(loadCrypto, 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const loadNews = async () => {
+      const r = await fetchNews("AI", 10);
+      if (!alive) return;
+      if (r.ok) {
+        setNews(r.items);
+        setNewsState("ok");
+      } else {
+        setNewsState("error");
+      }
+    };
+    void loadNews();
+    const t = window.setInterval(loadNews, 120_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, []);
+
+  const samples = getSamples(pulseSym);
+  const cryptoOnline = cryptoState === "ok";
+  const newsOnline = newsState === "ok";
+
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-graphite-950/40 p-3">
+      {/* Operator fun layer · honest online status (pulse only when real) */}
+      <div className="flex flex-wrap items-center gap-3 border-b border-white/6 pb-2 font-mono text-[10px] uppercase tracking-wider">
+        <FeedStatus label="market feed" online={cryptoOnline} loading={cryptoState === "loading"} />
+        <FeedStatus label="news wire" online={newsOnline} loading={newsState === "loading"} />
+        <span className="ml-auto hidden text-white/35 md:inline">
+          press <kbd className="rounded border border-white/15 bg-white/[0.05] px-1 text-white/55">/</kbd> for command bar
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {/* left · pulse chart + heat tiles */}
+        <div className="flex flex-col gap-3 lg:col-span-2">
+          <MarketPulseChart symbol={pulseSym} onSymbol={setPulseSym} samples={samples} online={cryptoOnline} />
+          <AssetHeatTiles quotes={quotes} state={cryptoState} />
+        </div>
+        {/* right · news wire + signal radar */}
+        <div className="flex flex-col gap-3">
+          <NewsWireTape items={news} state={newsState} />
+          <SignalRadar quotes={quotes} news={news} cryptoOnline={cryptoOnline} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FeedStatus({ label, online, loading }: { label: string; online: boolean; loading: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className={clsx(
+          "inline-block h-1.5 w-1.5 rounded-full",
+          online
+            ? "bg-emerald-400 shadow-[0_0_6px_1px_rgba(52,211,153,0.6)] animate-pulse"
+            : loading
+              ? "bg-amber-400/80"
+              : "bg-white/25"
+        )}
+      />
+      <span className={online ? "text-emerald-200/85" : "text-white/45"}>
+        {label} {online ? "online" : loading ? "…" : "offline"}
+      </span>
+    </span>
+  );
+}
+
+function MarketPulseChart({
+  symbol,
+  onSymbol,
+  samples,
+  online
+}: {
+  symbol: string;
+  onSymbol: (s: string) => void;
+  samples: Sample[];
+  online: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-white/8 bg-white/[0.012] p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+          <TrendingUp className="h-3 w-3" /> market pulse
+        </span>
+        <div className="flex items-center gap-1">
+          {PULSE_SYMBOLS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onSymbol(s)}
+              className={clsx(
+                "rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition",
+                s === symbol
+                  ? "border-accent/40 bg-accent/[0.08] text-accent"
+                  : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.06]"
+              )}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+      <Sparkline samples={samples} />
+      <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-white/40">
+        {samples.length < 2
+          ? online
+            ? "no samples yet · collecting from live fetches"
+            : "no samples yet · feed offline"
+          : `${samples.length} session samples · ${symbol}/USD`}
+      </p>
+    </div>
+  );
+}
+
+function Sparkline({ samples }: { samples: Sample[] }) {
+  const W = 520;
+  const H = 96;
+  if (samples.length < 2) {
+    return (
+      <div className="flex h-[96px] items-center justify-center rounded-md border border-dashed border-white/8 bg-black/30 font-mono text-[10px] uppercase tracking-wider text-white/35">
+        no samples yet
+      </div>
+    );
+  }
+  const prices = samples.map((s) => s.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const span = max - min || 1;
+  const pts = samples
+    .map((s, i) => {
+      const x = (i / (samples.length - 1)) * W;
+      const y = H - ((s.price - min) / span) * (H - 8) - 4;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const up = prices[prices.length - 1] >= prices[0];
+  const stroke = up ? "rgb(52,211,153)" : "rgb(248,113,113)";
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-[96px] w-full" preserveAspectRatio="none">
+      <polyline points={pts} fill="none" stroke={stroke} strokeWidth={1.5} strokeOpacity={0.85} />
+    </svg>
+  );
+}
+
+function AssetHeatTiles({ quotes, state }: { quotes: CryptoQuote[]; state: "loading" | "ok" | "error" }) {
+  if (state === "error") {
+    return (
+      <p className="rounded-xl border border-rose-400/25 bg-rose-500/[0.06] px-3 py-2 font-mono text-[10.5px] text-rose-100/90">
+        crypto feed error · CoinGecko unreachable or rate-limited · retries on interval
+      </p>
+    );
+  }
+  if (quotes.length === 0) {
+    return (
+      <p className="rounded-xl border border-white/8 bg-white/[0.012] px-3 py-2 font-mono text-[10.5px] text-white/45">
+        loading live prices…
+      </p>
+    );
+  }
+  return (
+    <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      {quotes.map((q) => {
+        const up = (q.change24h ?? 0) >= 0;
+        return (
+          <li
+            key={q.symbol}
+            className={clsx(
+              "flex flex-col gap-0.5 rounded-xl border p-2.5",
+              q.change24h == null
+                ? "border-white/8 bg-white/[0.012]"
+                : up
+                  ? "border-emerald-400/25 bg-emerald-500/[0.05]"
+                  : "border-rose-400/25 bg-rose-500/[0.05]"
+            )}
+          >
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-white">
+              {q.symbol}
+            </span>
+            <span className="font-mono text-[12.5px] tabular-nums text-white/90">{formatPrice(q.price)}</span>
+            <span
+              className={clsx(
+                "font-mono text-[10px] tabular-nums",
+                q.change24h == null ? "text-white/40" : up ? "text-emerald-300/90" : "text-rose-300/90"
+              )}
+            >
+              {formatChange(q.change24h)}
+            </span>
+            <span className="font-mono text-[8.5px] uppercase tracking-wider text-white/35">
+              {formatMarketCap(q.marketCap)}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function NewsWireTape({ items, state }: { items: NewsItem[]; state: "loading" | "ok" | "error" }) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-white/8 bg-white/[0.012] p-3">
+      <span className="flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+        <Newspaper className="h-3 w-3" /> news wire
+      </span>
+      {state === "error" ? (
+        <p className="font-mono text-[10px] text-rose-100/85">wire offline · Hacker News unreachable</p>
+      ) : items.length === 0 ? (
+        <p className="font-mono text-[10px] text-white/45">loading wire…</p>
+      ) : (
+        <ul className="flex max-h-[200px] flex-col gap-1 overflow-auto pr-1">
+          {items.map((n) => (
+            <li key={n.id} className="flex items-start gap-1.5 border-b border-white/5 pb-1 text-[11px] last:border-0">
+              <span className="mt-px font-mono text-[8px] uppercase tracking-wider text-accent">{n.category}</span>
+              <a
+                href={n.url ?? "#"}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="min-w-0 flex-1 truncate text-white/80 hover:text-accent"
+                title={n.title}
+              >
+                {n.title}
+              </a>
+              <span className="shrink-0 font-mono text-[8.5px] uppercase tracking-wider text-white/35">
+                {timeAgo(n.time)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function SignalRadar({
+  quotes,
+  news,
+  cryptoOnline
+}: {
+  quotes: CryptoQuote[];
+  news: NewsItem[];
+  cryptoOnline: boolean;
+}) {
+  const signals: Array<{ label: string; tone: "ok" | "warn" | "muted" }> = [];
+
+  // top mover (real, only if data present)
+  if (cryptoOnline && quotes.length > 0) {
+    const withChange = quotes.filter((q) => q.change24h != null);
+    if (withChange.length > 0) {
+      const top = withChange.reduce((a, b) =>
+        Math.abs(b.change24h ?? 0) > Math.abs(a.change24h ?? 0) ? b : a
+      );
+      signals.push({
+        label: `top mover · ${top.symbol} ${formatChange(top.change24h)}`,
+        tone: (top.change24h ?? 0) >= 0 ? "ok" : "warn"
+      });
+    }
+  }
+
+  // news velocity · count stories in the last hour (real timestamps)
+  const recent = news.filter((n) => Date.now() - n.time < 3_600_000).length;
+  if (news.length > 0) {
+    signals.push({ label: `news velocity · ${recent} in last hour`, tone: recent >= 3 ? "warn" : "muted" });
+  }
+
+  // provider errors + offline adapters (real)
+  const sum = adapterSummary();
+  if (sum.error > 0) signals.push({ label: `${sum.error} provider error${sum.error === 1 ? "" : "s"}`, tone: "warn" });
+  if (sum.offline > 0) signals.push({ label: `${sum.offline} adapter${sum.offline === 1 ? "" : "s"} offline`, tone: "muted" });
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-white/8 bg-white/[0.012] p-3">
+      <span className="flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+        <Activity className="h-3 w-3" /> signal radar
+      </span>
+      {signals.length === 0 ? (
+        <p className="font-mono text-[10px] text-white/45">no signals yet · feeds collecting</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {signals.map((s) => (
+            <li
+              key={s.label}
+              className={clsx(
+                "rounded border px-2 py-1 font-mono text-[10px]",
+                s.tone === "ok"
+                  ? "border-emerald-400/25 bg-emerald-500/[0.05] text-emerald-200/90"
+                  : s.tone === "warn"
+                    ? "border-amber-400/25 bg-amber-500/[0.05] text-amber-200/90"
+                    : "border-white/8 bg-white/[0.012] text-white/60"
+              )}
+            >
+              {s.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="font-mono text-[8.5px] uppercase tracking-wider text-white/35">
+        operational signal · not financial advice
+      </p>
+    </div>
+  );
+}
+
+// ============================================================================
 // Live providers · CoinGecko (crypto) + Hacker News (news) · REAL fetch
 // ============================================================================
 
@@ -1082,6 +1427,12 @@ function OperatorPanel({ kind, alertCount }: { kind: TabKind; alertCount: number
           <Metric k="approvals" v={String(presence?.pendingApprovals ?? 0)} warn={(presence?.pendingApprovals ?? 0) > 0} />
           <Metric k="telegram" v={presence?.telegram ?? "simulator"} />
         </ul>
+      )}
+
+      {kind === "runtime" && (
+        <div className="mt-1">
+          <CommunicationsRuntimeCard />
+        </div>
       )}
 
       {kind === "costs" && (
@@ -1337,6 +1688,9 @@ function ProviderHealthRail() {
                 {a.provider}
               </span>
               <div className="flex shrink-0 items-center gap-1.5">
+                {h.lastLatencyMs != null && status === "connected" && (
+                  <span className="text-white/45">{h.lastLatencyMs}ms</span>
+                )}
                 {h.lastSuccess && (
                   <span className="text-white/35">{new Date(h.lastSuccess).toLocaleTimeString()}</span>
                 )}

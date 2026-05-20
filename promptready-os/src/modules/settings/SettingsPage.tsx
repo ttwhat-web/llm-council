@@ -54,6 +54,7 @@ import { ModelLabCard } from "@/components/ModelLabCard";
 import { ModelCostsCard } from "@/components/ModelCostsCard";
 import { OperatorBulletinCard } from "@/components/OperatorBulletinCard";
 import { EmailRuntimeCard } from "@/components/EmailRuntimeCard";
+import { CommunicationsRuntimeCard } from "@/components/CommunicationsRuntimeCard";
 import { LaunchReadinessCard } from "@/components/LaunchReadinessCard";
 import { ProviderDiagnostics } from "@/components/ProviderDiagnostics";
 import { FounderBetaCard } from "@/components/FounderBetaCard";
@@ -277,8 +278,9 @@ export default function SettingsPage() {
         </article>
       </section>
 
-      <SettingsSection letter="R" label="Remote" hint="Phone · Telegram · Email" />
+      <SettingsSection letter="R" label="Remote" hint="Comms · Phone · Telegram · Email" />
       <RemoteTeaser />
+      <CommunicationsRuntimeCard />
       <EmailRuntimeCard />
       <TelegramCompanionCard />
       <TelegramLiveCard />

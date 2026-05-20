@@ -11,6 +11,7 @@
  */
 
 import { recordSuccess, recordError } from "@/services/providerHealth";
+import { recordSamples } from "@/services/marketSamples";
 
 export const COINGECKO_ADAPTER_ID = "coingecko";
 
@@ -53,6 +54,7 @@ type SimplePriceResponse = Record<
 export async function fetchCryptoPrices(): Promise<CryptoFetchResult> {
   const ids = COINS.map((c) => c.id).join(",");
   const url = `${ENDPOINT}?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_market_cap=true`;
+  const startedAt = Date.now();
   try {
     const r = await fetch(url, { headers: { accept: "application/json" } });
     if (r.status === 429) throw new Error("rate limited (429) · try again shortly");
@@ -67,7 +69,8 @@ export async function fetchCryptoPrices(): Promise<CryptoFetchResult> {
     }));
     const anyData = quotes.some((q) => q.price != null);
     if (!anyData) throw new Error("empty response");
-    recordSuccess(COINGECKO_ADAPTER_ID);
+    recordSuccess(COINGECKO_ADAPTER_ID, Date.now() - startedAt);
+    recordSamples(quotes.map((q) => ({ symbol: q.symbol, price: q.price })));
     return { ok: true, quotes, at: Date.now() };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "fetch failed";
