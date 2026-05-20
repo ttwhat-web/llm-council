@@ -1062,12 +1062,51 @@ function PackagingCard() {
     }
   ];
 
+  // Real local status · Sprint E. Icons were generated and committed; the
+  // local `tauri build` is blocked on host GTK/WebKit system libs (see
+  // TAURI_BUILD_REPORT.md) — so we report no artifact and no signing/updater.
+  const localStatus: Array<{ k: string; v: string; ok: boolean }> = [
+    { k: "app name", v: "Operator Core", ok: true },
+    { k: "icons present", v: "yes", ok: true },
+    { k: "tauri config", v: "valid", ok: true },
+    { k: "tauri build passed", v: "no · host libs missing", ok: false },
+    { k: "artifact path", v: "none", ok: false },
+    { k: "signing", v: "missing", ok: false },
+    { k: "updater", v: "missing", ok: false }
+  ];
+
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-      <header className="mb-3 flex items-center gap-2">
-        <BookOpen className="h-4 w-4 text-accent" />
-        <span className="text-[13px] font-semibold text-white">Packaging prep</span>
+      <header className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-accent" />
+          <span className="text-[13px] font-semibold text-white">Operator Core · packaging</span>
+        </div>
+        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
+          source build only
+        </span>
       </header>
+
+      <ul className="mb-3 grid grid-cols-2 gap-1.5 md:grid-cols-4">
+        {localStatus.map((s) => (
+          <li
+            key={s.k}
+            className="flex flex-col gap-0.5 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5"
+          >
+            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
+              {s.k}
+            </span>
+            <span
+              className={
+                s.ok ? "font-mono text-[11px] text-emerald-200/90" : "font-mono text-[11px] text-amber-200/90"
+              }
+            >
+              {s.v}
+            </span>
+          </li>
+        ))}
+      </ul>
+
       <ul className="grid grid-cols-1 gap-2 md:grid-cols-3">
         {PLATFORMS.map((p) => (
           <li
@@ -1103,11 +1142,12 @@ function PackagingCard() {
           packaging readiness
         </div>
         <ul className="grid grid-cols-1 gap-1 md:grid-cols-2">
-          <ReadinessRow label="Tauri config" state="ready" detail="src-tauri/tauri.conf.json present" />
-          <ReadinessRow label="macOS · Apple Silicon build" state="partial" detail="config ready · `npm run tauri:build` works locally" />
-          <ReadinessRow label="macOS · Intel build" state="partial" detail="universal binary target pending" />
-          <ReadinessRow label="Windows MSI build" state="partial" detail="WiX toolset needed on CI" />
-          <ReadinessRow label="Linux AppImage / deb" state="planned" detail="not yet packaged" />
+          <ReadinessRow label="Tauri config" state="ready" detail="src-tauri/tauri.conf.json · productName Operator Core" />
+          <ReadinessRow label="App icons" state="ready" detail="generated · 32/128/@2x · icns · ico" />
+          <ReadinessRow label="Local tauri build" state="planned" detail="blocked on GTK/WebKit host libs — see TAURI_BUILD_REPORT.md" />
+          <ReadinessRow label="macOS build" state="partial" detail="needs Xcode CLT · unsigned .app/.dmg" />
+          <ReadinessRow label="Windows MSI build" state="partial" detail="needs MSVC + WebView2 · unsigned" />
+          <ReadinessRow label="Linux AppImage / deb" state="planned" detail="install libgtk-3-dev + libwebkit2gtk-4.0-dev, then build" />
           <ReadinessRow label="Code signing · macOS" state="unknown" detail="developer ID + notarization not yet configured" />
           <ReadinessRow label="Code signing · Windows" state="unknown" detail="EV / OV certificate not yet acquired" />
           <ReadinessRow label="Auto-update" state="planned" detail="Tauri updater requires signed release feed" />
@@ -1115,9 +1155,11 @@ function PackagingCard() {
         </ul>
       </div>
       <p className="mt-3 text-[10.5px] text-white/45">
-        Build with <span className="font-mono">npm run tauri:build</span> once
-        signing keys land. Offline support is built in — the deterministic
-        engine never reaches the network.
+        Icons + config are ready. The local{" "}
+        <span className="font-mono">npm run tauri:build</span> needs GTK/WebKit
+        system libraries (Linux) or Xcode/MSVC (mac/win); signing keys land
+        before any public installer. Offline support is built in — the
+        deterministic engine never reaches the network.
       </p>
     </section>
   );

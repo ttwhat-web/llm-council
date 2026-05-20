@@ -1,7 +1,7 @@
 [package]
 name = "promptready-os"
 version = "0.1.0"
-description = "PromptReady OS — desktop shell"
+description = "Operator Core — desktop shell for Operator.Center"
 edition = "2021"
 rust-version = "1.74"
 

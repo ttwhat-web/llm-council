@@ -8,7 +8,7 @@
     "withGlobalTauri": true
   },
   "package": {
-    "productName": "PromptReady OS",
+    "productName": "Operator Core",
     "version": "0.1.0"
   },
   "tauri": {
@@ -23,8 +23,8 @@
       "active": true,
       "category": "Productivity",
       "identifier": "com.promptready.os",
-      "shortDescription": "The operating system for serious AI users.",
-      "longDescription": "PromptReady OS — prompt optimisation, multi-AI orchestration, session continuity, prompt memory and a floating workspace overlay, in one premium desktop app.",
+      "shortDescription": "Operator Core — the local-first AI command room.",
+      "longDescription": "Operator Core, the desktop app for Operator.Center — local-first brain, mission runtime, delivery center, intelligence terminal and operator workstation in one premium desktop app.",
       "targets": "all",
       "copyright": "© PromptReady",
       "icon": [
@@ -43,7 +43,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "PromptReady OS",
+        "title": "Operator Core",
         "url": "/",
         "width": 1280,
         "height": 820,
@@ -58,7 +58,7 @@
       },
       {
         "label": "overlay",
-        "title": "PromptReady · Overlay",
+        "title": "Operator Core · Overlay",
         "url": "/overlay",
         "width": 360,
         "height": 480,

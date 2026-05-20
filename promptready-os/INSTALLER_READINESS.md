@@ -18,10 +18,11 @@ Source of truth: `src-tauri/tauri.conf.json` + `src-tauri/icons/`.
 
 ## Blockers found
 
-### Missing icons — BLOCKER
-`src-tauri/icons/` contains only `README.md`. The config references:
-`icons/32x32.png`, `icons/128x128.png`, `icons/128x128@2x.png`, `icons/icon.icns`, `icons/icon.ico` — **none exist**. Bundling will fail until icons are generated.
-- Fix: `npm run tauri icon path/to/logo.png` (generates the full icon set).
+### Missing icons — RESOLVED (Sprint E)
+`src-tauri/icons/` now contains the full generated set
+(`32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.icns`, `icon.ico`, plus
+Windows Store logos), generated from `brand/operator-core.png` via
+`npm run tauri icon`. Bundling is no longer blocked on icons.
 
 ### Missing signing / certs — BLOCKER (distribution)
 - macOS: no Developer ID certificate, no notarization profile.
@@ -31,18 +32,27 @@ Source of truth: `src-tauri/tauri.conf.json` + `src-tauri/icons/`.
 ### Missing updater — NOT CONFIGURED
 - No `tauri.updater` block / no signed release feed / no update public key.
 
-### Naming note (no change made)
-- `package.productName` is `"PromptReady OS"` (legacy). Product rename is out of scope for this sprint per guardrails — flagged only.
+### Naming — UPDATED (Sprint E)
+- `package.productName` is now `"Operator Core"` (was "PromptReady OS"); window
+  titles + Cargo description + index.html title updated. Brand stays
+  Operator.Center. Folders/routes/package id unchanged.
+
+### Local tauri build — BLOCKED on host libs (Sprint E)
+- `npm run tauri:build` fails at `gdk-sys` (missing GTK/WebKit dev libs on this
+  host). See `TAURI_BUILD_REPORT.md` for the exact error + install commands.
+  Config + icons are valid; this is a host-provisioning step, not a config bug.
 
 ## Readiness summary
-- **Ready:** Tauri config, dev/build wiring, window + tray setup.
-- **Blocked before any installer:** icon set (must generate).
+- **Ready:** Tauri config (productName Operator Core), icon set (generated), dev/build wiring, window + tray setup.
+- **Blocked before a local artifact:** GTK/WebKit (Linux) or Xcode/MSVC (mac/win) system libraries.
 - **Blocked before public distribution:** code signing (mac + win), notarization, updater feed.
 - **Not started:** Linux packaging artifacts, CI signing pipeline.
 
 ## Exact commands
 ```bash
 cd promptready-os
-npm run tauri icon ./brand/logo.png   # generate missing icons (unblocks bundling)
+node brand/generate-icon.mjs          # regenerate the source PNG (already committed)
+npm run tauri icon ./brand/operator-core.png   # regenerate icon set (already done)
+# install host system deps first (see TAURI_BUILD_REPORT.md), then:
 npm run tauri:build                   # local unsigned build per host platform
 ```

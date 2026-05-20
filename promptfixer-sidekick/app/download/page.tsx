@@ -61,7 +61,7 @@ const PLATFORMS: PlatformCard[] = [
     arch: "AppImage · deb",
     Icon: Monitor,
     status: "coming-soon",
-    hint: "AppImage / .deb planned · build from source today."
+    hint: "Build from source · needs libgtk-3-dev + libwebkit2gtk-4.0-dev installed first."
   },
   {
     os: "Docker",
@@ -243,14 +243,19 @@ function BuildFromSource() {
         {`git clone https://github.com/ttwhat-web/llm-council
 cd llm-council/promptready-os
 npm install
-npm run build         # web bundle (Vite)
-npm run tauri:build   # native installer for your platform`}
+npm run build         # web bundle (Vite) — verified
+# native shell needs system deps first:
+#   Linux:   libgtk-3-dev libwebkit2gtk-4.0-dev librsvg2-dev
+#   macOS:   Xcode command-line tools
+#   Windows: MSVC build tools + WebView2
+npm run tauri:build   # unsigned native build for your platform`}
       </pre>
       <p className="text-[10.5px] text-white/45">
-        `tauri:build` produces a platform-specific binary in
+        The web bundle and the Tauri config + icons are verified. The native
+        <code className="font-mono text-white/65"> tauri:build</code> requires the
+        platform system libraries above; it emits an unsigned binary in
         <code className="font-mono text-white/65"> src-tauri/target/release/bundle</code>.
-        Signing is the operator&rsquo;s responsibility until the public
-        installers ship.
+        No verified/signed artifact is published yet — source build only.
       </p>
     </section>
   );
@@ -265,7 +270,8 @@ function KnownLimitations() {
         </span>
       </header>
       <ul className="grid grid-cols-1 gap-1 text-[12px] text-white/75 md:grid-cols-2">
-        <li>· No signed public installers yet · source build only</li>
+        <li>· No signed public installers yet · source build only · no verified artifact published</li>
+        <li>· Local `tauri:build` needs GTK/WebKit (Linux) or Xcode/MSVC (mac/win)</li>
         <li>· Mobile companion is planned · capture/approve over QR pairing</li>
         <li>· Telegram bridge is adapter-ready · networking ships with desktop runtime</li>
         <li>· Agent runtime cycles state but does not execute autonomously</li>
