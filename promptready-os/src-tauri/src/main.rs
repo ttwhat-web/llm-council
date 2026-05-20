@@ -6,6 +6,8 @@ use tauri::{
     SystemTrayMenu, SystemTrayMenuItem,
 };
 
+mod runtime;
+
 const CMDK_SHORTCUT: &str = "CmdOrCtrl+K";
 const OVERLAY_SHORTCUT: &str = "CmdOrCtrl+Shift+O";
 
@@ -44,6 +46,13 @@ fn toggle_overlay(app: &tauri::AppHandle) {
 
 fn main() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            runtime::runtime_ping,
+            runtime::runtime_get_env_status,
+            runtime::runtime_telegram_send,
+            runtime::runtime_telegram_poll_once,
+            runtime::runtime_provider_fetch
+        ])
         .system_tray(build_tray())
         .on_system_tray_event(|app, event| match event {
             SystemTrayEvent::LeftClick { .. } => show_window(app, "main"),

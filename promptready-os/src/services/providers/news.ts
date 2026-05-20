@@ -11,6 +11,7 @@
  */
 
 import { recordSuccess, recordError } from "@/services/providerHealth";
+import { isTauri, bridgeProviderFetch, envConfiguredCached } from "@/services/runtimeBridge";
 
 export const NEWS_ADAPTER_ID = "hackernews";
 
@@ -78,6 +79,47 @@ export async function fetchNews(category: NewsCategory, limit = 8): Promise<News
     recordError(NEWS_ADAPTER_ID, msg);
     return { ok: false, items: [], error: msg, at: Date.now() };
   }
+}
+
+/**
+ * Best-available news · Sprint H.
+ *
+ * On desktop with NEWSAPI_KEY configured, fetch real headlines via the
+ * Rust bridge (NewsAPI · key never touches JS). Otherwise fall back to
+ * the public, CORS-friendly Hacker News feed. NO fake headlines either
+ * way — a failed bridge call falls back to HN, and a failed HN call
+ * surfaces honestly.
+ */
+interface NewsApiArticle {
+  title?: string;
+  url?: string;
+  source?: { name?: string };
+  publishedAt?: string;
+}
+
+export async function fetchNewsBest(category: NewsCategory, limit = 10): Promise<NewsFetchResult> {
+  if (isTauri() && envConfiguredCached("NEWSAPI_KEY")) {
+    const r = await bridgeProviderFetch("newsapi", CATEGORY_QUERY[category]);
+    if (r.ok && r.data && typeof r.data === "object") {
+      const articles = (r.data as { articles?: NewsApiArticle[] }).articles ?? [];
+      const items: NewsItem[] = articles.slice(0, limit).map((a, i) => ({
+        id: `newsapi-${i}-${a.url ?? a.title ?? i}`,
+        title: a.title ?? "(untitled)",
+        url: a.url ?? null,
+        source: a.source?.name ?? "NewsAPI",
+        time: a.publishedAt ? Date.parse(a.publishedAt) : Date.now(),
+        category
+      }));
+      if (items.length > 0) {
+        recordSuccess("newsapi");
+        return { ok: true, items, at: Date.now() };
+      }
+    } else if (r.error) {
+      recordError("newsapi", r.error);
+    }
+    // fall through to Hacker News
+  }
+  return fetchNews(category, limit);
 }
 
 export function timeAgo(ts: number): string {

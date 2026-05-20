@@ -56,6 +56,7 @@ import {
 } from "@/services/providers/coingecko";
 import {
   fetchNews,
+  fetchNewsBest,
   timeAgo,
   NEWS_CATEGORIES,
   type NewsItem,
@@ -902,7 +903,7 @@ function MarketTheater() {
   useEffect(() => {
     let alive = true;
     const loadNews = async () => {
-      const r = await fetchNews("AI", 10);
+      const r = await fetchNewsBest("AI", 10);
       if (!alive) return;
       if (r.ok) {
         setNews(r.items);

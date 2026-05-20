@@ -57,6 +57,7 @@ import { EmailRuntimeCard } from "@/components/EmailRuntimeCard";
 import { CommunicationsRuntimeCard } from "@/components/CommunicationsRuntimeCard";
 import { LaunchReadinessCard } from "@/components/LaunchReadinessCard";
 import { ProviderDiagnostics } from "@/components/ProviderDiagnostics";
+import { ConnectorKeysCard } from "@/components/ConnectorKeysCard";
 import { FounderBetaCard } from "@/components/FounderBetaCard";
 import { FieldTestModeCard } from "@/components/FieldTestModeCard";
 import {
@@ -190,6 +191,7 @@ export default function SettingsPage() {
       <SettingsSection letter="I" label="Intelligence" hint="Brief · Costs · Models · Providers" />
       <OperatorBulletinCard />
       <ProviderDiagnostics />
+      <ConnectorKeysCard />
       <ModelCostsCard />
       <ModelLabCard />
 

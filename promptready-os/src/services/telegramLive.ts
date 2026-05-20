@@ -22,6 +22,12 @@
 import type { MissionReceipt } from "@/store/mission";
 import type { WorkflowRun } from "@/store/atlas";
 import { auditLog } from "@/services/auditLog";
+import {
+  isTauri,
+  bridgeTelegramSend,
+  bridgeTelegramPoll,
+  envConfiguredCached
+} from "@/services/runtimeBridge";
 
 export type TelegramLiveStatus =
   | "simulator"
@@ -113,8 +119,10 @@ export interface TelegramBridgeStatusLive {
 export function getTelegramBridgeStatus(): TelegramBridgeStatusLive {
   const cfg = readTelegramConfig();
   const state = readState();
-  const hasToken = !!cfg.token;
-  const hasChatId = !!cfg.chatId;
+  // On desktop the token lives in the Rust process env (never in JS); the
+  // cached bridge env-status reflects that without exposing the value.
+  const hasToken = !!cfg.token || envConfiguredCached("TELEGRAM_BOT_TOKEN");
+  const hasChatId = !!cfg.chatId || envConfiguredCached("TELEGRAM_ALLOWED_CHAT_ID");
 
   let live: TelegramLiveStatus;
   if (!hasToken) {
@@ -145,6 +153,19 @@ export function getTelegramBridgeStatus(): TelegramBridgeStatusLive {
 export async function sendTelegramMessage(
   text: string
 ): Promise<{ ok: boolean; error?: string }> {
+  // Desktop runtime: send through Rust so the token never touches JS and
+  // browser CORS is bypassed. The bot token lives in the process env.
+  if (isTauri()) {
+    const r = await bridgeTelegramSend(text);
+    const state = readState();
+    if (r.ok) {
+      writeState({ ...state, lastSendAt: Date.now(), lastError: null });
+    } else {
+      writeState({ ...state, lastError: r.error ?? "bridge send failed" });
+    }
+    return r;
+  }
+
   const cfg = readTelegramConfig();
   if (!cfg.token) {
     return { ok: false, error: "no token configured · simulator only" };
@@ -228,6 +249,27 @@ export async function sendTelegramApprovalRequest(
  * existing executeCommand handler.
  */
 export async function pollTelegramUpdates(): Promise<{ count: number; error?: string }> {
+  // Desktop runtime: poll through Rust, then route inbound /commands
+  // through the existing parser (same as the browser path below).
+  if (isTauri()) {
+    const r = await bridgeTelegramPoll();
+    const state = readState();
+    if (!r.ok) {
+      writeState({ ...state, lastError: r.error ?? "bridge poll failed" });
+      return { count: 0, error: r.error };
+    }
+    let processed = 0;
+    const { executeCommand } = await import("@/services/commandConsole");
+    for (const text of r.messages) {
+      if (!text.trim().startsWith("/")) continue;
+      await executeCommand(text, { remote: true });
+      auditLog("telegram.send", { direction: "inbound", command: text.split(" ")[0] });
+      processed++;
+    }
+    writeState({ ...state, lastPollAt: Date.now() });
+    return { count: processed };
+  }
+
   const cfg = readTelegramConfig();
   if (!cfg.token) return { count: 0, error: "no token · simulator only" };
   const state = readState();

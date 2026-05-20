@@ -11,6 +11,7 @@ import { useSpacesStore } from "@/store/spaces";
 import { BrainBootstrap } from "@/components/BrainBootstrap";
 import { RecoveryBanner } from "@/components/RecoveryBanner";
 import { bumpCrashCounter } from "@/services/telemetry";
+import { refreshEnvStatus } from "@/services/runtimeBridge";
 
 export function App() {
   useEffect(() => {
@@ -27,6 +28,10 @@ export function App() {
     if (checkpoint?.hadInFlightMission) {
       bumpCrashCounter();
     }
+
+    // Desktop runtime: cache connector env-status (configured flags only,
+    // never values) so status readers reflect desktop-configured keys.
+    void refreshEnvStatus();
   }, []);
 
   return (

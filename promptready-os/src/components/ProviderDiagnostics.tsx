@@ -11,6 +11,7 @@ import {
 import { getHealth } from "@/services/providerHealth";
 import { probeOllama } from "@/services/missionRunner";
 import { getTelegramBridgeStatus } from "@/services/telegramLive";
+import { runtimeLocation, refreshEnvStatus, envConfiguredCached } from "@/services/runtimeBridge";
 
 /**
  * Provider Diagnostics · Sprint C.
@@ -58,14 +59,27 @@ const STATUS_PILL: Record<AdapterStatus, string> = {
   offline: "border-white/10 bg-white/[0.03] text-white/55"
 };
 
+// env var per provider · used to show desktop-configured keys honestly
+const ENV_KEY: Record<string, string> = {
+  telegram: "TELEGRAM_BOT_TOKEN",
+  twelvedata: "TWELVEDATA_API_KEY",
+  fmp: "FMP_API_KEY",
+  newsapi: "NEWSAPI_KEY",
+  cryptopanic: "CRYPTOPANIC_API_KEY",
+  etherscan: "ETHERSCAN_API_KEY"
+};
+
 export function ProviderDiagnostics() {
   const [ollamaUp, setOllamaUp] = useState<boolean | null>(null);
+  const [, setEnvTick] = useState(0);
+  const location = runtimeLocation();
 
   useEffect(() => {
     let alive = true;
     probeOllama()
       .then((p) => alive && setOllamaUp(p.reachable))
       .catch(() => alive && setOllamaUp(false));
+    void refreshEnvStatus().then(() => alive && setEnvTick((n) => n + 1));
     return () => {
       alive = false;
     };
@@ -114,9 +128,21 @@ export function ProviderDiagnostics() {
           <Activity className="h-4 w-4 text-accent" />
           <span className="text-[13px] font-semibold text-white">Provider Diagnostics</span>
         </div>
-        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
-          {connected} connected · {rows.length} providers
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={clsx(
+              "rounded border px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider",
+              location === "tauri"
+                ? "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200"
+                : "border-white/10 bg-white/[0.03] text-white/55"
+            )}
+          >
+            runtime · {location}
+          </span>
+          <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+            {connected} connected · {rows.length} providers
+          </span>
+        </div>
       </header>
 
       <p className="text-[11px] text-white/55">
@@ -167,6 +193,9 @@ export function ProviderDiagnostics() {
                 </td>
                 <td className="py-1.5 pr-2 font-mono text-[10px] text-white/55">
                   {fact.needsKey ? "yes" : "no"}
+                  {ENV_KEY[fact.id] && envConfiguredCached(ENV_KEY[fact.id]) && (
+                    <span className="ml-1 text-emerald-300/80">· set</span>
+                  )}
                 </td>
                 <td className="py-1.5 pr-2 font-mono text-[10px]">
                   <span
