@@ -11,6 +11,7 @@ import {
   FileText,
   LineChart,
   Map as MapIcon,
+  Mic,
   Package,
   Settings as SettingsIcon,
   Terminal as TerminalIcon,
@@ -83,6 +84,7 @@ const GROUPS: NavGroup[] = [
     label: "Operator",
     items: [
       { to: "/agents", label: "Agents", Icon: Bot },
+      { to: "/voice", label: "Voice · Jarvis Console", Icon: Mic },
       { to: "/marketplace", label: "Marketplace", Icon: Package }
     ]
   },
