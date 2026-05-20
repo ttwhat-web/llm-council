@@ -17,16 +17,17 @@ export const NEWS_ADAPTER_ID = "hackernews";
 
 const ENDPOINT = "https://hn.algolia.com/api/v1/search_by_date";
 
-export type NewsCategory = "AI" | "Markets" | "Crypto" | "Tech";
+export type NewsCategory = "AI" | "Markets" | "Crypto" | "Tech" | "Business";
 
 const CATEGORY_QUERY: Record<NewsCategory, string> = {
   AI: "AI OR LLM OR GPT",
   Markets: "stock market OR earnings OR Fed",
   Crypto: "crypto OR bitcoin OR ethereum",
-  Tech: "technology OR software OR startup"
+  Tech: "technology OR software OR startup",
+  Business: "business OR startup OR funding OR acquisition"
 };
 
-export const NEWS_CATEGORIES: NewsCategory[] = ["AI", "Markets", "Crypto", "Tech"];
+export const NEWS_CATEGORIES: NewsCategory[] = ["AI", "Markets", "Crypto", "Tech", "Business"];
 
 export interface NewsItem {
   id: string;

@@ -53,6 +53,7 @@ import { SearchRuntimeCard } from "@/components/SearchRuntimeCard";
 import { NewsChannelMode } from "@/components/NewsChannelMode";
 import { BroadcastWall } from "@/components/BroadcastWall";
 import { BusinessCockpitCard } from "@/components/BusinessCockpitCard";
+import { LiveWall } from "@/components/LiveWall";
 import { Monitor } from "lucide-react";
 import {
   formatPrice,
@@ -432,8 +433,12 @@ export default function IntelligenceTerminalPage() {
   const [lastCommand, setLastCommand] = useState<string | null>(null);
   const [cmdFlash, setCmdFlash] = useState<string | null>(null);
   const cmdRef = useRef<HTMLInputElement | null>(null);
+  const mode = useUiModeStore((s) => s.mode);
   const secondScreen = useUiModeStore((s) => s.secondScreen);
-  const toggleSecondScreen = useUiModeStore((s) => s.toggleSecondScreen);
+  const liveWall = useUiModeStore((s) => s.liveWall);
+  const wallBroadcast = useUiModeStore((s) => s.wallBroadcast);
+  const setMode = useUiModeStore((s) => s.setMode);
+  const toggleBroadcast = useUiModeStore((s) => s.toggleBroadcast);
 
   const flash = (msg: string) => {
     setCmdFlash(msg);
@@ -443,19 +448,26 @@ export default function IntelligenceTerminalPage() {
   // Keyboard command bar · "/" focuses it (unless already typing somewhere).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "/") return;
       const el = document.activeElement;
       const typing =
         el instanceof HTMLInputElement ||
         el instanceof HTMLTextAreaElement ||
         (el instanceof HTMLElement && el.isContentEditable);
       if (typing) return;
-      e.preventDefault();
-      cmdRef.current?.focus();
+      if (e.key === "/") {
+        e.preventDefault();
+        cmdRef.current?.focus();
+      } else if (e.key === "w") {
+        setMode("wall");
+      } else if (e.key === "t") {
+        setMode("terminal");
+      } else if (e.key === "b") {
+        if (useUiModeStore.getState().liveWall) toggleBroadcast();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [setMode, toggleBroadcast]);
 
   const meta = useMemo(() => TABS.find((t) => t.kind === active)!, [active]);
   const cards = pinned[active];
@@ -546,22 +558,31 @@ export default function IntelligenceTerminalPage() {
         sub="Markets · Research · Signals · Operator. Market surfaces live under the Intelligence Layer only — Operator.Center is not a trading app. External feeds are honest about being offline; the Operator group shows real local state."
         right={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleSecondScreen}
-              className={clsx(
-                "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition",
-                secondScreen
-                  ? "border-accent/40 bg-accent/[0.1] text-accent shadow-glow"
-                  : "border-white/10 bg-white/[0.03] text-white/65 hover:bg-white/[0.06]"
-              )}
-              title="Second Screen / TV mode · hides nav, full-width broadcast wall"
-            >
-              <Monitor className="h-3 w-3" />
-              {secondScreen ? "exit second screen" : "second screen"}
-            </button>
-            <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/55">
-              {totalPinned} pinned · feeds offline
+            <div className="inline-flex items-center gap-0.5 rounded-md border border-white/10 bg-white/[0.03] p-0.5">
+              {([
+                { id: "terminal", label: "Terminal", key: "t" },
+                { id: "wall", label: "Live Wall", key: "w" },
+                { id: "second-screen", label: "Second Screen", key: "" }
+              ] as const).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setMode(m.id)}
+                  className={clsx(
+                    "inline-flex items-center gap-1 rounded px-2 py-1 font-mono text-[10px] uppercase tracking-wider transition",
+                    mode === m.id
+                      ? "bg-accent/[0.12] text-accent shadow-[inset_0_0_0_1px_rgba(124,155,255,0.25)]"
+                      : "text-white/60 hover:bg-white/[0.06]"
+                  )}
+                  title={m.key ? `${m.label} · press ${m.key}` : m.label}
+                >
+                  {m.id === "second-screen" && <Monitor className="h-3 w-3" />}
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <span className="hidden rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white/55 md:inline">
+              {totalPinned} pinned
             </span>
           </div>
         }
@@ -607,6 +628,8 @@ export default function IntelligenceTerminalPage() {
 
       {secondScreen ? (
         <BroadcastWall />
+      ) : liveWall ? (
+        <LiveWall broadcast={wallBroadcast} onToggleBroadcast={toggleBroadcast} />
       ) : (
         <>
       {/* ============== Cockpit theater ============== */}
