@@ -40,7 +40,7 @@ const PLATFORMS: PlatformCard[] = [
     arch: "Apple Silicon (M1+)",
     Icon: Apple,
     status: "source",
-    hint: "Local `.app` + `.dmg` build and open (unsigned · `CI=true npm run tauri:build`). Signed/notarized installer coming soon."
+    hint: "Beta: build the unsigned `.app` with `npm run tauri:build:app`. DMG is blocked by bundle_dmg.sh; signed installer coming soon."
   },
   {
     os: "macOS",
@@ -248,7 +248,8 @@ npm run build         # web bundle (Vite) — verified
 #   Linux:   libgtk-3-dev libwebkit2gtk-4.0-dev librsvg2-dev
 #   macOS:   Xcode command-line tools
 #   Windows: MSVC build tools + WebView2
-npm run tauri:build   # unsigned native build for your platform`}
+npm run tauri:build:app   # macOS beta: unsigned .app (no DMG)
+# npm run tauri:build     # full build (app + dmg) — dmg step currently blocked`}
       </pre>
       <p className="text-[10.5px] text-white/45">
         The web bundle and the Tauri config + icons are verified. The native
@@ -256,9 +257,10 @@ npm run tauri:build   # unsigned native build for your platform`}
         platform system libraries above; it emits an unsigned binary in
         <code className="font-mono text-white/65"> src-tauri/target/release/bundle</code>.
         No verified/signed artifact is published yet — source build only. On
-        macOS, <code className="font-mono text-white/65">CI=true npm run tauri:build</code>{" "}
-        produces a working unsigned <code className="font-mono text-white/65">.app</code> and{" "}
-        <code className="font-mono text-white/65">.dmg</code>.
+        macOS, <code className="font-mono text-white/65">npm run tauri:build:app</code>{" "}
+        produces the beta unsigned <code className="font-mono text-white/65">.app</code>.
+        The <code className="font-mono text-white/65">.dmg</code> step is blocked by
+        bundle_dmg.sh and is not required for the beta.
       </p>
     </section>
   );
@@ -273,7 +275,7 @@ function KnownLimitations() {
         </span>
       </header>
       <ul className="grid grid-cols-1 gap-1 text-[12px] text-white/75 md:grid-cols-2">
-        <li>· macOS `.app` + `.dmg` build and open locally (unsigned · `CI=true`); not signed/notarized yet</li>
+        <li>· macOS beta = unsigned `.app` via `npm run tauri:build:app`; `.dmg` blocked by bundle_dmg.sh (not required for beta)</li>
         <li>· No signed/notarized public installer published yet · no auto-updater</li>
         <li>· Linux/Windows local build needs GTK/WebKit or MSVC+WebView2 system deps</li>
         <li>· Mobile companion is planned · capture/approve over QR pairing</li>

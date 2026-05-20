@@ -78,10 +78,11 @@ status and Presence "markets"/"news" rollups. **No fake prices, no fake headline
 
 ## Desktop packaging (Sprint E2)
 
-- macOS `.app`: **builds + opens** (verified, Apple Silicon, unsigned) at
-  `src-tauri/target/release/bundle/macos/Operator Core.app`.
-- macOS `.dmg`: **builds (unsigned)** with `CI=true npm run tauri:build` at
-  `src-tauri/target/release/bundle/dmg/Operator Core_0.1.0_aarch64.dmg` (verified).
+- macOS `.app`: **builds + opens** (verified, Apple Silicon, unsigned) via
+  `npm run tauri:build:app` at `src-tauri/target/release/bundle/macos/Operator Core.app`.
+  **This is the beta artifact.**
+- macOS `.dmg`: **blocked** at `bundle_dmg.sh` (Finder styling) even with
+  `CI=true`. Not required for the beta.
 - Signing / notarization / updater: still missing.
 - Linux: needs GTK/WebKit dev libs; Windows: MSVC + WebView2.
 

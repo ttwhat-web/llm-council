@@ -12,7 +12,7 @@ Source of truth: `src-tauri/tauri.conf.json` + `src-tauri/icons/`.
 
 | Platform | State | Detail |
 |---|---|---|
-| macOS (Apple Silicon) | **ready (.app + .dmg, unsigned)** | `.app` builds + **opens**; `.dmg` builds with `CI=true` at `bundle/dmg/Operator Core_0.1.0_aarch64.dmg` (verified). Both **unsigned / not notarized**. |
+| macOS (Apple Silicon) | **ready (.app, unsigned) · dmg blocked** | `.app` builds + **opens** via `npm run tauri:build:app` (the beta artifact). `.dmg` still fails at `bundle_dmg.sh` even with `CI=true` and is **not required for beta**. Unsigned / not notarized. |
 | Windows (x86_64) | partial | NSIS/MSI buildable via Tauri; **no code-signing cert**; WiX/NSIS toolchain needed on CI. |
 | Linux (AppImage / deb) | planned | Targets available; not yet produced/tested. |
 
@@ -37,12 +37,12 @@ Windows Store logos), generated from `brand/operator-core.png` via
   titles + Cargo description + index.html title updated. Brand stays
   Operator.Center. Folders/routes/package id unchanged.
 
-### Local tauri build — macOS .app + .dmg WORK (Sprint E2 → E3, verified)
-- On macOS (Apple Silicon), `CI=true npm run tauri:build` (alias
-  `npm run tauri:build:ci`) produces both a working `Operator Core.app` and an
-  unsigned `Operator Core_0.1.0_aarch64.dmg`. Plain `npm run tauri:build` builds
-  the `.app` but the `.dmg` Finder-styling step needs `CI=true`. See
-  `TAURI_BUILD_REPORT.md`.
+### Local tauri build — macOS .app is the beta artifact (Sprint I.2)
+- `npm run tauri:build:app` (= `tauri build --bundles app`) builds a working,
+  openable `Operator Core.app` with no DMG step — this is the beta artifact.
+- The `.dmg` step (`bundle_dmg.sh` Finder/AppleScript styling) **still fails on
+  the build Mac even with `CI=true`**, so `tauri:build` / `tauri:build:ci` do not
+  yield a `.dmg` here. DMG is not required for the beta. See `TAURI_BUILD_REPORT.md`.
 - On the Linux CI box the build still needs GTK/WebKit dev libs (host setup).
 
 ### Remaining macOS distribution steps

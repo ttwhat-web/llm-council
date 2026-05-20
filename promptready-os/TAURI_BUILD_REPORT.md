@@ -6,11 +6,18 @@
 - Rust release build: **pass**
 - App bundle: **pass** — opens successfully
   - `src-tauri/target/release/bundle/macos/Operator Core.app`
-- DMG bundling: **PASS with `CI=true`** (unsigned)
-  - `src-tauri/target/release/bundle/dmg/Operator Core_0.1.0_aarch64.dmg`
-  - command: `CI=true npm run tauri:build` (or `npm run tauri:build:ci`)
-- Plain `npm run tauri:build` (no CI): DMG step fails at the `bundle_dmg.sh`
-  AppleScript Finder styling (leaves a `rw.*.dmg`); `CI=true` skips that step.
+- DMG bundling: **STILL FAILS** at `bundle_dmg.sh` even with `CI=true`
+  (the Finder/AppleScript volume-styling step), on this Mac. No final
+  `.dmg` is produced.
+- **Beta decision: ship the `.app`.** Build it directly without the DMG
+  bundle step:
+  ```bash
+  npm run tauri:build:app     # = tauri build --bundles app  → .app only, no DMG
+  ```
+  Artifact: `src-tauri/target/release/bundle/macos/Operator Core.app` (unsigned).
+- `npm run tauri:build` and `npm run tauri:build:ci` are kept for when the
+  DMG step is fixed (signing/notarization / a CI host that can run the
+  Finder styling, or a future Tauri that drops the AppleScript step).
 
 ### DMG failure — cause
 Tauri's `bundle_dmg.sh` creates a read-write `rw.*.dmg`, then runs an
@@ -58,8 +65,8 @@ Signing + notarization are the remaining steps before public distribution.
 | Frontend build | pass | pass |
 | Icons present | yes | yes |
 | Rust release build | pass | blocked (host libs) |
-| `.app` / binary | **pass · opens** | blocked |
-| DMG / installer | **pass · unsigned (`CI=true`)** | n/a |
+| `.app` / binary | **pass · opens · `tauri:build:app`** | blocked |
+| DMG / installer | **blocked · bundle_dmg.sh (even CI=true)** | n/a |
 | Signing | missing | missing |
 | Notarization | missing | n/a |
 | Updater | missing | missing |
@@ -67,8 +74,13 @@ Signing + notarization are the remaining steps before public distribution.
 ## Commands
 ```bash
 cd promptready-os
-npm run tauri:build         # builds .app (works on Mac); DMG step may fail on Finder styling
-npm run tauri:build:ci      # CI=true → skips Finder styling, produces a plain DMG
+npm run tauri:build:app     # BETA · .app only (no DMG) → always succeeds on Mac
+npm run tauri:build         # full (app + dmg) · dmg step currently fails
+npm run tauri:build:ci      # CI=true full · dmg step still fails on this Mac
 # open the app directly:
 open "src-tauri/target/release/bundle/macos/Operator Core.app"
 ```
+
+## Beta artifact
+`src-tauri/target/release/bundle/macos/Operator Core.app` (unsigned). DMG is
+not required for the beta and remains blocked by `bundle_dmg.sh`.

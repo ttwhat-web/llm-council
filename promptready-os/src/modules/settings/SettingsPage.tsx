@@ -1072,14 +1072,15 @@ function PackagingCard() {
   const localStatus: Array<{ k: string; v: string; ok: boolean }> = [
     { k: "app name", v: "Operator Core", ok: true },
     { k: "icons present", v: "yes", ok: true },
-    { k: "macOS .app build", v: "ready · opens", ok: true },
-    { k: "macOS .dmg", v: "ready · unsigned (CI=true)", ok: true },
+    { k: "macOS .app build", v: "ready · tauri:build:app", ok: true },
+    { k: "macOS .dmg", v: "blocked · bundle_dmg.sh", ok: false },
+    { k: "beta artifact", v: ".app (unsigned)", ok: true },
     { k: "signing", v: "missing", ok: false },
     { k: "notarization", v: "missing", ok: false },
     { k: "updater", v: "missing", ok: false },
     {
       k: "artifact",
-      v: "bundle/dmg/Operator Core_0.1.0_aarch64.dmg",
+      v: "bundle/macos/Operator Core.app",
       ok: true
     }
   ];
@@ -1153,8 +1154,8 @@ function PackagingCard() {
         <ul className="grid grid-cols-1 gap-1 md:grid-cols-2">
           <ReadinessRow label="Tauri config" state="ready" detail="src-tauri/tauri.conf.json · productName Operator Core" />
           <ReadinessRow label="App icons" state="ready" detail="generated · 32/128/@2x · icns · ico" />
-          <ReadinessRow label="macOS .app build" state="ready" detail="builds + opens · unsigned · bundle/macos/Operator Core.app" />
-          <ReadinessRow label="macOS .dmg" state="ready" detail="unsigned · `npm run tauri:build:ci` → bundle/dmg/Operator Core_0.1.0_aarch64.dmg" />
+          <ReadinessRow label="macOS .app build" state="ready" detail="`npm run tauri:build:app` · opens · unsigned · the beta artifact" />
+          <ReadinessRow label="macOS .dmg" state="planned" detail="bundle_dmg.sh Finder styling fails even with CI=true · not required for beta" />
           <ReadinessRow label="Windows MSI build" state="partial" detail="needs MSVC + WebView2 · unsigned" />
           <ReadinessRow label="Linux AppImage / deb" state="planned" detail="install libgtk-3-dev + libwebkit2gtk-4.0-dev, then build" />
           <ReadinessRow label="Code signing · macOS" state="unknown" detail="developer ID + notarization not yet configured" />
