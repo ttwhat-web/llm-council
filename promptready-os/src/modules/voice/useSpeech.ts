@@ -133,3 +133,46 @@ export function useSpeech(onFinal?: (text: string) => void): UseSpeech {
 
   return { supported, listening, transcript, error, start, stop, reset };
 }
+
+// ---------------------------------------------------------------------------
+// Microphone permission state · honest read-only query.
+// ---------------------------------------------------------------------------
+
+export type MicPermission = "granted" | "denied" | "prompt" | "unknown";
+
+/**
+ * Observe the microphone permission via navigator.permissions when the
+ * Permissions API supports the "microphone" descriptor. We NEVER prompt or
+ * capture here — this only reads + subscribes to the state so the orb can
+ * show granted / denied / prompt / unknown. Falls back to "unknown" when the
+ * API is missing (some browsers, notably Firefox for "microphone").
+ */
+export function useMicPermission(): MicPermission {
+  const [state, setState] = useState<MicPermission>("unknown");
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) return;
+    let status: PermissionStatus | null = null;
+    let cancelled = false;
+    const onChange = () => {
+      if (status && !cancelled) setState(status.state as MicPermission);
+    };
+    navigator.permissions
+      .query({ name: "microphone" as PermissionName })
+      .then((s) => {
+        if (cancelled) return;
+        status = s;
+        setState(s.state as MicPermission);
+        s.addEventListener("change", onChange);
+      })
+      .catch(() => {
+        if (!cancelled) setState("unknown");
+      });
+    return () => {
+      cancelled = true;
+      status?.removeEventListener("change", onChange);
+    };
+  }, []);
+
+  return state;
+}

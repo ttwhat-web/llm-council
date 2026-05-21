@@ -58,6 +58,8 @@ import { CommunicationsRuntimeCard } from "@/components/CommunicationsRuntimeCar
 import { LaunchReadinessCard } from "@/components/LaunchReadinessCard";
 import { ProviderDiagnostics } from "@/components/ProviderDiagnostics";
 import { ConnectorKeysCard } from "@/components/ConnectorKeysCard";
+import { OllamaSetupCard } from "@/components/OllamaSetupCard";
+import { ButtonAuditCard } from "@/components/ButtonAuditCard";
 import { FounderBetaCard } from "@/components/FounderBetaCard";
 import { FieldTestModeCard } from "@/components/FieldTestModeCard";
 import {
@@ -192,6 +194,7 @@ export default function SettingsPage() {
       <OperatorBulletinCard />
       <ProviderDiagnostics />
       <ConnectorKeysCard />
+      <OllamaSetupCard />
       <ModelCostsCard />
       <ModelLabCard />
 
@@ -312,6 +315,7 @@ export default function SettingsPage() {
       <SettingsSection letter="O" label="Operator" hint="Launch · Founder · Field Test" />
       <LaunchReadinessCard />
       <FounderBetaCard />
+      <ButtonAuditCard />
       <FieldTestModeCard />
       <Foldable title="Packaging" hint="macOS · Windows · Linux" persistKey="packaging">
         <PackagingCard />

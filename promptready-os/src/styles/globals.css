@@ -112,6 +112,49 @@ body[data-bg="graph"]::before {
   background-size: 26px 26px;
 }
 
+/* ---- Calmer presets · Sprint M · easier on the eyes ------------------- */
+
+/* soft-grid · faint wide grid, low opacity (new default) */
+body[data-bg="soft-grid"]::before {
+  opacity: 0.4;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* calm-graph · sparse, large, dim dot grid */
+body[data-bg="calm-graph"]::before {
+  opacity: 0.5;
+  background-image: radial-gradient(rgba(255,255,255,0.05) 1.2px, transparent 1.2px);
+  background-size: 40px 40px;
+}
+
+/* midnight-glass · two very soft cool glows, no pattern */
+body[data-bg="midnight-glass"]::before {
+  opacity: 0.7;
+  background-image:
+    radial-gradient(circle at 25% 15%, rgba(124,155,255,0.06), transparent 40%),
+    radial-gradient(circle at 80% 85%, rgba(124,155,255,0.05), transparent 45%);
+}
+
+/* warm-focus · gentle warm vignette toward the center */
+body[data-bg="warm-focus"]::before {
+  opacity: 0.6;
+  background-image:
+    radial-gradient(ellipse at 50% 40%, rgba(245,196,120,0.05), transparent 55%),
+    radial-gradient(ellipse at 50% 120%, rgba(0,0,0,0.35), transparent 60%);
+}
+
+/* low-contrast · almost flat, a whisper of grid */
+body[data-bg="low-contrast"]::before {
+  opacity: 0.25;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
 /* ---------- Glass utilities --------------------------------------------- */
 
 .glass {

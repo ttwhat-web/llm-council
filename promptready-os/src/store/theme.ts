@@ -38,9 +38,20 @@ export type BackgroundId =
   | "market"
   | "glass"
   | "holo"
-  | "graph";
+  | "graph"
+  | "calm-graph"
+  | "soft-grid"
+  | "midnight-glass"
+  | "warm-focus"
+  | "low-contrast";
 
 export const BACKGROUNDS: Array<{ id: BackgroundId; label: string }> = [
+  // calmer presets first · easier on the eyes
+  { id: "soft-grid", label: "Soft Grid" },
+  { id: "calm-graph", label: "Calm Graph" },
+  { id: "midnight-glass", label: "Midnight Glass" },
+  { id: "warm-focus", label: "Warm Focus" },
+  { id: "low-contrast", label: "Low Contrast" },
   { id: "static", label: "Static" },
   { id: "grid", label: "Grid" },
   { id: "blueprint", label: "Blueprint" },
@@ -225,7 +236,7 @@ function applyToDom(p: ThemePalette) {
 
 export const useThemeStore = create<ThemeState>((set) => ({
   id: "midnight",
-  bg: "static",
+  bg: "soft-grid",
 
   set(id) {
     const p = THEMES.find((t) => t.id === id) ?? THEMES[0];
@@ -255,7 +266,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
   hydrate() {
     if (typeof window === "undefined") return;
     let id: ThemeId = "midnight";
-    let bg: BackgroundId = "static";
+    let bg: BackgroundId = "soft-grid";
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw && THEMES.some((t) => t.id === raw)) id = raw as ThemeId;

@@ -27,6 +27,7 @@ import {
   Lock,
   Mic,
   MicOff,
+  Radio,
   Rocket,
   ScrollText,
   ShieldCheck,
@@ -43,7 +44,9 @@ import { useBrainStore } from "@/store/brain";
 import { getTelegramBridgeStatus } from "@/services/telegramLive";
 
 import { parseCommand, COMMAND_HINTS, type ParsedCommand } from "./commandParser";
-import { useSpeech } from "./useSpeech";
+import { useSpeech, useMicPermission, type MicPermission } from "./useSpeech";
+import { useWaveform } from "./useWaveform";
+import { TestConsole } from "./TestConsole";
 import {
   loadTasks,
   saveTasks,
@@ -103,12 +106,65 @@ export default function VoiceConsolePage() {
     commitCaptures([makeCapture(text, "speech"), ...loadCaptures()]);
   }, [commitCaptures]);
   const speech = useSpeech(onSpeechFinal);
+  const micPermission = useMicPermission();
+
+  // The mic is "active" (capturing) ONLY while speech is listening. The
+  // waveform hook opens getUserMedia only when this is true, and we tear it
+  // all down the instant listening stops. No background / hidden listening.
+  const micActive = speech.listening;
+  const waveform = useWaveform(micActive);
+
+  // ---- talk control: click-toggle + hold-Space, with a permission guard ----
+  const startTalk = useCallback(() => {
+    if (!speech.supported || micPermission === "denied") return;
+    speech.start();
+  }, [speech, micPermission]);
+  const stopTalk = useCallback(() => {
+    speech.stop();
+  }, [speech]);
+  const toggleTalk = useCallback(() => {
+    if (speech.listening) stopTalk();
+    else startTalk();
+  }, [speech.listening, startTalk, stopTalk]);
 
   useEffect(() => {
+    if (micPermission === "denied") {
+      setOrb("blocked");
+      return;
+    }
     if (speech.listening) setOrb("listening");
-    else if (orb === "listening") setOrb("idle");
+    else if (orb === "listening" || orb === "blocked") setOrb("idle");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [speech.listening]);
+  }, [speech.listening, micPermission]);
+
+  // Hold Space to talk — but NEVER while typing in an input/textarea/editable.
+  useEffect(() => {
+    if (!speech.supported) return;
+    const isTyping = (el: EventTarget | null): boolean => {
+      const node = el as HTMLElement | null;
+      if (!node) return false;
+      const tag = node.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || node.isContentEditable;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.repeat) return;
+      if (isTyping(e.target)) return;
+      e.preventDefault();
+      if (!speech.listening) startTalk();
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      if (isTyping(e.target)) return;
+      e.preventDefault();
+      if (speech.listening) stopTalk();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [speech.supported, speech.listening, startTalk, stopTalk]);
 
   // ---- run the paste cleaner ----
   const runClean = useCallback(
@@ -257,15 +313,20 @@ export default function VoiceConsolePage() {
 
         {/* CENTER · Orb + command + paste */}
         <div className="flex flex-col gap-4">
+          <MicActiveBanner active={micActive} />
           <VoiceOrb
             status={orb}
             speech={speech}
+            micPermission={micPermission}
+            waveform={waveform}
             command={command}
             onCommand={setCommand}
             onSubmit={() => submit()}
-            onMicDown={() => (speech.supported ? speech.start() : undefined)}
-            onMicUp={() => speech.stop()}
+            onToggleTalk={toggleTalk}
+            onMicDown={startTalk}
+            onMicUp={stopTalk}
           />
+          <TestConsole />
           <PasteIntelligence
             value={pasteIn}
             onChange={setPasteIn}
@@ -308,24 +369,47 @@ export default function VoiceConsolePage() {
 function VoiceOrb({
   status,
   speech,
+  micPermission,
+  waveform,
   command,
   onCommand,
   onSubmit,
+  onToggleTalk,
   onMicDown,
   onMicUp
 }: {
   status: OrbStatus;
   speech: ReturnType<typeof useSpeech>;
+  micPermission: MicPermission;
+  waveform: ReturnType<typeof useWaveform>;
   command: string;
   onCommand: (v: string) => void;
   onSubmit: () => void;
+  onToggleTalk: () => void;
   onMicDown: () => void;
   onMicUp: () => void;
 }) {
   const tone = orbTone(status);
+  const denied = micPermission === "denied";
+  const blocked = status === "blocked" || denied;
   return (
     <section className="flex flex-col items-center gap-4 rounded-3xl border border-white/10 bg-gradient-to-b from-black via-zinc-950 to-black p-6 text-white">
-      <div className="relative flex h-44 w-44 items-center justify-center">
+      {/* Orb — click to toggle talk */}
+      <button
+        type="button"
+        onClick={blocked ? undefined : onToggleTalk}
+        disabled={blocked || !speech.supported}
+        title={
+          denied
+            ? "Microphone permission denied"
+            : speech.supported
+            ? speech.listening
+              ? "Click to stop"
+              : "Click to talk"
+            : "Speech API unavailable"
+        }
+        className="relative flex h-44 w-44 items-center justify-center rounded-full focus:outline-none disabled:cursor-not-allowed"
+      >
         {/* halo rings */}
         <span
           className={clsx(
@@ -340,27 +424,44 @@ function VoiceOrb({
             tone.core
           )}
         >
-          <Waves className={clsx("h-7 w-7", tone.icon)} />
+          {/* REAL waveform while capturing, else a static idle ring */}
+          <WaveformView samples={waveform.samples} active={waveform.capturing} tone={tone.icon} />
           <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-white/55">
             {status}
           </span>
         </div>
-      </div>
+      </button>
+
       <div className="flex flex-col items-center gap-0.5">
-        <span className="text-[13px] font-semibold">Atlas listening</span>
+        <span className="text-[13px] font-semibold">Atlas</span>
         <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/40">
           {speech.supported ? "browser speech API" : "browser speech API unavailable · use text"}
         </span>
+        <span
+          className={clsx(
+            "mt-0.5 font-mono text-[9px] uppercase tracking-wider",
+            denied ? "text-rose-300" : micPermission === "granted" ? "text-emerald-300/80" : "text-white/40"
+          )}
+        >
+          mic permission · {micPermission}
+        </span>
+        {denied && (
+          <span className="mt-0.5 max-w-[40ch] text-center text-[10px] text-rose-300">
+            microphone blocked · enable it in the browser/site settings to talk · text still works
+          </span>
+        )}
         {speech.transcript && (
           <span className="mt-1 max-w-[40ch] text-center text-[11px] text-accent/90">“{speech.transcript}”</span>
         )}
-        {speech.error && <span className="mt-0.5 text-[10px] text-rose-300">{speech.error}</span>}
+        {(speech.error || waveform.error) && (
+          <span className="mt-0.5 text-[10px] text-rose-300">{speech.error ?? waveform.error}</span>
+        )}
       </div>
 
-      {/* push-to-talk */}
+      {/* push-to-talk (hold) — also works via mouse/touch hold */}
       <button
         type="button"
-        disabled={!speech.supported}
+        disabled={!speech.supported || denied}
         onMouseDown={onMicDown}
         onMouseUp={onMicUp}
         onMouseLeave={() => speech.listening && onMicUp()}
@@ -377,6 +478,17 @@ function VoiceOrb({
         {speech.listening ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
         {speech.listening ? "listening · release to send" : "hold to talk"}
       </button>
+
+      {/* dual hints + wake-sound (planned/locked) */}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <span className="rounded border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/45">
+          hold Space to talk
+        </span>
+        <span className="rounded border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/45">
+          click orb to toggle
+        </span>
+        <WakeSoundToggle />
+      </div>
 
       {/* text command box (always works) */}
       <div className="flex w-full max-w-[640px] flex-col gap-2">
@@ -416,6 +528,82 @@ function VoiceOrb({
         </div>
       </div>
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MIC ACTIVE banner — large + obvious, ONLY while capturing
+// ---------------------------------------------------------------------------
+
+function MicActiveBanner({ active }: { active: boolean }) {
+  if (!active) return null;
+  return (
+    <div
+      role="status"
+      aria-live="assertive"
+      className="flex items-center justify-center gap-3 rounded-2xl border border-rose-400/50 bg-rose-500/[0.12] px-4 py-3 shadow-glow"
+    >
+      <span className="relative flex h-3.5 w-3.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400/70" />
+        <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-rose-400" />
+      </span>
+      <span className="font-mono text-[13px] font-bold uppercase tracking-[0.25em] text-rose-200">
+        ● mic active · capturing
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Waveform — REAL bars from the analyser while active, else a static ring
+// ---------------------------------------------------------------------------
+
+function WaveformView({ samples, active, tone }: { samples: number[]; active: boolean; tone: string }) {
+  if (!active || samples.length === 0) {
+    // static idle ring — no animation, no fake data
+    return <Waves className={clsx("h-7 w-7", tone)} />;
+  }
+  const w = 96;
+  const h = 36;
+  const mid = h / 2;
+  const step = w / samples.length;
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="text-accent" aria-hidden>
+      {samples.map((v, i) => {
+        const barH = Math.max(1.5, v * (h - 4));
+        return (
+          <rect
+            key={i}
+            x={i * step}
+            y={mid - barH / 2}
+            width={Math.max(1, step - 1)}
+            height={barH}
+            rx={1}
+            className="fill-accent"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Wake-sound (clap/tap) — PLANNED · LOCKED · off by default · non-functional
+// ---------------------------------------------------------------------------
+
+function WakeSoundToggle() {
+  return (
+    <button
+      type="button"
+      disabled
+      aria-disabled
+      title="Planned. Local-only when shipped. Off by default. No always-on audio monitoring exists today."
+      className="inline-flex cursor-not-allowed items-center gap-1.5 rounded border border-amber-400/25 bg-amber-500/[0.05] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200/80 opacity-70"
+    >
+      <Lock className="h-3 w-3" />
+      <Radio className="h-3 w-3" />
+      wake-sound · planned · local-only when shipped · off by default
+    </button>
   );
 }
 
