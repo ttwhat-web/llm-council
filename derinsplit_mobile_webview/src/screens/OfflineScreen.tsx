@@ -5,14 +5,17 @@ import { COLORS } from '../config';
 interface Props {
   /** Optional contextual message — defaults to a friendly Turkish line. */
   message?: string;
+  /** HTTP status code (when the failure was an HTTP error). */
+  statusCode?: number;
   onRetry: () => void;
 }
 
 /**
  * Shown when network is unavailable OR the WebView fails to load. Gives
- * the user a single primary action: retry.
+ * the user a single primary action: retry. Surfaces the raw WebView
+ * error description + HTTP status so failures are diagnosable on-device.
  */
-export default function OfflineScreen({ message, onRetry }: Props) {
+export default function OfflineScreen({ message, statusCode, onRetry }: Props) {
   return (
     <View style={styles.root}>
       <View style={styles.icon}>
@@ -23,6 +26,11 @@ export default function OfflineScreen({ message, onRetry }: Props) {
       <Text style={styles.body}>
         {message ?? 'İnternet bağlantınızı kontrol edip tekrar deneyin.'}
       </Text>
+      {statusCode !== undefined && (
+        <View style={styles.codePill}>
+          <Text style={styles.codePillText}>HTTP {statusCode}</Text>
+        </View>
+      )}
       <Pressable
         onPress={onRetry}
         style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
@@ -77,8 +85,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     textAlign: 'center',
-    marginBottom: 28,
+    marginBottom: 16,
     maxWidth: 320,
+  },
+  codePill: {
+    borderWidth: 1,
+    borderColor: 'rgba(245,241,232,0.18)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 24,
+  },
+  codePillText: {
+    color: COLORS.goldLight,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    fontWeight: '800',
+    fontFamily: 'Courier',
   },
   btn: {
     paddingVertical: 14,

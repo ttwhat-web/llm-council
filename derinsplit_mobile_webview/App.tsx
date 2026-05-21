@@ -24,6 +24,7 @@ export default function App() {
 
 function Shell() {
   useEffect(() => {
+    console.log('[App] selected DERINSPLIT_URL:', DERINSPLIT_URL);
     SplashScreen.hideAsync().catch(() => undefined);
   }, []);
 
