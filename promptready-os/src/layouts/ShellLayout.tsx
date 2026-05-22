@@ -20,6 +20,7 @@ import {
 import { KbdHint } from "@/components/primitives/KbdHint";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { MediaDock } from "@/components/MediaDock";
+import { CommandPalette } from "@/components/CommandPalette";
 import { useUiModeStore } from "@/store/uiMode";
 
 /**
@@ -185,6 +186,9 @@ export function ShellLayout() {
 
       {/* Floating media dock · user-selected media only */}
       <MediaDock />
+
+      {/* Global command palette · Cmd/Ctrl+K */}
+      <CommandPalette />
     </div>
   );
 }

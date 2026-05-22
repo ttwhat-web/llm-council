@@ -29,7 +29,15 @@ export type ThemeId =
   | "travel"
   | "crypto"
   | "export"
-  | "minimal";
+  | "minimal"
+  // Theme 2.0 · UX-X
+  | "midnight-operator"
+  | "graph-paper"
+  | "dark-glass"
+  | "atlas-blue"
+  | "trading-night"
+  | "warm-focus-theme"
+  | "low-light";
 
 export type BackgroundId =
   | "static"
@@ -43,10 +51,22 @@ export type BackgroundId =
   | "soft-grid"
   | "midnight-glass"
   | "warm-focus"
-  | "low-contrast";
+  | "low-contrast"
+  // Theme 2.0 · animated (UX-X)
+  | "animated-grid"
+  | "market-dots"
+  | "slow-graph"
+  | "signal-field"
+  | "soft-stars";
 
 export const BACKGROUNDS: Array<{ id: BackgroundId; label: string }> = [
-  // calmer presets first · easier on the eyes
+  // animated · Theme 2.0 (premium · calm)
+  { id: "animated-grid", label: "Animated Grid" },
+  { id: "market-dots", label: "Market Dots" },
+  { id: "slow-graph", label: "Slow Graph" },
+  { id: "signal-field", label: "Signal Field" },
+  { id: "soft-stars", label: "Soft Stars" },
+  // calmer presets · easier on the eyes
   { id: "soft-grid", label: "Soft Grid" },
   { id: "calm-graph", label: "Calm Graph" },
   { id: "midnight-glass", label: "Midnight Glass" },
@@ -202,6 +222,77 @@ export const THEMES: ThemePalette[] = [
     accentSoft: "rgba(230,232,238,0.14)",
     glow: "0 0 20px 2px rgba(230,232,238,0.12)",
     swatch: "linear-gradient(135deg,#0c0d0f 0%,#e6e8ee 100%)"
+  },
+  // ---- Theme 2.0 · UX-X --------------------------------------------------
+  {
+    id: "midnight-operator",
+    label: "Midnight Operator",
+    bg: "#05070e",
+    panel: "rgba(124,155,255,0.03)",
+    accent: "#8aa6ff",
+    accentSoft: "rgba(138,166,255,0.16)",
+    glow: "0 0 24px 2px rgba(138,166,255,0.18)",
+    swatch: "linear-gradient(135deg,#05070e 0%,#8aa6ff 100%)"
+  },
+  {
+    id: "graph-paper",
+    label: "Graph Paper",
+    bg: "#0a0b0d",
+    panel: "rgba(255,255,255,0.022)",
+    accent: "#9fb3c8",
+    accentSoft: "rgba(159,179,200,0.15)",
+    glow: "0 0 20px 2px rgba(159,179,200,0.12)",
+    swatch: "linear-gradient(135deg,#0a0b0d 0%,#9fb3c8 100%)"
+  },
+  {
+    id: "dark-glass",
+    label: "Dark Glass",
+    bg: "#070a10",
+    panel: "rgba(255,255,255,0.03)",
+    accent: "#a8c0ff",
+    accentSoft: "rgba(168,192,255,0.16)",
+    glow: "0 0 26px 2px rgba(168,192,255,0.16)",
+    swatch: "linear-gradient(135deg,#070a10 0%,#a8c0ff 100%)"
+  },
+  {
+    id: "atlas-blue",
+    label: "Atlas Blue",
+    bg: "#040a18",
+    panel: "rgba(70,130,255,0.05)",
+    accent: "#5aa0ff",
+    accentSoft: "rgba(90,160,255,0.2)",
+    glow: "0 0 28px 2px rgba(90,160,255,0.22)",
+    swatch: "linear-gradient(135deg,#040a18 0%,#5aa0ff 100%)"
+  },
+  {
+    id: "trading-night",
+    label: "Trading Night",
+    bg: "#060a08",
+    panel: "rgba(95,217,163,0.04)",
+    accent: "#4fd39a",
+    accentSoft: "rgba(79,211,154,0.18)",
+    glow: "0 0 26px 2px rgba(79,211,154,0.2)",
+    swatch: "linear-gradient(135deg,#060a08 0%,#4fd39a 100%)"
+  },
+  {
+    id: "warm-focus-theme",
+    label: "Warm Focus",
+    bg: "#0c0907",
+    panel: "rgba(245,196,120,0.04)",
+    accent: "#f0b970",
+    accentSoft: "rgba(240,185,112,0.16)",
+    glow: "0 0 24px 2px rgba(240,185,112,0.18)",
+    swatch: "linear-gradient(135deg,#0c0907 0%,#f0b970 100%)"
+  },
+  {
+    id: "low-light",
+    label: "Low Light",
+    bg: "#0a0b0d",
+    panel: "rgba(255,255,255,0.018)",
+    accent: "#8b93a7",
+    accentSoft: "rgba(139,147,167,0.12)",
+    glow: "0 0 16px 2px rgba(139,147,167,0.1)",
+    swatch: "linear-gradient(135deg,#0a0b0d 0%,#8b93a7 100%)"
   }
 ];
 
