@@ -33,7 +33,7 @@ export function Pill({
   return (
     <span
       className={clsx(
-        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider",
+        "inline-flex items-center gap-1 rounded border px-1 py-px font-mono text-[9px] uppercase tracking-wider",
         TONE_PILL[tone],
         className
       )}
@@ -49,7 +49,8 @@ export function Panel({
   glow,
   title,
   icon,
-  right
+  right,
+  bodyClassName
 }: {
   children: ReactNode;
   className?: string;
@@ -57,25 +58,26 @@ export function Panel({
   title?: string;
   icon?: ReactNode;
   right?: ReactNode;
+  bodyClassName?: string;
 }) {
   return (
     <section
       className={clsx(
-        "flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4",
+        "flex min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.02]",
         glow && "shadow-[0_0_40px_-12px_rgba(255,255,255,0.08)]",
         className
       )}
     >
       {(title || right) && (
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+        <div className="flex items-center justify-between gap-2 border-b border-white/6 px-2.5 py-1.5">
+          <span className="flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-accent">
             {icon}
             {title}
           </span>
           {right}
         </div>
       )}
-      {children}
+      <div className={clsx("flex min-w-0 flex-col gap-2 p-2.5", bodyClassName)}>{children}</div>
     </section>
   );
 }
@@ -105,11 +107,11 @@ export function StatRow({
   tone?: Tone;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5">
-      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/40">{label}</span>
+    <div className="flex items-center justify-between gap-2 py-[3px]">
+      <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/40">{label}</span>
       <span
         className={clsx(
-          "font-mono text-[11px] tabular-nums",
+          "font-mono text-[10.5px] tabular-nums",
           tone === "ok"
             ? "text-emerald-300/90"
             : tone === "warn"
@@ -127,7 +129,20 @@ export function StatRow({
   );
 }
 
-/** Honest "no live source yet" panel body. Never shows numbers. */
+/**
+ * Diagonal-hatch background used to mark a zone as intentionally disabled
+ * (no live source). Subtle, low-contrast — reads "off", never "broken".
+ */
+export const HATCH: import("react").CSSProperties = {
+  backgroundImage:
+    "repeating-linear-gradient(45deg, rgba(255,255,255,0.018) 0px, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 7px)"
+};
+
+/**
+ * Honest "no live source yet" panel body — styled as INTENTIONALLY
+ * disabled: compact, muted, low-opacity, hatched. Never shows numbers,
+ * never reads as "unfinished / blank".
+ */
 export function AdapterReady({
   what,
   detail
@@ -136,14 +151,31 @@ export function AdapterReady({
   detail?: string;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-dashed border-white/12 bg-white/[0.01] p-4">
-      <div className="flex items-center gap-2">
-        <Pill tone="accent">adapter-ready</Pill>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-white/55">{what}</span>
+    <div
+      className="flex items-start gap-2 rounded border border-white/8 bg-white/[0.008] px-2 py-1.5 opacity-70"
+      style={HATCH}
+    >
+      <Pill tone="muted">offline</Pill>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">{what}</span>
+        {detail && <p className="text-[10px] leading-snug text-white/35">{detail}</p>}
       </div>
-      <p className="text-[11.5px] leading-relaxed text-white/45">
-        {detail ?? "No live provider is wired for this surface yet. The seam is defined; the desktop runtime fills it in. No numbers are shown until a real round-trip is verified — never fabricated."}
-      </p>
+    </div>
+  );
+}
+
+/**
+ * A single compact adapter-ready instrument/cell row — intentionally
+ * disabled look (muted, hatched, low opacity). No numbers.
+ */
+export function DisabledRow({ label, note = "offline" }: { label: string; note?: string }) {
+  return (
+    <div
+      className="flex items-center justify-between gap-2 px-1 py-[3px] opacity-60"
+      style={HATCH}
+    >
+      <span className="font-mono text-[10px] tabular-nums text-white/45">{label}</span>
+      <span className="font-mono text-[8.5px] uppercase tracking-wider text-white/30">{note}</span>
     </div>
   );
 }

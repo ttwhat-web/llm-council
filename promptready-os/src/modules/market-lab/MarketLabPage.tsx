@@ -64,7 +64,7 @@ import { getTelegramBridgeStatus } from "@/services/telegramLive";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
 
-import { Pill, Panel, Dot, StatRow, AdapterReady, heatStyle, type Tone } from "./lab-ui";
+import { Pill, Panel, Dot, StatRow, AdapterReady, DisabledRow, HATCH, heatStyle, type Tone } from "./lab-ui";
 
 // ---------------------------------------------------------------------------
 // constants
@@ -258,7 +258,7 @@ export default function MarketLabPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-4 px-5 py-5 md:px-7 md:py-7">
+    <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-2 px-3 py-3 md:px-4">
       <SurfaceHeader
         eyebrow="market lab · intelligence center"
         title="Market Intelligence Center"
@@ -277,18 +277,18 @@ export default function MarketLabPage() {
         }
       />
 
-      {/* A · TOP BAR */}
+      {/* A · TOP COMMAND / STATUS BAR */}
       <TopBar now={now} crypto={crypto} adapters={adapters} cryptoOnline={cryptoOnline} />
 
-      {/* main grid: left sidebar · center wall · right AI stack */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)_300px]">
-        {/* B · LEFT SIDEBAR · watchlists */}
-        <div className={clsx("flex flex-col gap-4", fullscreen && "xl:hidden")}>
+      {/* terminal frame: watchlist rail · center chart wall · analyst rail */}
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[220px_minmax(0,1fr)_300px]">
+        {/* B · LEFT · WATCHLIST RAIL */}
+        <div className={clsx("flex flex-col gap-2", fullscreen && "xl:hidden")}>
           <Watchlists quotes={quotes} cryptoOnline={cryptoOnline} selected={selected} onSelect={setSelected} />
         </div>
 
-        {/* C · CENTER · main chart wall */}
-        <div className="flex min-w-0 flex-col gap-4">
+        {/* C · CENTER · CHART WALL */}
+        <div className="flex min-w-0 flex-col gap-2">
           <ChartWall
             selected={selected}
             quote={selectedQuote}
@@ -308,9 +308,9 @@ export default function MarketLabPage() {
             <MarketMaps quotes={quotes} cryptoOnline={cryptoOnline} avgChange={avgChange} />
           )}
 
-          {/* NEWS ROOM + POLYMARKET */}
+          {/* NEWS ROOM + PREDICTION WALL */}
           {!fullscreen && (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1.5fr_1fr]">
               <NewsRoom
                 chip={newsChip}
                 onChip={onChip}
@@ -326,8 +326,8 @@ export default function MarketLabPage() {
           )}
         </div>
 
-        {/* D · RIGHT · AI MARKET STACK + BOT COMMAND */}
-        <div className={clsx("flex flex-col gap-4", fullscreen && "xl:hidden")}>
+        {/* D · RIGHT · ANALYST RAIL */}
+        <div className={clsx("flex flex-col gap-2", fullscreen && "xl:hidden")}>
           <AiMarketStack alert={aiAlert} cost={cost} />
           <BotCommandCenter
             telegram={telegram}
@@ -338,7 +338,7 @@ export default function MarketLabPage() {
         </div>
       </div>
 
-      {/* F · bottom ticker */}
+      {/* F · BOTTOM · NEWS TAPE (full width) */}
       <Ticker quotes={quotes} items={items} cryptoOnline={cryptoOnline} />
     </div>
   );
@@ -359,69 +359,49 @@ function TopBar({
   adapters: ReturnType<typeof adapterSummary>;
   cryptoOnline: boolean;
 }) {
-  const latency = crypto.at ? `${Math.max(1, Math.round((Date.now() - crypto.at) / 1000))}s ago` : "—";
+  const latency = crypto.at ? `${Math.max(1, Math.round((Date.now() - crypto.at) / 1000))}s` : "—";
   const stateTone: Tone = crypto.state === "ok" ? "ok" : crypto.state === "error" ? "bad" : "muted";
   return (
     <section
-      className="relative grid grid-cols-2 gap-3 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-3 md:grid-cols-4"
+      className="relative flex flex-wrap items-center gap-x-4 gap-y-1.5 overflow-hidden rounded-lg border border-white/10 bg-gradient-to-b from-white/[0.035] to-white/[0.01] px-2.5 py-1.5"
       style={GRID_BG}
     >
-      <Tile icon={<Radio className="h-3.5 w-3.5" />} label="market status">
-        <div className="flex items-center gap-2">
-          <Pill tone={stateTone}>{cryptoOnline ? "live · crypto" : crypto.state}</Pill>
-          <span className="font-mono text-[10px] text-white/45">{latency}</span>
-        </div>
-      </Tile>
-
-      <Tile icon={<Signal className="h-3.5 w-3.5" />} label="provider health">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Pill tone="ok">{adapters.connected} live</Pill>
-          <Pill tone="accent">{adapters.ready} ready</Pill>
-          {adapters.error > 0 && <Pill tone="bad">{adapters.error} err</Pill>}
-          <Pill tone="muted">{adapters.offline} off</Pill>
-        </div>
-      </Tile>
-
-      <Tile icon={<Globe2 className="h-3.5 w-3.5" />} label="world clock" wide>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {CLOCKS.map((c) => (
-            <span key={c.tz} className="inline-flex items-baseline gap-1 font-mono">
-              <span className="text-[9px] uppercase tracking-wider text-white/40">{c.label}</span>
-              <span className="text-[12px] tabular-nums text-white/85">{fmtClock(now, c.tz)}</span>
-            </span>
-          ))}
-        </div>
-      </Tile>
-
-      <Tile icon={<Cpu className="h-3.5 w-3.5" />} label="runtime">
-        <div className="flex items-center gap-2">
-          <Dot live={cryptoOnline} label="local-first" />
-          <span className="font-mono text-[10px] text-white/45">desktop</span>
-        </div>
-      </Tile>
-    </section>
-  );
-}
-
-function Tile({
-  icon,
-  label,
-  children,
-  wide
-}: {
-  icon: React.ReactNode;
-  label: string;
-  children: React.ReactNode;
-  wide?: boolean;
-}) {
-  return (
-    <div className={clsx("flex flex-col gap-1.5 rounded-xl border border-white/8 bg-black/20 px-3 py-2", wide && "md:col-span-1")}>
-      <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-accent">
-        {icon}
-        {label}
+      {/* command / status input row */}
+      <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tabular-nums text-white/55">
+        <Radio className="h-3.5 w-3.5 text-accent" />
+        <span className="text-accent">{">"}</span>
+        <span className="text-white/40">market</span>
+        <Pill tone={stateTone}>{cryptoOnline ? "live · crypto" : crypto.state}</Pill>
+        <span className="text-white/35">{latency}</span>
       </span>
-      {children}
-    </div>
+
+      <span className="hidden h-3.5 w-px bg-white/10 sm:inline-block" />
+
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        <Signal className="h-3.5 w-3.5 text-accent" />
+        <Pill tone="ok">{adapters.connected} live</Pill>
+        <Pill tone="accent">{adapters.ready} ready</Pill>
+        {adapters.error > 0 && <Pill tone="bad">{adapters.error} err</Pill>}
+        <Pill tone="muted">{adapters.offline} off</Pill>
+      </span>
+
+      <span className="hidden h-3.5 w-px bg-white/10 md:inline-block" />
+
+      <span className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <Globe2 className="h-3.5 w-3.5 text-accent" />
+        {CLOCKS.map((c) => (
+          <span key={c.tz} className="inline-flex items-baseline gap-1 font-mono">
+            <span className="text-[9px] uppercase tracking-wider text-white/40">{c.label}</span>
+            <span className="text-[11px] tabular-nums text-white/85">{fmtClock(now, c.tz)}</span>
+          </span>
+        ))}
+      </span>
+
+      <span className="ml-auto inline-flex items-center gap-2">
+        <Cpu className="h-3.5 w-3.5 text-accent" />
+        <Dot live={cryptoOnline} label="local-first · desktop" />
+      </span>
+    </section>
   );
 }
 
@@ -442,8 +422,20 @@ function Watchlists({
 }) {
   return (
     <>
-      <Panel title="crypto" icon={<LineChart className="h-3.5 w-3.5" />} right={<Dot live={cryptoOnline} label="live" />}>
-        <ul className="flex flex-col gap-1">
+      <Panel
+        title="crypto"
+        icon={<LineChart className="h-3.5 w-3.5" />}
+        right={<Dot live={cryptoOnline} label="live" />}
+        bodyClassName="gap-0 p-0"
+      >
+        <div className="flex items-center justify-between px-2.5 py-1 font-mono text-[8.5px] uppercase tracking-wider text-white/30">
+          <span>sym</span>
+          <span className="flex items-center gap-3">
+            <span>last</span>
+            <span>24h</span>
+          </span>
+        </div>
+        <ul className="flex flex-col divide-y divide-white/6 border-t border-white/6">
           {CRYPTO_SYMBOLS.map((sym) => {
             const q = quotes.find((x) => x.symbol === sym);
             const up = (q?.change24h ?? 0) >= 0;
@@ -453,20 +445,18 @@ function Watchlists({
                   type="button"
                   onClick={() => onSelect(sym)}
                   className={clsx(
-                    "flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left transition",
-                    sym === selected
-                      ? "border-accent/40 bg-accent/[0.06]"
-                      : "border-white/8 bg-white/[0.012] hover:bg-white/[0.04]"
+                    "flex w-full items-center justify-between gap-2 px-2.5 py-1 text-left transition",
+                    sym === selected ? "bg-accent/[0.07]" : "hover:bg-white/[0.03]"
                   )}
                 >
                   <span className="font-mono text-[11px] text-white/85">{sym}</span>
-                  <span className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] tabular-nums text-white/80">
+                  <span className="flex items-center gap-3">
+                    <span className="font-mono text-[10px] tabular-nums text-white/80">
                       {cryptoOnline ? formatPrice(q?.price ?? null) : "—"}
                     </span>
                     <span
                       className={clsx(
-                        "font-mono text-[10px] tabular-nums",
+                        "w-12 text-right font-mono text-[10px] tabular-nums",
                         q?.change24h == null ? "text-white/35" : up ? "text-emerald-300" : "text-rose-300"
                       )}
                     >
@@ -489,18 +479,18 @@ function Watchlists({
 
 function AdapterWatchlist({ title, symbols }: { title: string; symbols: string[] }) {
   return (
-    <Panel title={title} icon={<Boxes className="h-3.5 w-3.5" />} right={<Pill tone="accent">adapter-ready</Pill>}>
-      <ul className="flex flex-col gap-1">
+    <Panel
+      title={title}
+      icon={<Boxes className="h-3.5 w-3.5" />}
+      right={<Pill tone="muted">adapter-ready</Pill>}
+      className="opacity-80"
+      bodyClassName="gap-0 p-0"
+    >
+      <div className="flex flex-col divide-y divide-white/6 px-1.5" style={HATCH}>
         {symbols.map((s) => (
-          <li
-            key={s}
-            className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5"
-          >
-            <span className="font-mono text-[11px] text-white/70">{s}</span>
-            <Pill tone="muted">no live source</Pill>
-          </li>
+          <DisabledRow key={s} label={s} note="no source" />
         ))}
-      </ul>
+      </div>
     </Panel>
   );
 }
@@ -544,7 +534,7 @@ function ChartWall({
       className="relative overflow-hidden"
     >
       <div className="pointer-events-none absolute inset-0" style={GRID_BG} />
-      <div className="relative flex flex-col gap-3">
+      <div className="relative flex flex-col gap-2">
         {/* header row */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
@@ -777,23 +767,23 @@ function MiniChart({
 
 function CryptoHeatmap({ quotes, cryptoOnline }: { quotes: CryptoQuote[]; cryptoOnline: boolean }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         <Pill tone="ok">real · 24h %</Pill>
         <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">CoinGecko · live crypto only</span>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+      <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
         {CRYPTO_SYMBOLS.map((sym) => {
           const q = quotes.find((x) => x.symbol === sym) ?? null;
           const style = heatStyle(cryptoOnline ? q?.change24h ?? null : null);
           return (
             <div
               key={sym}
-              className="flex flex-col gap-1 rounded-lg border p-3"
+              className="flex flex-col gap-0.5 rounded border p-1.5"
               style={{ background: style.background, borderColor: style.border }}
             >
-              <span className="font-mono text-[12px] text-white/90">{sym}</span>
-              <span className="font-mono text-[15px] font-semibold tabular-nums text-white">
+              <span className="font-mono text-[10px] text-white/90">{sym}</span>
+              <span className="font-mono text-[13px] font-semibold tabular-nums text-white">
                 {cryptoOnline ? formatChange(q?.change24h ?? null) : "—"}
               </span>
               <span className="font-mono text-[9px] tabular-nums text-white/55">
@@ -831,14 +821,14 @@ function MarketMaps({
 
   return (
     <Panel title="market maps" icon={<Grid3x3 className="h-3.5 w-3.5" />}>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.3fr_1fr]">
-        <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-[1.3fr_1fr]">
+        <div className="flex flex-col gap-1.5">
           <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">crypto heatmap · real 24h %</span>
           <CryptoHeatmap quotes={quotes} cryptoOnline={cryptoOnline} />
         </div>
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-col gap-1.5 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-            <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-accent">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1 rounded border border-white/10 bg-white/[0.02] p-2">
+            <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-accent">
               <Gauge className="h-3.5 w-3.5" /> risk regime
             </span>
             <div className="flex items-center gap-2">
@@ -851,11 +841,14 @@ function MarketMaps({
               from crypto 24h % only · not a market-wide read
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5" style={HATCH}>
             {["sector", "volatility", "correlation", "breadth"].map((m) => (
-              <div key={m} className="flex flex-col gap-1 rounded-lg border border-dashed border-white/12 bg-white/[0.01] p-2.5">
-                <span className="font-mono text-[9px] uppercase tracking-wider text-white/55">{m} map</span>
-                <Pill tone="accent">adapter-ready</Pill>
+              <div
+                key={m}
+                className="flex items-center justify-between gap-1 rounded border border-white/8 bg-white/[0.008] px-1.5 py-1 opacity-65"
+              >
+                <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">{m}</span>
+                <Pill tone="muted">off</Pill>
               </div>
             ))}
           </div>
@@ -915,30 +908,30 @@ function NewsRoom({
       </div>
 
       {state === "adapter" ? (
-        <AdapterReady what="this category · needs provider" detail="Hacker News / NewsAPI cover AI, Markets, Crypto, Tech and Business. Breaking / economy / politics / earnings need a dedicated wire — wired later via the runtime. No headlines fabricated." />
+        <AdapterReady what="this category · no live wire" detail="HN / NewsAPI cover AI, Markets, Crypto, Tech, Business. Breaking / economy / politics / earnings need a dedicated wire — no headlines fabricated." />
       ) : state === "error" ? (
-        <div className="rounded-xl border border-rose-400/25 bg-rose-500/[0.06] p-4">
-          <p className="font-mono text-[12px] uppercase tracking-wider text-rose-200">news wire offline</p>
-          <p className="mt-1 text-[11px] text-white/55">{err}</p>
+        <div className="rounded border border-rose-400/25 bg-rose-500/[0.06] px-2.5 py-2">
+          <p className="font-mono text-[11px] uppercase tracking-wider text-rose-200">news wire offline</p>
+          <p className="mt-0.5 text-[10.5px] text-white/55">{err}</p>
         </div>
       ) : !hero ? (
         <p className="font-mono text-[11px] uppercase tracking-wider text-white/40">loading wire…</p>
       ) : (
         <>
-          <article className="flex flex-col gap-2 rounded-xl border border-white/10 bg-black/30 p-4">
-            <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-accent">{hero.category}</span>
+          <article className="flex flex-col gap-1.5 rounded border border-white/10 bg-black/30 p-2.5">
+            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-accent">{hero.category}</span>
             <a
               href={hero.url ?? "#"}
               target="_blank"
               rel="noreferrer noopener"
-              className="text-lg font-semibold leading-snug text-white hover:text-accent"
+              className="text-[15px] font-semibold leading-snug text-white hover:text-accent"
             >
               {hero.title}
             </a>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+            <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/40">
               {hero.source} · {timeAgo(hero.time)}
             </span>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
               <NewsAction Icon={Rocket} label={missionBusy ? "mission running" : "create mission"} disabled={missionBusy} onClick={() => onCreateMission(hero)} accent />
               <NewsAction Icon={Save} label="save to brain" onClick={() => onSaveToBrain(hero)} />
               {hero.url && (
@@ -946,17 +939,17 @@ function NewsRoom({
                   href={hero.url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+                  className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
                 >
                   <ExternalLink className="h-3 w-3" /> open source
                 </a>
               )}
             </div>
           </article>
-          <ul className="flex max-h-[200px] flex-col gap-1 overflow-auto pr-1">
+          <ul className="flex max-h-[180px] flex-col divide-y divide-white/6 overflow-auto">
             {items.slice(1).map((n, i) => (
-              <li key={n.id} className="flex items-start gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11px]">
-                <span className="mt-px font-mono text-[8px] uppercase tracking-wider text-white/30">{i + 2}</span>
+              <li key={n.id} className="flex items-center gap-2 px-1 py-1 text-[11px]">
+                <span className="font-mono text-[8px] tabular-nums text-white/30">{String(i + 2).padStart(2, "0")}</span>
                 <a
                   href={n.url ?? "#"}
                   target="_blank"
@@ -1015,8 +1008,8 @@ function PolymarketWall() {
   const [tab, setTab] = useState("Politics");
   const tabs = ["Politics", "Crypto", "AI", "Economy", "Top movers"];
   return (
-    <Panel title="prediction wall" icon={<Waypoints className="h-3.5 w-3.5" />} right={<Pill tone="accent">adapter-ready</Pill>}>
-      <div className="flex flex-wrap items-center gap-1">
+    <Panel title="prediction wall" icon={<Waypoints className="h-3.5 w-3.5" />} right={<Pill tone="muted">adapter-ready</Pill>} className="opacity-80">
+      <div className="flex flex-wrap items-center gap-1 opacity-60" style={HATCH}>
         {tabs.map((t) => (
           <button
             key={t}
@@ -1025,8 +1018,8 @@ function PolymarketWall() {
             className={clsx(
               "rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition",
               t === tab
-                ? "border-accent/40 bg-accent/[0.08] text-accent"
-                : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.06]"
+                ? "border-white/15 bg-white/[0.05] text-white/55"
+                : "border-white/10 bg-white/[0.02] text-white/40 hover:bg-white/[0.04]"
             )}
           >
             {t}
@@ -1035,7 +1028,7 @@ function PolymarketWall() {
       </div>
       <AdapterReady
         what="Polymarket · prediction odds"
-        detail="A Polymarket adapter is planned. Until a verified round-trip exists, no odds, no movers and no probabilities are shown — fabricated betting numbers would be dishonest."
+        detail="No verified round-trip yet — no odds, movers or probabilities shown. Fabricated betting numbers would be dishonest."
       />
     </Panel>
   );
@@ -1062,25 +1055,29 @@ function AiMarketStack({ alert, cost }: { alert: boolean; cost: ReturnType<typeo
     { name: "Gemini", state: "idle · BYOK", stateTone: "muted", confidence: "—", cost: cloud, provider: "no key" }
   ];
   return (
-    <Panel title="ai market stack" icon={<Cpu className="h-3.5 w-3.5" />} right={alert ? <Pill tone="bad">alert</Pill> : <Pill tone="ok">nominal</Pill>}>
-      <ul className="flex flex-col gap-1.5">
+    <Panel
+      title="ai market stack"
+      icon={<Cpu className="h-3.5 w-3.5" />}
+      right={alert ? <Pill tone="bad">alert</Pill> : <Pill tone="ok">nominal</Pill>}
+      bodyClassName="gap-0 p-0"
+    >
+      <ul className="flex flex-col divide-y divide-white/6">
         {rows.map((r) => (
-          <li key={r.name} className="flex flex-col gap-1.5 rounded-lg border border-white/8 bg-white/[0.012] p-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-[11px] text-white/85">{r.name}</span>
-              <Pill tone={r.stateTone}>{r.state}</Pill>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
+          <li key={r.name} className="flex items-center justify-between gap-2 px-2.5 py-1">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-mono text-[11px] text-white/85">{r.name}</span>
+              <span className="font-mono text-[8.5px] uppercase tracking-wider text-white/30">{r.provider}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5">
               <Pill tone="muted">conf {r.confidence}</Pill>
-              <Pill tone="ok">{r.cost} cloud</Pill>
-              <Pill tone="muted">{r.provider}</Pill>
-            </div>
+              <Pill tone={r.stateTone}>{r.state}</Pill>
+            </span>
           </li>
         ))}
       </ul>
-      <span className="font-mono text-[8.5px] uppercase tracking-wider text-white/35">
-        no fabricated signals · confidence stays "—" until a real engine emits one · est cloud avoided {formatUsd(cost.estimatedCloudCostAvoidedUSD)}
-      </span>
+      <p className="border-t border-white/6 px-2.5 py-1.5 font-mono text-[8.5px] uppercase tracking-wider text-white/35">
+        no fabricated signals · confidence "—" until a real engine emits one · est cloud avoided {formatUsd(cost.estimatedCloudCostAvoidedUSD)}
+      </p>
     </Panel>
   );
 }
@@ -1103,18 +1100,20 @@ function BotCommandCenter({
   const live = telegram.live === "live-connected" || telegram.live === "live-ready";
   return (
     <Panel title="bot command center" icon={<Bot className="h-3.5 w-3.5" />} right={<Pill tone="muted">read-only</Pill>}>
-      <div className="flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.012] px-2.5 py-2">
+      <div className="flex items-center gap-2 border-b border-white/6 pb-1.5">
         <Dot live={live} label="telegram" />
         <Pill tone={live ? "ok" : "muted"}>{telegram.live}</Pill>
       </div>
-      <StatRow label="status" value={live ? "connected bot" : "simulator only"} tone={live ? "ok" : undefined} />
-      <StatRow label="runtime" value="local-first" />
-      <StatRow label="latency" value={adapters.connected > 0 ? "live" : "—"} />
-      <StatRow label="missions" value={missions} />
-      <StatRow label="approval queue" value={approvals} tone={approvals > 0 ? "warn" : undefined} />
-      <StatRow label="execution" value="disabled" tone="muted" />
-      <span className="flex items-center gap-1.5 font-mono text-[8.5px] uppercase tracking-wider text-white/35">
-        <ShieldCheck className="h-3 w-3" /> display-only mirror · moves nothing · no remote execution from this surface
+      <div className="flex flex-col divide-y divide-white/6">
+        <StatRow label="status" value={live ? "connected bot" : "simulator only"} tone={live ? "ok" : undefined} />
+        <StatRow label="runtime" value="local-first" />
+        <StatRow label="latency" value={adapters.connected > 0 ? "live" : "—"} />
+        <StatRow label="missions" value={missions} />
+        <StatRow label="approval queue" value={approvals} tone={approvals > 0 ? "warn" : undefined} />
+        <StatRow label="execution" value="disabled" tone="muted" />
+      </div>
+      <span className="flex items-center gap-1.5 border-t border-white/6 pt-1.5 font-mono text-[8.5px] uppercase tracking-wider text-white/35">
+        <ShieldCheck className="h-3 w-3" /> display-only mirror · moves nothing · no remote execution
       </span>
     </Panel>
   );
@@ -1141,15 +1140,16 @@ function Ticker({
 
   if (bits.length === 0) {
     return (
-      <div className="rounded-xl border border-white/8 bg-black/30 px-3 py-2 font-mono text-[10px] uppercase tracking-wider text-white/40">
-        ticker · feeds offline / adapter-ready · real crypto + headlines appear here when a feed is live
+      <div className="rounded border border-white/8 bg-black/30 px-2.5 py-1.5 font-mono text-[9.5px] uppercase tracking-wider text-white/40">
+        news tape · feeds offline / adapter-ready · real crypto + headlines appear here when a feed is live
       </div>
     );
   }
   const run = [...bits, ...bits];
   return (
-    <div className="overflow-hidden rounded-xl border border-white/8 bg-black/40">
-      <div className="mic-tape flex w-max items-center gap-6 whitespace-nowrap px-3 py-2 font-mono text-[11px] text-white/75">
+    <div className="flex items-center overflow-hidden rounded border border-white/8 bg-black/40">
+      <span className="shrink-0 border-r border-white/8 px-2 py-1.5 font-mono text-[8.5px] uppercase tracking-[0.2em] text-accent">tape</span>
+      <div className="mic-tape flex w-max items-center gap-6 whitespace-nowrap px-3 py-1.5 font-mono text-[10.5px] tabular-nums text-white/75">
         {run.map((b, i) => (
           <span key={i} className="inline-flex items-center gap-2">
             <span className="h-1 w-1 rounded-full bg-accent/70" />

@@ -495,6 +495,12 @@ export default function VoiceConsolePage() {
         {/* CENTER · Orb + command + deck + paste */}
         <div className="flex flex-col gap-4">
           <MicActiveBanner active={micActive} />
+          <VoiceDiagnostics
+            speech={speech}
+            micPermission={micPermission}
+            micActive={micActive}
+            parsed={parsed}
+          />
           <VoiceOrb
             status={orb}
             orbMode={orbMode}
@@ -946,6 +952,82 @@ function WakeModeToggle() {
 // ---------------------------------------------------------------------------
 // Safe Actions (right)
 // ---------------------------------------------------------------------------
+
+function VoiceDiagnostics({
+  speech,
+  micPermission,
+  micActive,
+  parsed
+}: {
+  speech: ReturnType<typeof useSpeech>;
+  micPermission: MicPermission;
+  micActive: boolean;
+  parsed: ParsedCommand | null;
+}) {
+  const rows: Array<{ k: string; v: string; ok: boolean | null }> = [
+    {
+      k: "mic permission",
+      v: micPermission,
+      ok: micPermission === "granted" ? true : micPermission === "denied" ? false : null
+    },
+    { k: "speech API available", v: speech.supported ? "yes" : "no", ok: speech.supported },
+    { k: "audio input active", v: micActive ? "yes" : "no", ok: micActive ? true : null },
+    { k: "transcript received", v: speech.transcript ? "yes" : "no", ok: speech.transcript ? true : null },
+    {
+      k: "parser result",
+      v: parsed ? (parsed.blocked ? "blocked" : "yes") : "no",
+      ok: parsed ? !parsed.blocked : null
+    }
+  ];
+  return (
+    <section className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
+          voice diagnostics
+        </span>
+        <span className="font-mono text-[8.5px] uppercase tracking-wider text-white/40">
+          live · no fake success
+        </span>
+      </div>
+      {!speech.supported && (
+        <p className="rounded-md border border-amber-400/25 bg-amber-500/[0.06] px-2 py-1.5 font-mono text-[10.5px] text-amber-200/90">
+          browser speech unavailable — text mode active
+        </p>
+      )}
+      {speech.error && (
+        <p className="rounded-md border border-rose-400/25 bg-rose-500/[0.06] px-2 py-1.5 font-mono text-[10px] text-rose-100/90">
+          {speech.error}
+        </p>
+      )}
+      <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+        {rows.map((r) => (
+          <li
+            key={r.k}
+            className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1"
+          >
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">{r.k}</span>
+            <span
+              className={
+                r.ok === true
+                  ? "font-mono text-[10.5px] text-emerald-300/90"
+                  : r.ok === false
+                    ? "font-mono text-[10.5px] text-rose-300/90"
+                    : "font-mono text-[10.5px] text-white/55"
+              }
+            >
+              {r.v}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {speech.transcript && (
+        <p className="font-mono text-[10px] text-white/55">
+          last transcript · <span className="text-white/80">{speech.transcript.slice(0, 80)}</span>
+        </p>
+      )}
+    </section>
+  );
+}
 
 function SafeActions({ parsed }: { parsed: ParsedCommand | null }) {
   return (

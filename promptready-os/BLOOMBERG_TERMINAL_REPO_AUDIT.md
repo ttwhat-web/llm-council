@@ -1,5 +1,11 @@
 # BLOOMBERG_TERMINAL_REPO_AUDIT
 
+## Decision (Sprint UX-FIX · Option 1)
+**NOT IMPORTED · NOT USED · ORIGINAL IMPLEMENTATION.** The Market Lab /
+Terminal Pro density and layout are our own work in the Operator.Center
+design language. No code, branding, trade dress, or assets from the repo
+below are present or used. This is the explicit, final position.
+
 ## Repo in question
 `https://github.com/bloomberg-terminal/bloomberg-terminal-free.git`
 
