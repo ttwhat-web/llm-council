@@ -88,3 +88,32 @@ export function saveCaptures(captures: VoiceCapture[]): void {
 export function makeCapture(text: string, via: VoiceCapture["via"]): VoiceCapture {
   return { id: rid("cap"), text, at: Date.now(), via };
 }
+
+// ---------------------------------------------------------------------------
+// Smart Paste Autopilot · per-device "auto-clean pastes" preference.
+//
+//   key → "promptready-os.voice.autoclean"  ("1" = on)
+//
+// When on, future pastes auto-apply cleanPaste — but the page still shows
+// the notice + Undo, never executes, and never auto-pastes elsewhere.
+// ---------------------------------------------------------------------------
+
+const AUTOCLEAN_KEY = "promptready-os.voice.autoclean";
+
+export function loadAutoClean(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(AUTOCLEAN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveAutoClean(on: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(AUTOCLEAN_KEY, on ? "1" : "0");
+  } catch {
+    // ignore quota
+  }
+}

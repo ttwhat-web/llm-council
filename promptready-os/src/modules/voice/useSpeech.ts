@@ -13,6 +13,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
+  /** 0..1 confidence. Often only populated on final results; may be 0. */
+  confidence?: number;
 }
 interface SpeechRecognitionResultLike {
   0: SpeechRecognitionAlternativeLike;
@@ -52,6 +54,12 @@ export interface UseSpeech {
   supported: boolean;
   listening: boolean;
   transcript: string;
+  /**
+   * Real recognition confidence (0..1) from the browser, or null when the
+   * engine does not report it. NEVER synthesised — the UI hides its
+   * confidence bar when this is null.
+   */
+  confidence: number | null;
   error: string | null;
   start(): void;
   stop(): void;
@@ -62,6 +70,7 @@ export function useSpeech(onFinal?: (text: string) => void): UseSpeech {
   const [supported] = useState<boolean>(() => getCtor() !== null);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [confidence, setConfidence] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const onFinalRef = useRef(onFinal);
@@ -78,6 +87,7 @@ export function useSpeech(onFinal?: (text: string) => void): UseSpeech {
 
   const reset = useCallback(() => {
     setTranscript("");
+    setConfidence(null);
     setError(null);
   }, []);
 
@@ -89,6 +99,7 @@ export function useSpeech(onFinal?: (text: string) => void): UseSpeech {
     }
     setError(null);
     setTranscript("");
+    setConfidence(null);
     const rec = new Ctor();
     rec.lang = "en-US";
     rec.continuous = false;
@@ -101,6 +112,11 @@ export function useSpeech(onFinal?: (text: string) => void): UseSpeech {
       }
       setTranscript(text.trim());
       const last = e.results[e.results.length - 1];
+      // Only surface a confidence the engine actually reported (> 0). Many
+      // browsers leave interim confidence at 0 — we treat that as "unknown"
+      // (null) rather than show a misleading empty bar.
+      const c = last?.[0]?.confidence;
+      setConfidence(typeof c === "number" && c > 0 ? Math.min(1, c) : null);
       if (last && last.isFinal) {
         const finalText = text.trim();
         if (finalText) onFinalRef.current?.(finalText);
@@ -131,7 +147,7 @@ export function useSpeech(onFinal?: (text: string) => void): UseSpeech {
     };
   }, []);
 
-  return { supported, listening, transcript, error, start, stop, reset };
+  return { supported, listening, transcript, confidence, error, start, stop, reset };
 }
 
 // ---------------------------------------------------------------------------

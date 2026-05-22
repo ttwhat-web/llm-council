@@ -19,24 +19,33 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import {
+  Activity,
   AlertTriangle,
   Brain,
   CheckCircle2,
   Clipboard,
+  Clock3,
   Copy,
+  Cpu,
+  FileText,
+  LayoutGrid,
   Lock,
   Mic,
   MicOff,
   Radio,
   Rocket,
+  RotateCcw,
   ScrollText,
+  Send,
   ShieldCheck,
   Sparkles,
   Trash2,
+  TrendingUp,
   Waves
 } from "lucide-react";
 
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
+import { AtlasOrb, type AtlasOrbMode } from "@/components/AtlasOrb";
 import { cleanPaste } from "@/services/pasteClean";
 import { useMissionStore } from "@/store/mission";
 import { useAtlasStore } from "@/store/atlas";
@@ -54,12 +63,53 @@ import {
   loadCaptures,
   saveCaptures,
   makeCapture,
+  loadAutoClean,
+  saveAutoClean,
   type VoiceTask,
   type VoiceCapture,
   type TaskStatus
 } from "./voiceTasks";
 
 type OrbStatus = "idle" | "listening" | "thinking" | "ready" | "blocked";
+
+// ---------------------------------------------------------------------------
+// Atlas presence modes (H · purely visual). The selectable "scene" combines
+// with live activity (listening / reasoning / blocked) to drive the orb.
+// ---------------------------------------------------------------------------
+
+type AtlasScene = "general" | "market" | "research" | "coding" | "replay" | "voice" | "risk";
+
+const ATLAS_SCENES: { id: AtlasScene; label: string; icon: typeof Activity }[] = [
+  { id: "general", label: "general", icon: Sparkles },
+  { id: "market", label: "market", icon: TrendingUp },
+  { id: "research", label: "research", icon: Brain },
+  { id: "coding", label: "coding", icon: Cpu },
+  { id: "replay", label: "replay", icon: RotateCcw },
+  { id: "voice", label: "voice", icon: Mic },
+  { id: "risk", label: "risk", icon: AlertTriangle }
+];
+
+/** Live status outranks the chosen scene so the orb always reflects reality. */
+function resolveOrbMode(status: OrbStatus, scene: AtlasScene): AtlasOrbMode {
+  if (status === "blocked") return "risk";
+  if (status === "listening") return "listening";
+  if (status === "thinking") return "reasoning";
+  if (status === "ready") return "mission";
+  // idle → reflect the chosen scene
+  return scene as AtlasOrbMode;
+}
+
+function readMarketAlertCount(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = window.localStorage.getItem("promptready-os.intel-terminal.alerts");
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    return 0;
+  }
+}
 
 export default function VoiceConsolePage() {
   const navigate = useNavigate();
@@ -94,11 +144,26 @@ export default function VoiceConsolePage() {
   const [orb, setOrb] = useState<OrbStatus>("idle");
   const [queueFilter, setQueueFilter] = useState<"all" | "approval">("all");
 
-  // paste cleaner
+  // H · Atlas presence scene (purely visual)
+  const [scene, setScene] = useState<AtlasScene>("voice");
+  const orbMode = resolveOrbMode(orb, scene);
+
+  // paste cleaner + Smart Paste Autopilot
   const [pasteIn, setPasteIn] = useState("");
   const [cleaned, setCleaned] = useState<string | null>(null);
   const [changes, setChanges] = useState<string[]>([]);
+  const [autoApplied, setAutoApplied] = useState(false);
+  const [preCleanText, setPreCleanText] = useState<string | null>(null);
+  const [autoClean, setAutoClean] = useState(false);
+  const [pasteEvents, setPasteEvents] = useState(0);
   const pasteRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    setAutoClean(loadAutoClean());
+  }, []);
+  const setAutoCleanPref = useCallback((on: boolean) => {
+    setAutoClean(on);
+    saveAutoClean(on);
+  }, []);
 
   // speech
   const onSpeechFinal = useCallback((text: string) => {
@@ -126,6 +191,25 @@ export default function VoiceConsolePage() {
     if (speech.listening) stopTalk();
     else startTalk();
   }, [speech.listening, startTalk, stopTalk]);
+
+  // Double-tap the orb to immediately submit the current command (a quick
+  // "commit" affordance). Single tap still toggles talk. This is purely a
+  // local convenience — it just calls the existing submit path.
+  const lastTapRef = useRef(0);
+  const onOrbActivate = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 320) {
+      lastTapRef.current = 0;
+      if (command.trim()) {
+        submitRef.current?.();
+        return;
+      }
+    }
+    lastTapRef.current = now;
+    toggleTalk();
+  }, [command, toggleTalk]);
+  // submit is defined below; keep a ref so the double-tap handler can reach it
+  const submitRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (micPermission === "denied") {
@@ -166,16 +250,61 @@ export default function VoiceConsolePage() {
     };
   }, [speech.supported, speech.listening, startTalk, stopTalk]);
 
-  // ---- run the paste cleaner ----
+  // ---- run the paste cleaner (manual button) ----
   const runClean = useCallback(
     (text?: string) => {
       const input = text ?? pasteIn;
       const r = cleanPaste(input);
       setCleaned(r.cleaned);
       setChanges(r.changes);
+      setAutoApplied(false);
+      setPreCleanText(null);
     },
     [pasteIn]
   );
+
+  // ---- C · Smart Paste Autopilot ----
+  // When the operator pastes, ALWAYS compute a clean preview ("Atlas cleaned
+  // paste"). If the autoclean preference is on we also apply it into the box
+  // (still reversible via Undo). We never execute and never paste elsewhere.
+  const onPasteCapture = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const pasted = e.clipboardData.getData("text");
+      if (!pasted) return;
+      setPasteEvents((n) => n + 1);
+      const r = cleanPaste(pasted);
+      setCleaned(r.cleaned);
+      setChanges(r.changes);
+      if (autoClean) {
+        // intercept the native paste and drop the cleaned text in instead
+        e.preventDefault();
+        setPreCleanText(pasted);
+        setPasteIn(r.cleaned);
+        setAutoApplied(true);
+      } else {
+        // let the raw paste land in the box; just show the preview + offer Accept
+        setPreCleanText(pasted);
+        setAutoApplied(false);
+      }
+    },
+    [autoClean]
+  );
+
+  // Accept the cleaned preview into the paste box (manual path).
+  const acceptCleaned = useCallback(() => {
+    if (cleaned == null) return;
+    setPreCleanText(pasteIn);
+    setPasteIn(cleaned);
+    setAutoApplied(true);
+  }, [cleaned, pasteIn]);
+
+  // Undo restores the exact pre-clean text.
+  const undoClean = useCallback(() => {
+    if (preCleanText == null) return;
+    setPasteIn(preCleanText);
+    setPreCleanText(null);
+    setAutoApplied(false);
+  }, [preCleanText]);
 
   // ---- submit a command (the only entry point) ----
   const submit = useCallback(
@@ -248,6 +377,7 @@ export default function VoiceConsolePage() {
     },
     [command, commit, commitCaptures, history, navigate, runClean]
   );
+  submitRef.current = () => submit();
 
   // ---- task actions (all local) ----
   const setStatus = (id: string, status: TaskStatus) =>
@@ -288,6 +418,57 @@ export default function VoiceConsolePage() {
   const visibleTasks =
     queueFilter === "approval" ? tasks.filter((t) => t.actionType === "approval") : tasks;
 
+  // recent commands chips · de-duplicated, most recent first (real captures)
+  const recentCommands = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of captures) {
+      const v = c.text.trim();
+      if (!v || seen.has(v.toLowerCase())) continue;
+      seen.add(v.toLowerCase());
+      out.push(v);
+      if (out.length >= 6) break;
+    }
+    return out;
+  }, [captures]);
+
+  // Deck stats — all real local sources; "—" where there is no honest source.
+  const marketAlerts = readMarketAlertCount();
+  const deck = useMemo<DeckStat[]>(() => {
+    const pending = tasks.filter((t) => t.status === "pending").length;
+    const latestReceipt = history[0] ?? null;
+    return [
+      { key: "tasks", label: "tasks", value: String(tasks.length), icon: ScrollText, hint: "queued" },
+      { key: "pending", label: "pending", value: String(pending), icon: Clock3, hint: "awaiting" },
+      { key: "missions", label: "recent missions", value: String(history.length), icon: Rocket, hint: history[0]?.id ?? "none" },
+      {
+        key: "receipts",
+        label: "receipts",
+        value: String(history.length),
+        icon: ShieldCheck,
+        hint: latestReceipt ? latestReceipt.id : "none"
+      },
+      { key: "clipboard", label: "clipboard events", value: "—", icon: Clipboard, hint: "untracked" },
+      { key: "paste", label: "paste events", value: String(pasteEvents), icon: FileText, hint: "this session" },
+      {
+        key: "market",
+        label: "market alerts",
+        value: marketAlerts > 0 ? String(marketAlerts) : "—",
+        icon: TrendingUp,
+        hint: "intel terminal"
+      },
+      {
+        key: "telegram",
+        label: "telegram activity",
+        value: tg.live === "live-connected" ? "live" : tg.live === "live-ready" ? "ready" : tg.live === "error" ? "error" : "—",
+        icon: Send,
+        hint: tg.live === "simulator" ? "simulator" : tg.source
+      },
+      { key: "voice", label: "voice activity", value: String(captures.length), icon: Mic, hint: "captures" },
+      { key: "memory", label: "atlas memory", value: String(memoryDocs.length), icon: Brain, hint: "notes" }
+    ];
+  }, [tasks, history, pasteEvents, marketAlerts, tg.live, tg.source, captures.length, memoryDocs.length]);
+
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-5 py-5 md:px-7 md:py-7">
       <SurfaceHeader
@@ -311,28 +492,45 @@ export default function VoiceConsolePage() {
           captures={captures}
         />
 
-        {/* CENTER · Orb + command + paste */}
+        {/* CENTER · Orb + command + deck + paste */}
         <div className="flex flex-col gap-4">
           <MicActiveBanner active={micActive} />
           <VoiceOrb
             status={orb}
+            orbMode={orbMode}
+            scene={scene}
+            onScene={setScene}
             speech={speech}
             micPermission={micPermission}
             waveform={waveform}
             command={command}
+            recentCommands={recentCommands}
             onCommand={setCommand}
             onSubmit={() => submit()}
             onToggleTalk={toggleTalk}
+            onOrbActivate={onOrbActivate}
             onMicDown={startTalk}
             onMicUp={stopTalk}
           />
+          <CommandDeck stats={deck} />
           <TestConsole />
           <PasteIntelligence
             value={pasteIn}
-            onChange={setPasteIn}
+            onChange={(v) => {
+              setPasteIn(v);
+              // typing/clearing invalidates a stale undo target
+              if (preCleanText != null) setPreCleanText(null);
+            }}
             onClean={() => runClean()}
             cleaned={cleaned}
             changes={changes}
+            autoApplied={autoApplied}
+            canUndo={preCleanText != null}
+            autoClean={autoClean}
+            onAutoClean={setAutoCleanPref}
+            onPasteCapture={onPasteCapture}
+            onAccept={acceptCleaned}
+            onUndo={undoClean}
             onCopy={copyCleaned}
             onSave={saveCleaned}
             onMission={missionFromCleaned}
@@ -368,71 +566,94 @@ export default function VoiceConsolePage() {
 
 function VoiceOrb({
   status,
+  orbMode,
+  scene,
+  onScene,
   speech,
   micPermission,
   waveform,
   command,
+  recentCommands,
   onCommand,
   onSubmit,
   onToggleTalk,
+  onOrbActivate,
   onMicDown,
   onMicUp
 }: {
   status: OrbStatus;
+  orbMode: AtlasOrbMode;
+  scene: AtlasScene;
+  onScene: (s: AtlasScene) => void;
   speech: ReturnType<typeof useSpeech>;
   micPermission: MicPermission;
   waveform: ReturnType<typeof useWaveform>;
   command: string;
+  recentCommands: string[];
   onCommand: (v: string) => void;
   onSubmit: () => void;
   onToggleTalk: () => void;
+  onOrbActivate: () => void;
   onMicDown: () => void;
   onMicUp: () => void;
 }) {
-  const tone = orbTone(status);
   const denied = micPermission === "denied";
   const blocked = status === "blocked" || denied;
+  const capturing = waveform.capturing || speech.listening;
   return (
     <section className="flex flex-col items-center gap-4 rounded-3xl border border-white/10 bg-gradient-to-b from-black via-zinc-950 to-black p-6 text-white">
-      {/* Orb — click to toggle talk */}
+      {/* H · Atlas presence scene selector — purely visual */}
+      <AtlasModesSelector scene={scene} onScene={onScene} />
+
+      {/* Orb — single tap toggles talk · double-tap commits the command */}
       <button
         type="button"
-        onClick={blocked ? undefined : onToggleTalk}
+        onClick={blocked ? undefined : onOrbActivate}
         disabled={blocked || !speech.supported}
         title={
           denied
             ? "Microphone permission denied"
             : speech.supported
             ? speech.listening
-              ? "Click to stop"
-              : "Click to talk"
+              ? "Tap to stop · double-tap to command"
+              : "Tap to talk · double-tap to command"
             : "Speech API unavailable"
         }
-        className="relative flex h-44 w-44 items-center justify-center rounded-full focus:outline-none disabled:cursor-not-allowed"
+        className="relative flex h-48 w-48 items-center justify-center rounded-full focus:outline-none disabled:cursor-not-allowed"
       >
-        {/* halo rings */}
-        <span
-          className={clsx(
-            "absolute inset-0 rounded-full border",
-            status === "listening" ? "animate-ping border-accent/40" : "border-white/5"
-          )}
-        />
-        <span className={clsx("absolute inset-3 rounded-full border", tone.ring)} />
-        <div
-          className={clsx(
-            "flex h-32 w-32 flex-col items-center justify-center rounded-full border text-center transition",
-            tone.core
-          )}
-        >
-          {/* REAL waveform while capturing, else a static idle ring */}
-          <WaveformView samples={waveform.samples} active={waveform.capturing} tone={tone.icon} />
-          <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-white/55">
-            {status}
+        {/* listening halo + wave ring + sound ripple — ONLY while capturing */}
+        {capturing && (
+          <>
+            <span className="atlas-listen-halo pointer-events-none absolute inset-0 rounded-full border border-emerald-400/40" aria-hidden />
+            <span className="atlas-wave-ring pointer-events-none absolute inset-2 rounded-full border border-emerald-300/30" aria-hidden />
+            <span className="atlas-sound-ripple pointer-events-none absolute inset-6 rounded-full border border-emerald-300/20" aria-hidden />
+            <style>{`
+              .atlas-listen-halo { animation: atlasHalo 1.8s ease-out infinite; }
+              .atlas-wave-ring { animation: atlasHalo 1.8s ease-out infinite; animation-delay: 0.45s; }
+              .atlas-sound-ripple { animation: atlasHalo 1.8s ease-out infinite; animation-delay: 0.9s; }
+              @keyframes atlasHalo {
+                0% { transform: scale(0.86); opacity: 0.85; }
+                100% { transform: scale(1.18); opacity: 0; }
+              }
+              @media (prefers-reduced-motion: reduce) {
+                .atlas-listen-halo, .atlas-wave-ring, .atlas-sound-ripple { animation: none !important; opacity: 0.4; }
+              }
+            `}</style>
+          </>
+        )}
+        <AtlasOrb mode={orbMode} size={184} />
+        {/* REAL waveform overlay while capturing (honest analyser data) */}
+        {capturing && (
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <WaveformView samples={waveform.samples} active={waveform.capturing} tone="text-emerald-300" />
           </span>
-        </div>
+        )}
+        <span className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 font-mono text-[9px] uppercase tracking-[0.24em] text-white/55">
+          {status}
+        </span>
       </button>
 
-      <div className="flex flex-col items-center gap-0.5">
+      <div className="flex flex-col items-center gap-0.5 pt-3">
         <span className="text-[13px] font-semibold">Atlas</span>
         <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/40">
           {speech.supported ? "browser speech API" : "browser speech API unavailable · use text"}
@@ -450,13 +671,20 @@ function VoiceOrb({
             microphone blocked · enable it in the browser/site settings to talk · text still works
           </span>
         )}
+        {/* Atlas heard: … — the last real transcript */}
         {speech.transcript && (
-          <span className="mt-1 max-w-[40ch] text-center text-[11px] text-accent/90">“{speech.transcript}”</span>
+          <span className="mt-1 max-w-[44ch] text-center text-[11.5px] text-accent/90">
+            <span className="font-mono text-[8.5px] uppercase tracking-[0.2em] text-white/45">atlas heard · </span>
+            “{speech.transcript}”
+          </span>
         )}
         {(speech.error || waveform.error) && (
           <span className="mt-0.5 text-[10px] text-rose-300">{speech.error ?? waveform.error}</span>
         )}
       </div>
+
+      {/* mic confidence bar — REAL value only · hidden when unknown */}
+      <ConfidenceBar confidence={speech.confidence} />
 
       {/* push-to-talk (hold) — also works via mouse/touch hold */}
       <button
@@ -470,7 +698,7 @@ function VoiceOrb({
         className={clsx(
           "inline-flex items-center gap-2 rounded-full border px-4 py-2 font-mono text-[10px] uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-40",
           speech.listening
-            ? "border-accent/50 bg-accent/[0.12] text-accent shadow-glow"
+            ? "border-emerald-400/50 bg-emerald-500/[0.12] text-emerald-200 shadow-glow"
             : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
         )}
         title={speech.supported ? "Hold to talk" : "Speech API unavailable"}
@@ -479,16 +707,39 @@ function VoiceOrb({
         {speech.listening ? "listening · release to send" : "hold to talk"}
       </button>
 
-      {/* dual hints + wake-sound (planned/locked) */}
+      {/* affordance hints + wake mode (planned/locked) */}
       <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <span className="rounded border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/45">
+          tap orb to talk
+        </span>
         <span className="rounded border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/45">
           hold Space to talk
         </span>
         <span className="rounded border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/45">
-          click orb to toggle
+          double-tap to command
         </span>
-        <WakeSoundToggle />
+        <WakeModeToggle />
       </div>
+
+      {/* recent commands chip row (real captures) */}
+      {recentCommands.length > 0 && (
+        <div className="flex w-full max-w-[640px] flex-col gap-1">
+          <span className="font-mono text-[8.5px] uppercase tracking-[0.2em] text-white/40">recent commands</span>
+          <div className="flex flex-wrap gap-1">
+            {recentCommands.map((c, i) => (
+              <button
+                key={`${c}-${i}`}
+                type="button"
+                onClick={() => onCommand(c)}
+                title={c}
+                className="max-w-[220px] truncate rounded border border-white/8 bg-white/[0.02] px-2 py-0.5 font-mono text-[9px] tracking-wider text-white/55 hover:bg-white/[0.06]"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* text command box (always works) */}
       <div className="flex w-full max-w-[640px] flex-col gap-2">
@@ -527,7 +778,92 @@ function VoiceOrb({
           ))}
         </div>
       </div>
+
+      {/* voice-history ribbon — most recent transcribed/typed commands */}
+      <VoiceHistoryRibbon recent={recentCommands} onPick={onCommand} />
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// H · Atlas modes selector — drives the orb mode + label (purely visual)
+// ---------------------------------------------------------------------------
+
+function AtlasModesSelector({ scene, onScene }: { scene: AtlasScene; onScene: (s: AtlasScene) => void }) {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1">
+      <span className="mr-1 font-mono text-[8.5px] uppercase tracking-[0.22em] text-white/40">atlas mode</span>
+      {ATLAS_SCENES.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onScene(id)}
+          title={`Atlas presence · ${label} (visual only)`}
+          className={clsx(
+            "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition",
+            id === scene
+              ? id === "risk"
+                ? "border-amber-400/40 bg-amber-500/[0.1] text-amber-200"
+                : "border-accent/40 bg-accent/[0.08] text-accent"
+              : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.06]"
+          )}
+        >
+          <Icon className="h-3 w-3" />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mic confidence bar — REAL SpeechRecognition confidence ONLY · hidden when
+// the engine does not report it (never a fabricated value).
+// ---------------------------------------------------------------------------
+
+function ConfidenceBar({ confidence }: { confidence: number | null }) {
+  if (confidence == null) return null;
+  const pct = Math.round(confidence * 100);
+  const tone = pct >= 75 ? "bg-emerald-400" : pct >= 45 ? "bg-accent" : "bg-amber-400";
+  return (
+    <div className="flex w-full max-w-[280px] flex-col gap-1">
+      <div className="flex items-center justify-between font-mono text-[8.5px] uppercase tracking-[0.2em] text-white/45">
+        <span>recognition confidence</span>
+        <span>{pct}%</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full border border-white/10 bg-white/[0.04]">
+        <div className={clsx("h-full rounded-full transition-all", tone)} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Voice-history ribbon — a horizontal scroll of recent commands (captures).
+// ---------------------------------------------------------------------------
+
+function VoiceHistoryRibbon({ recent, onPick }: { recent: string[]; onPick: (v: string) => void }) {
+  if (recent.length === 0) return null;
+  return (
+    <div className="flex w-full max-w-[640px] flex-col gap-1">
+      <span className="flex items-center gap-1 font-mono text-[8.5px] uppercase tracking-[0.2em] text-white/40">
+        <Activity className="h-3 w-3 text-accent" /> voice history
+      </span>
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        {recent.map((c, i) => (
+          <button
+            key={`${c}-${i}`}
+            type="button"
+            onClick={() => onPick(c)}
+            title={c}
+            className="shrink-0 rounded-full border border-white/8 bg-white/[0.015] px-2.5 py-1 text-[10.5px] text-white/70 hover:bg-white/[0.06]"
+          >
+            <span className="mr-1 font-mono text-[8px] text-white/30">{i + 1}</span>
+            <span className="inline-block max-w-[160px] truncate align-middle">{c}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -591,18 +927,18 @@ function WaveformView({ samples, active, tone }: { samples: number[]; active: bo
 // Wake-sound (clap/tap) — PLANNED · LOCKED · off by default · non-functional
 // ---------------------------------------------------------------------------
 
-function WakeSoundToggle() {
+function WakeModeToggle() {
   return (
     <button
       type="button"
       disabled
       aria-disabled
-      title="Planned. Local-only when shipped. Off by default. No always-on audio monitoring exists today."
+      title="Planned. Local-only when shipped. Off by default. No always-on / background listening exists today — the mic is active only while held or toggled."
       className="inline-flex cursor-not-allowed items-center gap-1.5 rounded border border-amber-400/25 bg-amber-500/[0.05] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200/80 opacity-70"
     >
       <Lock className="h-3 w-3" />
       <Radio className="h-3 w-3" />
-      wake-sound · planned · local-only when shipped · off by default
+      wake mode · planned · local-only when shipped · off by default
     </button>
   );
 }
@@ -755,6 +1091,13 @@ function PasteIntelligence({
   onClean,
   cleaned,
   changes,
+  autoApplied,
+  canUndo,
+  autoClean,
+  onAutoClean,
+  onPasteCapture,
+  onAccept,
+  onUndo,
   onCopy,
   onSave,
   onMission,
@@ -766,31 +1109,92 @@ function PasteIntelligence({
   onClean: () => void;
   cleaned: string | null;
   changes: string[];
+  autoApplied: boolean;
+  canUndo: boolean;
+  autoClean: boolean;
+  onAutoClean: (on: boolean) => void;
+  onPasteCapture: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+  onAccept: () => void;
+  onUndo: () => void;
   onCopy: () => void;
   onSave: () => void;
   onMission: () => void;
   missionBusy: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
 }) {
+  const showNotice = cleaned != null;
+  const realChanges = changes.filter((c) => !/^no artifacts found/.test(c));
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-white">
       <header className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Clipboard className="h-4 w-4 text-accent" />
           <span className="text-[13px] font-semibold">Paste Intelligence</span>
+          <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">autopilot</span>
         </div>
         <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
           does not change meaning · no execution
         </span>
       </header>
+
+      {/* Remember-for-coding control · persists the autoclean preference */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.012] px-3 py-2">
+        <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+          remember for coding? auto-clean future pastes
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onAutoClean(true)}
+            className={clsx(
+              "rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider transition",
+              autoClean ? "border-emerald-400/40 bg-emerald-500/[0.1] text-emerald-200" : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.06]"
+            )}
+          >
+            yes
+          </button>
+          <button
+            type="button"
+            onClick={() => onAutoClean(false)}
+            className={clsx(
+              "rounded border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider transition",
+              !autoClean ? "border-accent/40 bg-accent/[0.08] text-accent" : "border-white/10 bg-white/[0.03] text-white/55 hover:bg-white/[0.06]"
+            )}
+          >
+            no
+          </button>
+        </div>
+      </div>
+
       <textarea
         ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onPaste={onPasteCapture}
         rows={4}
-        placeholder="Paste text or code copied from an AI tool / terminal…"
+        placeholder="Paste text or code copied from an AI tool / terminal… Atlas auto-cleans the preview."
         className="min-h-[90px] resize-y rounded-xl border border-white/10 bg-black/40 px-3 py-2 font-mono text-[12px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
       />
+
+      {/* Atlas cleaned-paste notice + Accept/Undo */}
+      {showNotice && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/25 bg-accent/[0.06] px-3 py-2">
+          <span className="flex items-center gap-1.5 text-[11px] text-accent/90">
+            <Sparkles className="h-3.5 w-3.5" />
+            Atlas cleaned paste{autoApplied ? " · applied" : " · preview"}
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
+              · {realChanges.length} change(s)
+            </span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            {!autoApplied && (
+              <Btn icon={CheckCircle2} label="accept" onClick={onAccept} accent />
+            )}
+            <Btn icon={RotateCcw} label="undo" onClick={onUndo} disabled={!canUndo} />
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <Btn icon={Sparkles} label="clean" onClick={onClean} accent />
         <Btn icon={Copy} label="copy cleaned" onClick={onCopy} disabled={cleaned == null} />
@@ -802,23 +1206,128 @@ function PasteIntelligence({
           disabled={cleaned == null || missionBusy}
         />
       </div>
+
       {cleaned != null && (
         <div className="flex flex-col gap-2">
+          {/* removed artifacts highlighted from changes[] */}
           <div className="flex flex-wrap gap-1">
-            {changes.map((c, i) => (
-              <span
-                key={i}
-                className="rounded border border-white/8 bg-white/[0.02] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55"
-              >
-                {c}
+            {realChanges.length === 0 ? (
+              <span className="rounded border border-white/8 bg-white/[0.02] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/45">
+                already clean · no artifacts
               </span>
-            ))}
+            ) : (
+              realChanges.map((c, i) => (
+                <span
+                  key={i}
+                  className="rounded border border-amber-400/25 bg-amber-500/[0.06] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200/85"
+                >
+                  {c}
+                </span>
+              ))
+            )}
           </div>
-          <pre className="max-h-[180px] overflow-auto rounded-xl border border-white/10 bg-black/50 p-3 font-mono text-[11.5px] text-white/85">
-            {cleaned || "(empty)"}
-          </pre>
+          {/* before → after preview diff (simple line list) */}
+          <PasteDiff before={value} after={cleaned} />
         </div>
       )}
+    </section>
+  );
+}
+
+// A lightweight before→after line list. Lines present in `before` but not in
+// `after` are flagged as removed; the rest of `after` is shown as the result.
+function PasteDiff({ before, after }: { before: string; after: string }) {
+  const afterLines = after.split("\n");
+  const afterSet = new Set(afterLines.map((l) => l.trimEnd()));
+  const removed = before
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .filter((l) => l !== "" && !afterSet.has(l))
+    .slice(0, 12);
+  return (
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-[8.5px] uppercase tracking-[0.2em] text-white/40">removed / changed</span>
+        {removed.length === 0 ? (
+          <span className="rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 font-mono text-[10px] text-white/40">
+            nothing removed
+          </span>
+        ) : (
+          <ul className="flex max-h-[160px] flex-col gap-0.5 overflow-auto">
+            {removed.map((l, i) => (
+              <li
+                key={i}
+                className="truncate rounded-md border border-rose-400/20 bg-rose-500/[0.05] px-2 py-0.5 font-mono text-[10.5px] text-rose-200/80 line-through"
+                title={l}
+              >
+                {l}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-[8.5px] uppercase tracking-[0.2em] text-white/40">after</span>
+        <pre className="max-h-[160px] overflow-auto rounded-xl border border-white/10 bg-black/50 p-3 font-mono text-[11px] text-white/85">
+          {after || "(empty)"}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// D · Atlas Command Deck — READ-ONLY Jarvis grid from real local state.
+// ---------------------------------------------------------------------------
+
+interface DeckStat {
+  key: string;
+  label: string;
+  value: string;
+  icon: typeof Activity;
+  hint?: string;
+}
+
+function CommandDeck({ stats }: { stats: DeckStat[] }) {
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-white">
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <LayoutGrid className="h-4 w-4 text-accent" />
+          <span className="text-[13px] font-semibold">Atlas Command Deck</span>
+        </div>
+        <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
+          read-only · real local state · no fake numbers
+        </span>
+      </header>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {stats.map((s) => {
+          const Icon = s.icon;
+          const dim = s.value === "—";
+          return (
+            <li
+              key={s.key}
+              className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/[0.015] p-2.5"
+            >
+              <span className="flex items-center gap-1.5 font-mono text-[8.5px] uppercase tracking-[0.16em] text-white/45">
+                <Icon className="h-3 w-3 text-accent" />
+                {s.label}
+              </span>
+              <span className={clsx("font-mono text-[18px] tabular-nums", dim ? "text-white/30" : "text-white")}>
+                {s.value}
+              </span>
+              {s.hint && (
+                <span className="truncate font-mono text-[8.5px] uppercase tracking-wider text-white/35" title={s.hint}>
+                  {s.hint}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="rounded-lg border border-white/8 bg-white/[0.012] p-2 font-mono text-[9px] uppercase tracking-wider text-white/40">
+        display only · "—" where there is no honest local source · nothing here executes
+      </p>
     </section>
   );
 }
@@ -1089,37 +1598,3 @@ function tgLabel(live: string): string {
   }
 }
 
-function orbTone(status: OrbStatus): { ring: string; core: string; icon: string } {
-  switch (status) {
-    case "listening":
-      return {
-        ring: "border-accent/40",
-        core: "border-accent/50 bg-accent/[0.1] shadow-glow",
-        icon: "text-accent"
-      };
-    case "thinking":
-      return {
-        ring: "border-sky-400/30",
-        core: "border-sky-400/40 bg-sky-500/[0.08]",
-        icon: "text-sky-300"
-      };
-    case "ready":
-      return {
-        ring: "border-emerald-400/30",
-        core: "border-emerald-400/40 bg-emerald-500/[0.08]",
-        icon: "text-emerald-300"
-      };
-    case "blocked":
-      return {
-        ring: "border-amber-400/30",
-        core: "border-amber-400/40 bg-amber-500/[0.08]",
-        icon: "text-amber-300"
-      };
-    default:
-      return {
-        ring: "border-white/10",
-        core: "border-white/10 bg-white/[0.03]",
-        icon: "text-white/60"
-      };
-  }
-}
