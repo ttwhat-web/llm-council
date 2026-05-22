@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { KbdHint } from "@/components/primitives/KbdHint";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { MediaDock } from "@/components/MediaDock";
 import { useUiModeStore } from "@/store/uiMode";
 
 /**
@@ -181,6 +182,9 @@ export function ShellLayout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Floating media dock · user-selected media only */}
+      <MediaDock />
     </div>
   );
 }

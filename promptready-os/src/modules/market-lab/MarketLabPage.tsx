@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
+import { PlanBadge } from "@/components/PlanBadge";
 import { useCryptoFeed } from "@/services/marketFeed";
 import {
   formatPrice,
@@ -113,9 +114,7 @@ const NEWS_CHIPS: Array<{ label: string; cat: NewsCategory | null }> = [
   { label: "business", cat: "Business" },
   { label: "economy", cat: null },
   { label: "politics", cat: null },
-  { label: "earnings", cat: null },
-  { label: "travel", cat: null },
-  { label: "export", cat: null }
+  { label: "earnings", cat: null }
 ];
 
 // ---------------------------------------------------------------------------
@@ -266,6 +265,7 @@ export default function MarketLabPage() {
         sub="Quant-desk cockpit. Crypto + news are live; every other instrument, map and prediction is an honest adapter-ready seam — never a fabricated number."
         right={
           <div className="flex items-center gap-2">
+            <PlanBadge tier="desk" />
             <button
               type="button"
               onClick={() => setTvMode(true)}
@@ -915,7 +915,7 @@ function NewsRoom({
       </div>
 
       {state === "adapter" ? (
-        <AdapterReady what="this category · needs provider" detail="Hacker News / NewsAPI cover AI, Markets, Crypto, Tech and Business. Breaking / economy / politics / earnings / travel / export need a dedicated wire — wired later via the runtime. No headlines fabricated." />
+        <AdapterReady what="this category · needs provider" detail="Hacker News / NewsAPI cover AI, Markets, Crypto, Tech and Business. Breaking / economy / politics / earnings need a dedicated wire — wired later via the runtime. No headlines fabricated." />
       ) : state === "error" ? (
         <div className="rounded-xl border border-rose-400/25 bg-rose-500/[0.06] p-4">
           <p className="font-mono text-[12px] uppercase tracking-wider text-rose-200">news wire offline</p>

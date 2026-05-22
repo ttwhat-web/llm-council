@@ -11,7 +11,7 @@ import type { AdapterModule } from "@/services/adapters";
  * Morning Operator Brief · honest-by-design bulletin.
  *
  * The desktop runtime will wire in external feeds (AI/markets/crypto/
- * travel/tech news). None of those adapters are live yet, so every
+ * economy/tech news). None of those adapters are live yet, so every
  * external row reports a real source state — "planned" or "adapter
  * ready" — and NEVER a fabricated headline or number.
  *
@@ -125,8 +125,7 @@ export function OperatorBulletinCard() {
     adapterRow("AI", "ai-news"),
     adapterRow("Markets", "markets"),
     adapterRow("Crypto", "crypto"),
-    plannedRow("Travel"),
-    adapterRow("Export", "export-ops"),
+    plannedRow("Economy"),
     plannedRow("Tech"),
     {
       section: "Operator",
@@ -165,7 +164,7 @@ export function OperatorBulletinCard() {
       </header>
 
       <p className="text-[11px] text-white/55">
-        External feeds (AI, markets, crypto, travel, tech) wire in with the desktop
+        External feeds (AI, markets, crypto, economy, tech) wire in with the desktop
         runtime — they are offline today, so each row reports its real source state
         and never invents a headline. Operator metrics below are live local counts.
       </p>

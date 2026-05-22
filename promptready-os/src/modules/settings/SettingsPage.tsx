@@ -60,6 +60,8 @@ import { ProviderDiagnostics } from "@/components/ProviderDiagnostics";
 import { ConnectorKeysCard } from "@/components/ConnectorKeysCard";
 import { OllamaSetupCard } from "@/components/OllamaSetupCard";
 import { ButtonAuditCard } from "@/components/ButtonAuditCard";
+import { PlansCard } from "@/components/PlansCard";
+import { PlanBadge } from "@/components/PlanBadge";
 import { FounderBetaCard } from "@/components/FounderBetaCard";
 import { FieldTestModeCard } from "@/components/FieldTestModeCard";
 import {
@@ -174,10 +176,11 @@ export default function SettingsPage() {
         <OperatorIdCard />
       </Foldable>
 
-      <SettingsSection letter="S" label="System" hint="Runtime · Policies · Remote" />
+      <SettingsSection letter="S" label="System" hint="Plans · Runtime · Policies" />
+      <PlansCard />
       <SetupWizard />
       <RuntimeBus />
-      <Foldable title="Operator Mode" hint="solo · team · agency · enterprise" persistKey="operator-mode">
+      <Foldable title="Operator Mode" hint="solo · team · agency · enterprise" persistKey="operator-mode" badge={<PlanBadge tier="elite" />}>
         <OperatorModeCard />
       </Foldable>
       <Foldable title="Release Center" hint="version · changelog" persistKey="release-center">
@@ -320,16 +323,16 @@ export default function SettingsPage() {
       <Foldable title="Packaging" hint="macOS · Windows · Linux" persistKey="packaging">
         <PackagingCard />
       </Foldable>
-      <Foldable title="Connector Hub" hint="planned" persistKey="connector-hub">
+      <Foldable title="Connector Hub" hint="planned" persistKey="connector-hub" badge={<PlanBadge tier="elite" />}>
         <ConnectorHubCard />
       </Foldable>
-      <Foldable title="Cloud Sync" hint="planned · opt-in" persistKey="cloud-sync">
+      <Foldable title="Cloud Sync" hint="planned · opt-in" persistKey="cloud-sync" badge={<PlanBadge tier="elite" />}>
         <CloudSyncCard />
       </Foldable>
       <Foldable title="Mobile Companion · roadmap" hint="planned" persistKey="mobile-roadmap">
         <MobileCompanionRoadmapCard />
       </Foldable>
-      <Foldable title="Enterprise Server" hint="planned" persistKey="enterprise-server">
+      <Foldable title="Enterprise Server" hint="planned" persistKey="enterprise-server" badge={<PlanBadge tier="elite" />}>
         <EnterpriseServerCard />
       </Foldable>
     </div>
