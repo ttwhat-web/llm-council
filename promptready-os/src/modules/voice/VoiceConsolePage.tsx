@@ -54,6 +54,17 @@ import { getTelegramBridgeStatus } from "@/services/telegramLive";
 
 import { parseCommand, COMMAND_HINTS, type ParsedCommand } from "./commandParser";
 import { useSpeech, useMicPermission, type MicPermission } from "./useSpeech";
+import { isTauri } from "@/services/runtimeBridge";
+
+/**
+ * Native speech bridge · planned (see SPEECH_BRIDGE_PLAN.md). Honest probe:
+ * a future macOS Speech-framework Tauri bridge sets this runtime flag. Until
+ * then it is undefined → "no · planned". Never faked.
+ */
+function nativeSpeechAvailable(): boolean {
+  if (typeof window === "undefined") return false;
+  return (window as unknown as { __OPERATOR_NATIVE_SPEECH__?: boolean }).__OPERATOR_NATIVE_SPEECH__ === true;
+}
 import { useWaveform } from "./useWaveform";
 import { TestConsole } from "./TestConsole";
 import {
@@ -964,13 +975,16 @@ function VoiceDiagnostics({
   micActive: boolean;
   parsed: ParsedCommand | null;
 }) {
+  const desktop = isTauri();
+  const nativeSpeech = nativeSpeechAvailable();
   const rows: Array<{ k: string; v: string; ok: boolean | null }> = [
     {
       k: "mic permission",
       v: micPermission,
       ok: micPermission === "granted" ? true : micPermission === "denied" ? false : null
     },
-    { k: "speech API available", v: speech.supported ? "yes" : "no", ok: speech.supported },
+    { k: "browser speech available", v: speech.supported ? "yes" : "no", ok: speech.supported },
+    { k: "native speech available", v: nativeSpeech ? "yes" : "no · planned", ok: nativeSpeech ? true : null },
     { k: "audio input active", v: micActive ? "yes" : "no", ok: micActive ? true : null },
     { k: "transcript received", v: speech.transcript ? "yes" : "no", ok: speech.transcript ? true : null },
     {
@@ -991,7 +1005,9 @@ function VoiceDiagnostics({
       </div>
       {!speech.supported && (
         <p className="rounded-md border border-amber-400/25 bg-amber-500/[0.06] px-2 py-1.5 font-mono text-[10.5px] text-amber-200/90">
-          browser speech unavailable — text mode active
+          {desktop && !nativeSpeech
+            ? "browser speech unavailable in desktop app; native bridge planned — text mode active"
+            : "browser speech unavailable — text mode active"}
         </p>
       )}
       {speech.error && (
