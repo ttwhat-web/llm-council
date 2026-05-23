@@ -1,6 +1,6 @@
 "use client";
 
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import {
   Activity,
@@ -22,6 +22,24 @@ import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { MediaDock } from "@/components/MediaDock";
 import { CommandPalette } from "@/components/CommandPalette";
 import { useUiModeStore } from "@/store/uiMode";
+import { useWorkspace, DEFAULT_HOME_PATHS, type NavId } from "@/store/workspace";
+import { useEffect, useRef } from "react";
+
+// Map nav route → workspace nav id, used to filter the rail.
+const NAV_ID_BY_PATH: Record<string, NavId> = {
+  "/": "atlas",
+  "/mission-control": "mission-control",
+  "/market-lab": "market-lab",
+  "/terminal": "terminal",
+  "/voice": "voice",
+  "/memory": "memory",
+  "/library": "library",
+  "/brain": "brain",
+  "/agents": "agents",
+  "/workflows": "workflows",
+  "/marketplace": "marketplace",
+  "/settings": "settings"
+};
 
 /**
  * Shell layout · Operator Core frame.
@@ -100,6 +118,21 @@ const GROUPS: NavGroup[] = [
 
 export function ShellLayout() {
   const secondScreen = useUiModeStore((s) => s.secondScreen);
+  const workspace = useWorkspace();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const homeRedirectedRef = useRef(false);
+
+  // One-time default-home redirect when the app first lands on "/".
+  useEffect(() => {
+    if (homeRedirectedRef.current) return;
+    homeRedirectedRef.current = true;
+    if (workspace.defaultHome !== "atlas" && location.pathname === "/") {
+      navigate(DEFAULT_HOME_PATHS[workspace.defaultHome], { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       {/* ---- left rail (hidden in Second Screen mode) ---- */}
@@ -122,7 +155,12 @@ export function ShellLayout() {
                 >
                   {group.letter}
                 </span>
-                {group.items.map(({ to, label, Icon }) => (
+                {group.items
+                  .filter(({ to }) => {
+                    const id = NAV_ID_BY_PATH[to];
+                    return !id || !workspace.hiddenNav.includes(id);
+                  })
+                  .map(({ to, label, Icon }) => (
                   <NavLink
                     key={to}
                     to={to}

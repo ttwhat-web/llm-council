@@ -51,6 +51,18 @@ Voice, Settings). Premium, calm, dark, information-dense.
 - Real = CoinGecko crypto, HN/NewsAPI news, local stores. Everything else = adapter-ready.
 - No fake data, no fake "connected"/"live", no hidden mic capture, no auto execution.
 
+## Button label taxonomy (Sprint FINAL-UX)
+Every visible button must clearly read as ONE of these — set the
+`title`/aria-label and use the matching style:
+- **WORKS** — performs a real local action (mission dispatch, save note, attach repo, copy, etc.). Default accent/neutral chip.
+- **COPY ONLY** — copies a command/link to clipboard; nothing else runs.
+- **OPEN EXTERNAL** — opens a browser tab (`window.open(_, "_blank", "noopener,noreferrer")`). Shows an external/arrow icon.
+- **REQUIRES KEY** — needs an env key / BYOK; muted with a "needs key" pill.
+- **REQUIRES DESKTOP** — needs the Tauri runtime (CORS / OAuth / Speech). Muted with "needs desktop" pill.
+- **DISABLED · planned** — future surface; clearly disabled, no tooltip lying about availability.
+
+No dead buttons. If an action has no path, the button should not exist.
+
 ## Anti-patterns (do not do)
 - SaaS marketing spacing inside the app · giant empty cards · centered prose ·
   soft pastel gradients · oversized icons/headings · low-information panels ·

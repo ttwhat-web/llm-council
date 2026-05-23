@@ -43,7 +43,8 @@ const CATEGORIES: Category[] = [
   { key: "invoices", label: "Invoices" },
   { key: "support", label: "Support" },
   { key: "urgent", label: "Urgent", urgent: true },
-  { key: "waiting-reply", label: "Waiting Reply" }
+  { key: "waiting-reply", label: "Waiting Reply" },
+  { key: "customers", label: "Customer messages" }
 ];
 
 const FLOW: { Icon: typeof Mail; label: string }[] = [

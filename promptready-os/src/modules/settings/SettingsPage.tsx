@@ -62,6 +62,7 @@ import { OllamaSetupCard } from "@/components/OllamaSetupCard";
 import { ButtonAuditCard } from "@/components/ButtonAuditCard";
 import { PlansCard } from "@/components/PlansCard";
 import { PlanBadge } from "@/components/PlanBadge";
+import { WorkspaceMenuCard } from "@/components/WorkspaceMenuCard";
 import { FounderBetaCard } from "@/components/FounderBetaCard";
 import { FieldTestModeCard } from "@/components/FieldTestModeCard";
 import {
@@ -176,8 +177,9 @@ export default function SettingsPage() {
         <OperatorIdCard />
       </Foldable>
 
-      <SettingsSection letter="S" label="System" hint="Plans · Runtime · Policies" />
+      <SettingsSection letter="S" label="System" hint="Plans · Workspace · Runtime" />
       <PlansCard />
+      <WorkspaceMenuCard />
       <SetupWizard />
       <RuntimeBus />
       <Foldable title="Operator Mode" hint="solo · team · agency · enterprise" persistKey="operator-mode" badge={<PlanBadge tier="elite" />}>
