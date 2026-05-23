@@ -306,7 +306,7 @@ export default function BrainPage() {
                       : "border-white/10 bg-white/[0.03] text-white/55"
                   )}
                 >
-                  {p.state === "manual" ? "manual" : "coming soon"}
+                  {p.state === "manual" ? "manual" : "planned"}
                 </span>
               </div>
               <p className="text-[11px] text-white/55">{p.blurb}</p>
