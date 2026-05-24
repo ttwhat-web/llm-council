@@ -99,3 +99,69 @@ export function formatMarketCap(n: number | null): string {
   if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
   return `$${n.toFixed(0)}`;
 }
+
+// ---------------------------------------------------------------------------
+// Historical price + volume (line + histogram for the chart wall)
+// ---------------------------------------------------------------------------
+
+export interface HistoryPoint {
+  t: number; // ms epoch
+  price: number;
+  volume: number;
+}
+
+export interface HistoryResult {
+  ok: boolean;
+  points: HistoryPoint[];
+  error?: string;
+  at: number;
+}
+
+/**
+ * Fetch historical price + volume series for one coin from CoinGecko's
+ * /coins/{id}/market_chart endpoint. Public, key-free, CORS-enabled.
+ *
+ * `days` is the lookback window (1 · 7 · 30 · 90 · 365 · "max"). CoinGecko
+ * picks the candle interval automatically: ~5-minute for 1d, hourly for
+ * <=30d, daily for longer.
+ *
+ * No fake fallback: on failure we return ok:false and surface the error.
+ */
+export async function fetchCoinHistory(
+  coinId: string,
+  days: number | "max" = 1
+): Promise<HistoryResult> {
+  const url =
+    `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coinId)}` +
+    `/market_chart?vs_currency=usd&days=${days}`;
+  const startedAt = Date.now();
+  try {
+    const r = await fetch(url, { headers: { accept: "application/json" } });
+    if (r.status === 429) throw new Error("rate limited (429) · try again shortly");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = (await r.json()) as {
+      prices?: Array<[number, number]>;
+      total_volumes?: Array<[number, number]>;
+    };
+    const prices = j.prices ?? [];
+    const volumes = j.total_volumes ?? [];
+    if (!prices.length) throw new Error("empty response");
+    const volMap = new Map<number, number>();
+    volumes.forEach(([t, v]) => volMap.set(t, v));
+    const points: HistoryPoint[] = prices.map(([t, p]) => ({
+      t,
+      price: p,
+      volume: volMap.get(t) ?? 0
+    }));
+    recordSuccess(COINGECKO_ADAPTER_ID, Date.now() - startedAt);
+    return { ok: true, points, at: Date.now() };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "fetch failed";
+    recordError(COINGECKO_ADAPTER_ID, msg);
+    return { ok: false, points: [], error: msg, at: Date.now() };
+  }
+}
+
+export function coinIdFromSymbol(symbol: string): string | null {
+  return COINS.find((c) => c.symbol === symbol)?.id ?? null;
+}

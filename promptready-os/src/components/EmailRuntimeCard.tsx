@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Bot,
   ChevronRight,
+  ExternalLink,
   Inbox,
   Mail,
   PenLine,
@@ -140,16 +141,54 @@ export function EmailRuntimeCard() {
       <p className="text-[11px] text-white/55">
         Not an inbox clone. It surfaces what needs operator action and routes
         mail into missions. No mailbox is connected — counts stay at zero until
-        an adapter wires in with the desktop runtime.
+        an adapter wires in with the desktop runtime. The opener buttons below
+        launch the official web app in your default browser — no scraping, no
+        passwords touched here.
       </p>
 
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="self-start rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider text-white/55 hover:bg-white/[0.06]"
-      >
-        {expanded ? "collapse" : "expand"}
-      </button>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() =>
+            typeof window !== "undefined" &&
+            window.open("https://mail.google.com", "_blank", "noopener,noreferrer")
+          }
+          title="Open Gmail in default browser · OPEN EXTERNAL · OAuth read API planned"
+          aria-label="Open Gmail · OPEN EXTERNAL"
+          className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/[0.1] px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider text-accent transition hover:bg-accent/[0.15]"
+        >
+          <ExternalLink className="h-3 w-3" /> open gmail
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            typeof window !== "undefined" &&
+            window.open(
+              "https://outlook.live.com/mail/",
+              "_blank",
+              "noopener,noreferrer"
+            )
+          }
+          title="Open Outlook in default browser · OPEN EXTERNAL · Microsoft Graph API planned"
+          aria-label="Open Outlook · OPEN EXTERNAL"
+          className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/[0.1] px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider text-accent transition hover:bg-accent/[0.15]"
+        >
+          <ExternalLink className="h-3 w-3" /> open outlook
+        </button>
+        <span
+          className="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-500/[0.06] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200"
+          title="OAuth credentials required to read mail"
+        >
+          oauth required
+        </span>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="ml-auto self-start rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider text-white/55 hover:bg-white/[0.06]"
+        >
+          {expanded ? "collapse" : "expand"}
+        </button>
+      </div>
 
       {expanded && (
         <>

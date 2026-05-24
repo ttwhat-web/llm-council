@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { MessagesSquare, Radio, Send } from "lucide-react";
+import { ExternalLink, MessageCircle, MessagesSquare, Radio, Send } from "lucide-react";
 import { statusForModule, statusMeta } from "@/services/adapters";
 import { getTelegramBridgeStatus, type TelegramLiveStatus } from "@/services/telegramLive";
 
@@ -138,7 +138,50 @@ export function CommunicationsRuntimeCard() {
       <p className="text-[11px] text-white/55">
         Five communication sources as an honest seam — not an inbox clone or chat
         client. Only the existing local Telegram bridge can be non-offline today.
+        The opener buttons below launch the official web app in your default
+        browser — no scraping, no passwords touched here.
       </p>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() =>
+            typeof window !== "undefined" &&
+            window.open(
+              "https://web.whatsapp.com",
+              "_blank",
+              "noopener,noreferrer"
+            )
+          }
+          title="Open WhatsApp Web · OPEN EXTERNAL · Twilio / Meta API planned"
+          aria-label="Open WhatsApp Web · OPEN EXTERNAL"
+          className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/[0.1] px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider text-accent transition hover:bg-accent/[0.15]"
+        >
+          <MessageCircle className="h-3 w-3" /> open whatsapp web
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            typeof window !== "undefined" &&
+            window.open(
+              "https://web.telegram.org",
+              "_blank",
+              "noopener,noreferrer"
+            )
+          }
+          title="Open Telegram Web · OPEN EXTERNAL · separate from bot bridge"
+          aria-label="Open Telegram Web · OPEN EXTERNAL"
+          className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/[0.1] px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider text-accent transition hover:bg-accent/[0.15]"
+        >
+          <ExternalLink className="h-3 w-3" /> open telegram web
+        </button>
+        <span
+          className="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-500/[0.06] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200"
+          title="WhatsApp Web sessions need a phone scan; web.telegram.org needs SMS / app code"
+        >
+          provider auth required
+        </span>
+      </div>
 
       {/* SOURCES */}
       <ul className="flex flex-col gap-2">

@@ -59,6 +59,7 @@ import {
 } from "@/services/providers/news";
 import { getSamples, type Sample } from "@/services/marketSamples";
 import { adapterSummary } from "@/services/adapters";
+import { PriceChartLW } from "@/components/market-lab/PriceChartLW";
 import { computeCostBoard, formatUsd } from "@/services/cost";
 import { getTelegramBridgeStatus } from "@/services/telegramLive";
 import { useMissionStore } from "@/store/mission";
@@ -614,18 +615,7 @@ function ChartWall({
                 {cryptoOnline ? formatChange(quote?.change24h ?? null) : "—"}
               </span>
             </div>
-            <BigChart samples={samples} up={up} fullscreen={fullscreen} />
-            <div className="flex items-center justify-between font-mono text-[9.5px] uppercase tracking-wider text-white/40">
-              <span>{samples.length} session samples · CoinGecko</span>
-              <span className={cryptoOnline ? "text-emerald-300/70" : "text-white/35"}>
-                {cryptoOnline ? "feed live" : "feed offline"}
-              </span>
-            </div>
-            {samples.length < 2 && (
-              <p className="rounded-lg border border-dashed border-white/10 bg-white/[0.01] px-3 py-2 text-center font-mono text-[10px] uppercase tracking-wider text-white/45">
-                collecting live samples · the last real price shows above
-              </p>
-            )}
+            <PriceChartLW symbol={selected} up={up} fullscreen={fullscreen} />
             {/* multi-chart stack · real crypto minis */}
             <div
               className={clsx(

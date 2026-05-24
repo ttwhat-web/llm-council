@@ -20,6 +20,7 @@ import {
 import { KbdHint } from "@/components/primitives/KbdHint";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { MediaDock } from "@/components/MediaDock";
+import { ConnectorDock } from "@/components/ConnectorDock";
 import { CommandPalette } from "@/components/CommandPalette";
 import { useUiModeStore } from "@/store/uiMode";
 import { useWorkspace, DEFAULT_HOME_PATHS, type NavId } from "@/store/workspace";
@@ -224,6 +225,10 @@ export function ShellLayout() {
 
       {/* Floating media dock · user-selected media only */}
       <MediaDock />
+
+      {/* Floating connector dock · external openers for Gmail · Outlook ·
+       *  WhatsApp · Telegram · custom URL. No scraping, no passwords. */}
+      <ConnectorDock />
 
       {/* Global command palette · Cmd/Ctrl+K */}
       <CommandPalette />
