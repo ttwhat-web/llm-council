@@ -58,6 +58,12 @@ import {
 import { getSamples, type Sample } from "@/services/marketSamples";
 import { adapterSummary, statusForModule } from "@/services/adapters";
 import { PriceChartLW } from "@/components/market-lab/PriceChartLW";
+import { CandlestickChart } from "@/components/market-lab/CandlestickChart";
+import { ComparisonChart } from "@/components/market-lab/ComparisonChart";
+import { OrderBookPanel } from "@/components/market-lab/OrderBookPanel";
+import { TimeAndSalesPanel } from "@/components/market-lab/TimeAndSalesPanel";
+import { DepthPanel } from "@/components/market-lab/DepthPanel";
+import { binancePairFor } from "@/services/providers/binance";
 import { computeCostBoard, formatUsd } from "@/services/cost";
 import { getTelegramBridgeStatus } from "@/services/telegramLive";
 import { useMissionStore } from "@/store/mission";
@@ -303,7 +309,7 @@ export default function MarketLabPage() {
           <div className="grid min-h-0 grid-cols-1 gap-1.5 lg:grid-cols-3">
             <BreadthPanel quotes={quotes} cryptoOnline={cryptoOnline} avgChange={avgChange} />
             <MacroFxPanel />
-            <OrderFlowStack />
+            <OrderFlowStack selected={selected} />
           </div>
         </main>
 
@@ -504,16 +510,21 @@ function MainChartPanel({
   selectedIsCrypto: boolean;
 }) {
   const up = (quote?.change24h ?? 0) >= 0;
+  const hasBinance = binancePairFor(selected) != null;
   return (
     <Panel
-      title={`main candlestick · ${selected}/USD`}
+      title={`main candlestick · ${selected}/${hasBinance ? "USDT" : "USD"}`}
       icon={<LineChart className="h-3.5 w-3.5" />}
-      right={<Pill tone={selectedIsCrypto ? "ok" : "muted"}>{selectedIsCrypto ? "line only · OHLC adapter-ready" : "no source"}</Pill>}
+      right={
+        <Pill tone={hasBinance ? "ok" : selectedIsCrypto ? "ok" : "muted"}>
+          {hasBinance ? "Binance OHLCV · real" : selectedIsCrypto ? "line only · OHLC adapter-ready" : "no source"}
+        </Pill>
+      }
       glow
     >
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col">
-          <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">last</span>
+          <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">last · coingecko</span>
           <span className="font-mono text-3xl font-semibold tabular-nums text-white">
             {selectedIsCrypto && cryptoOnline ? formatPrice(quote?.price ?? null) : "—"}
           </span>
@@ -522,7 +533,9 @@ function MainChartPanel({
           {selectedIsCrypto && cryptoOnline ? formatChange(quote?.change24h ?? null) : "—"}
         </span>
       </div>
-      {selectedIsCrypto ? (
+      {hasBinance ? (
+        <CandlestickChart symbol={selected} height={300} />
+      ) : selectedIsCrypto ? (
         <PriceChartLW symbol={selected} up={up} fullscreen />
       ) : (
         <AdapterReady what={`${selected} · no live chart source`} detail="Equities, FX and metals need a keyed market provider. No candles, last price or volume are fabricated." />
@@ -532,17 +545,11 @@ function MainChartPanel({
 }
 
 function ComparisonPanel({ quotes, cryptoOnline }: { quotes: CryptoQuote[]; cryptoOnline: boolean }) {
+  void quotes;
+  void cryptoOnline;
   return (
-    <Panel title="BTC / ETH comparison" icon={<Activity className="h-3.5 w-3.5" />} right={<Pill tone="ok">real quotes</Pill>}>
-      <div className="grid grid-cols-2 gap-2">
-        {(["BTC", "ETH"] as const).map((sym) => {
-          const q = quotes.find((x) => x.symbol === sym) ?? null;
-          return (
-            <MiniChart key={sym} symbol={sym} quote={q} online={cryptoOnline} active={false} onClick={() => undefined} />
-          );
-        })}
-      </div>
-      <p className="font-mono text-[8.5px] uppercase tracking-wider text-white/35">CoinGecko line samples · no synthetic spread or correlation</p>
+    <Panel title="BTC / ETH comparison" icon={<Activity className="h-3.5 w-3.5" />} right={<Pill tone="ok">CoinGecko · normalized</Pill>}>
+      <ComparisonChart symbols={["BTC", "ETH"]} days={7} height={150} />
     </Panel>
   );
 }
@@ -596,18 +603,34 @@ function MacroFxPanel() {
   );
 }
 
-function OrderFlowStack() {
-  const binance = statusForModule("crypto").adapters.find((a) => a.def.id === "binance")?.status ?? "adapter-ready";
-  const note = binance === "connected" ? "depth endpoint not wired in UI" : "Binance depth adapter-ready · no live orderbook source";
+function OrderFlowStack({ selected }: { selected: string }) {
+  const hasBinance = binancePairFor(selected) != null;
   return (
     <div className="grid min-h-0 grid-rows-3 gap-1.5">
-      {["Order Book", "Time & Sales", "Liquidity / Depth"].map((title) => (
-        <Panel key={title} title={title.toLowerCase()} icon={<Signal className="h-3.5 w-3.5" />} right={<Pill tone="muted">no source</Pill>} bodyClassName="p-2">
-          <div className="flex h-full min-h-[48px] items-center justify-center border border-dashed border-white/10 bg-white/[0.008] px-2 text-center font-mono text-[9px] uppercase tracking-wider text-white/38" style={HATCH}>
-            {note}
-          </div>
-        </Panel>
-      ))}
+      <Panel
+        title="order book"
+        icon={<Signal className="h-3.5 w-3.5" />}
+        right={<Pill tone={hasBinance ? "ok" : "muted"}>{hasBinance ? "Binance · live" : "no source"}</Pill>}
+        bodyClassName="p-2"
+      >
+        <OrderBookPanel symbol={selected} rows={10} />
+      </Panel>
+      <Panel
+        title="time & sales"
+        icon={<Signal className="h-3.5 w-3.5" />}
+        right={<Pill tone={hasBinance ? "ok" : "muted"}>{hasBinance ? "Binance · live" : "no source"}</Pill>}
+        bodyClassName="p-2"
+      >
+        <TimeAndSalesPanel symbol={selected} rows={12} />
+      </Panel>
+      <Panel
+        title="liquidity / depth"
+        icon={<Signal className="h-3.5 w-3.5" />}
+        right={<Pill tone={hasBinance ? "ok" : "muted"}>{hasBinance ? "Binance · L2 cumulative" : "no source"}</Pill>}
+        bodyClassName="p-2"
+      >
+        <DepthPanel symbol={selected} height={130} />
+      </Panel>
     </div>
   );
 }
