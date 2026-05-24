@@ -1,4 +1,5 @@
 @import "../design/tokens.css";
+@import "./atlas-cinema.css";
 
 @tailwind base;
 @tailwind components;

@@ -33,6 +33,29 @@ import { RepoWorkspace } from "./panels/RepoWorkspace";
 import { MemoryVault } from "./panels/MemoryVault";
 import { WorkflowCanvas } from "./panels/WorkflowCanvas";
 import { DeliveryCenter } from "./panels/DeliveryCenter";
+import AtlasCinema from "@/components/atlas-cinema/AtlasCinema";
+import type { AtlasCanvasMode } from "@/components/atlas-cinema/CinemaModeSwitch";
+
+const ATLAS_CANVAS_KEY = "promptready-os.atlas.canvas";
+const VALID_CANVAS_MODES: AtlasCanvasMode[] = [
+  "cinema",
+  "graph",
+  "blueprint",
+  "operations",
+  "live"
+];
+function loadCanvasMode(): AtlasCanvasMode {
+  if (typeof window === "undefined") return "cinema";
+  try {
+    const raw = window.localStorage.getItem(ATLAS_CANVAS_KEY);
+    if (raw && (VALID_CANVAS_MODES as string[]).includes(raw)) {
+      return raw as AtlasCanvasMode;
+    }
+  } catch {
+    // ignore
+  }
+  return "cinema";
+}
 
 /**
  * Mission Atlas · Phase 14.
@@ -196,6 +219,27 @@ export default function AtlasPage() {
     return () => window.clearInterval(t);
   }, []);
 
+  // Atlas canvas mode · adds "cinema" as the default first-impression
+  // surface. Old Atlas remains untouched in graph/blueprint/operations/
+  // live modes.
+  const [canvasMode, setCanvasMode] = useState<AtlasCanvasMode>(() =>
+    loadCanvasMode()
+  );
+  const persistCanvasMode = (m: AtlasCanvasMode) => {
+    setCanvasMode(m);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(ATLAS_CANVAS_KEY, m);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  if (canvasMode === "cinema") {
+    return <AtlasCinema mode={canvasMode} onMode={persistCanvasMode} />;
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-4 px-5 py-5 md:px-7 md:py-7">
       <SurfaceHeader
@@ -204,6 +248,14 @@ export default function AtlasPage() {
         sub="Brain, repo hub, mission launcher, workflow wall, delivery center — your operator home screen. Work without leaving Atlas."
         right={
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => persistCanvasMode("cinema")}
+              className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/[0.1] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent shadow-glow transition hover:bg-accent/[0.15]"
+              title="Open Atlas Cinema mode (C)"
+            >
+              Cinema
+            </button>
             <HomeModeToggle mode={homeMode} onChange={setHomeMode} />
             {homeMode === "blueprint" && (
               <ZoomControls zoom={zoom} onZoom={setZoom} />
