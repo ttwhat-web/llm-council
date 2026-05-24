@@ -35,14 +35,13 @@ import {
   Radio,
   Rocket,
   Save,
+  Search,
   ShieldCheck,
   Signal,
   Tv,
   Waypoints
 } from "lucide-react";
 
-import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
-import { PlanBadge } from "@/components/PlanBadge";
 import { useCryptoFeed } from "@/services/marketFeed";
 import {
   formatPrice,
@@ -53,12 +52,11 @@ import {
 import {
   fetchNewsBest,
   timeAgo,
-  NEWS_CATEGORIES,
   type NewsItem,
   type NewsCategory
 } from "@/services/providers/news";
 import { getSamples, type Sample } from "@/services/marketSamples";
-import { adapterSummary } from "@/services/adapters";
+import { adapterSummary, statusForModule } from "@/services/adapters";
 import { PriceChartLW } from "@/components/market-lab/PriceChartLW";
 import { computeCostBoard, formatUsd } from "@/services/cost";
 import { getTelegramBridgeStatus } from "@/services/telegramLive";
@@ -72,6 +70,8 @@ import { Pill, Panel, Dot, StatRow, AdapterReady, DisabledRow, HATCH, heatStyle,
 // ---------------------------------------------------------------------------
 
 const CRYPTO_SYMBOLS = ["BTC", "ETH", "SOL", "BNB", "XRP"] as const;
+const WAR_ROOM_WATCHLIST = ["BTC", "ETH", "SOL", "BNB", "XRP", "AAPL", "TSLA", "NVDA", "EURUSD", "XAUUSD"] as const;
+const MACRO_STRIP = ["DXY", "US10Y", "VIX", "EURUSD", "XAUUSD", "BTC.D"] as const;
 
 const GRID_BG: React.CSSProperties = {
   backgroundImage:
@@ -154,9 +154,7 @@ export default function MarketLabPage() {
   const now = useWorldClock();
 
   const [selected, setSelected] = useState<string>("BTC");
-  const [chartTab, setChartTab] = useState<ChartTab>("price");
-  const [stack, setStack] = useState<(typeof STACK_OPTIONS)[number]>(2);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [command, setCommand] = useState("BTC");
   const [tvMode, setTvMode] = useState(false);
 
   // News room · local per-category fetch (shared fetcher, no extra polling
@@ -178,6 +176,7 @@ export default function MarketLabPage() {
   const cryptoOnline = crypto.state === "ok";
   const quotes = crypto.quotes;
   const selectedQuote = quotes.find((q) => q.symbol === selected) ?? null;
+  const selectedIsCrypto = (CRYPTO_SYMBOLS as readonly string[]).includes(selected);
 
   const loadNews = useCallback(async (cat: NewsCategory | null) => {
     if (cat == null) {
@@ -231,6 +230,12 @@ export default function MarketLabPage() {
       }
     ]);
   };
+  const openSymbol = (symbol: string) => {
+    const next = symbol.trim().toUpperCase();
+    if (!next) return;
+    setSelected(next);
+    setCommand(next);
+  };
 
   // Risk indicator · derived ONLY from real crypto 24h %.
   const avgChange = useMemo(() => {
@@ -259,87 +264,76 @@ export default function MarketLabPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-2 px-3 py-3 md:px-4">
-      <SurfaceHeader
-        eyebrow="market lab · intelligence center"
-        title="Market Intelligence Center"
-        sub="Quant-desk cockpit. Crypto + news are live; every other instrument, map and prediction is an honest adapter-ready seam — never a fabricated number."
-        right={
-          <div className="flex items-center gap-2">
-            <PlanBadge tier="desk" />
-            <button
-              type="button"
-              onClick={() => setTvMode(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-white/70 transition hover:bg-white/[0.06]"
-            >
-              <Tv className="h-3.5 w-3.5" /> tv market mode
-            </button>
-          </div>
-        }
+    <div className="flex min-h-[calc(100vh-43px)] w-full flex-col gap-1.5 bg-black px-2 py-2">
+      <WarRoomHeader
+        now={now}
+        selected={selected}
+        command={command}
+        onCommand={setCommand}
+        onOpenSymbol={openSymbol}
+        crypto={crypto}
+        adapters={adapters}
+        cryptoOnline={cryptoOnline}
+        onTvMode={() => setTvMode(true)}
       />
+      <MacroStrip />
 
-      {/* A · TOP COMMAND / STATUS BAR */}
-      <TopBar now={now} crypto={crypto} adapters={adapters} cryptoOnline={cryptoOnline} />
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 xl:grid-cols-[210px_minmax(0,1fr)_330px]">
+        <WarRoomWatchlist
+          quotes={quotes}
+          cryptoOnline={cryptoOnline}
+          selected={selected}
+          onSelect={openSymbol}
+        />
 
-      {/* terminal frame: watchlist rail · center chart wall · analyst rail */}
-      <div className="grid grid-cols-1 gap-2 xl:grid-cols-[220px_minmax(0,1fr)_300px]">
-        {/* B · LEFT · WATCHLIST RAIL */}
-        <div className={clsx("flex flex-col gap-2", fullscreen && "xl:hidden")}>
-          <Watchlists quotes={quotes} cryptoOnline={cryptoOnline} selected={selected} onSelect={setSelected} />
-        </div>
+        <main className="grid min-h-0 grid-rows-[minmax(360px,1.25fr)_minmax(230px,0.75fr)] gap-1.5">
+          <div className="grid min-h-0 grid-cols-1 gap-1.5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+            <MainChartPanel
+              selected={selected}
+              quote={selectedQuote}
+              cryptoOnline={cryptoOnline}
+              selectedIsCrypto={selectedIsCrypto}
+            />
+            <div className="grid min-h-0 grid-rows-2 gap-1.5">
+              <ComparisonPanel quotes={quotes} cryptoOnline={cryptoOnline} />
+              <VolumePanel selected={selected} selectedIsCrypto={selectedIsCrypto} />
+            </div>
+          </div>
 
-        {/* C · CENTER · CHART WALL */}
-        <div className="flex min-w-0 flex-col gap-2">
-          <ChartWall
+          <div className="grid min-h-0 grid-cols-1 gap-1.5 lg:grid-cols-3">
+            <BreadthPanel quotes={quotes} cryptoOnline={cryptoOnline} avgChange={avgChange} />
+            <MacroFxPanel />
+            <OrderFlowStack />
+          </div>
+        </main>
+
+        <aside className="grid min-h-0 grid-rows-[minmax(260px,1fr)_minmax(210px,0.72fr)] gap-1.5">
+          <VerticalNewsTape
+            chip={newsChip}
+            onChip={onChip}
+            items={items}
+            state={newsState}
+            err={newsErr}
+            missionBusy={!!current}
+            onCreateMission={onCreateMission}
+            onSaveToBrain={onSaveToBrain}
+          />
+          <AiAnalystPanel
             selected={selected}
             quote={selectedQuote}
-            quotes={quotes}
+            selectedIsCrypto={selectedIsCrypto}
             cryptoOnline={cryptoOnline}
-            chartTab={chartTab}
-            onChartTab={setChartTab}
-            stack={stack}
-            onStack={setStack}
-            fullscreen={fullscreen}
-            onFullscreen={() => setFullscreen((v) => !v)}
-            onSelect={setSelected}
-          />
-
-          {/* MARKET MAPS */}
-          {!fullscreen && (
-            <MarketMaps quotes={quotes} cryptoOnline={cryptoOnline} avgChange={avgChange} />
-          )}
-
-          {/* NEWS ROOM + PREDICTION WALL */}
-          {!fullscreen && (
-            <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1.5fr_1fr]">
-              <NewsRoom
-                chip={newsChip}
-                onChip={onChip}
-                items={items}
-                state={newsState}
-                err={newsErr}
-                missionBusy={!!current}
-                onCreateMission={onCreateMission}
-                onSaveToBrain={onSaveToBrain}
-              />
-              <PolymarketWall />
-            </div>
-          )}
-        </div>
-
-        {/* D · RIGHT · ANALYST RAIL */}
-        <div className={clsx("flex flex-col gap-2", fullscreen && "xl:hidden")}>
-          <AiMarketStack alert={aiAlert} cost={cost} />
-          <BotCommandCenter
+            newsItems={items}
+            alert={aiAlert}
+            cost={cost}
             telegram={telegram}
             adapters={adapters}
             missions={history.length}
             approvals={approvals}
           />
-        </div>
+        </aside>
       </div>
 
-      {/* F · BOTTOM · NEWS TAPE (full width) */}
       <Ticker quotes={quotes} items={items} cryptoOnline={cryptoOnline} />
     </div>
   );
@@ -348,6 +342,394 @@ export default function MarketLabPage() {
 // ---------------------------------------------------------------------------
 // A · TOP BAR
 // ---------------------------------------------------------------------------
+
+function WarRoomHeader({
+  now,
+  selected,
+  command,
+  onCommand,
+  onOpenSymbol,
+  crypto,
+  adapters,
+  cryptoOnline,
+  onTvMode
+}: {
+  now: Date;
+  selected: string;
+  command: string;
+  onCommand: (v: string) => void;
+  onOpenSymbol: (s: string) => void;
+  crypto: ReturnType<typeof useCryptoFeed>;
+  adapters: ReturnType<typeof adapterSummary>;
+  cryptoOnline: boolean;
+  onTvMode: () => void;
+}) {
+  const latency = crypto.at ? `${Math.max(1, Math.round((Date.now() - crypto.at) / 1000))}s` : "—";
+  return (
+    <section className="border border-white/10 bg-[#05070b]">
+      <div className="flex flex-wrap items-center gap-2 border-b border-white/8 px-2 py-1">
+        <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
+          <LineChart className="h-3.5 w-3.5" /> Market Lab War Room
+        </span>
+        <form
+          className="flex min-w-[260px] flex-1 items-center gap-1 border border-white/10 bg-white/[0.025] px-2 py-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onOpenSymbol(command);
+          }}
+        >
+          <Search className="h-3.5 w-3.5 text-white/35" />
+          <input
+            value={command}
+            onChange={(e) => onCommand(e.target.value)}
+            placeholder="BTC, ETH, SOL, AAPL, TSLA, NVDA, EURUSD, XAUUSD"
+            className="min-w-0 flex-1 bg-transparent font-mono text-[12px] uppercase tracking-wide text-white outline-none placeholder:text-white/25"
+          />
+          <button
+            type="submit"
+            className="border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/60 hover:bg-white/[0.06]"
+          >
+            open
+          </button>
+        </form>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
+          active <span className="text-white/85">{selected}</span>
+        </span>
+        <Pill tone={cryptoOnline ? "ok" : crypto.state === "error" ? "bad" : "muted"}>
+          CoinGecko {cryptoOnline ? "connected" : crypto.state}
+        </Pill>
+        <Pill tone="accent">{adapters.ready} adapter-ready</Pill>
+        <Pill tone="muted">{adapters.offline} offline</Pill>
+        <button
+          type="button"
+          onClick={onTvMode}
+          className="inline-flex items-center gap-1 border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-white/65 hover:bg-white/[0.06]"
+        >
+          <Tv className="h-3.5 w-3.5" /> wall
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-white/40">
+        <span>/ search</span>
+        <span>1D · 7D · 1M · 3M · 1Y</span>
+        <span>last crypto refresh {crypto.at ? new Date(crypto.at).toLocaleTimeString() : "—"} · {latency}</span>
+        {CLOCKS.map((c) => (
+          <span key={c.tz}>{c.label} <span className="text-white/75">{fmtClock(now, c.tz)}</span></span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MacroStrip() {
+  const market = statusForModule("markets").status;
+  const fx = statusForModule("fx").status;
+  const commodities = statusForModule("commodities").status;
+  const cells: Array<{ label: string; status: string; detail: string }> = [
+    { label: "DXY", status: market, detail: "TwelveData required" },
+    { label: "US10Y", status: market, detail: "rates provider required" },
+    { label: "VIX", status: market, detail: "index provider required" },
+    { label: "EURUSD", status: fx, detail: "FX adapter" },
+    { label: "XAUUSD", status: commodities, detail: "commodities adapter" },
+    { label: "BTC.D", status: "adapter-ready", detail: "dominance source required" }
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-6">
+      {cells.map((c) => (
+        <div key={c.label} className="flex items-center justify-between border border-white/8 bg-white/[0.015] px-2 py-1">
+          <span className="font-mono text-[10px] text-white/80">{c.label}</span>
+          <span className="text-right font-mono text-[8px] uppercase tracking-wider text-white/35">
+            {c.status === "connected" ? "connected" : "adapter-ready"} · no live value
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WarRoomWatchlist({
+  quotes,
+  cryptoOnline,
+  selected,
+  onSelect
+}: {
+  quotes: CryptoQuote[];
+  cryptoOnline: boolean;
+  selected: string;
+  onSelect: (s: string) => void;
+}) {
+  return (
+    <Panel title="watchlist" icon={<LineChart className="h-3.5 w-3.5" />} bodyClassName="gap-0 p-0">
+      <div className="grid grid-cols-[52px_1fr_52px] border-b border-white/6 px-2 py-1 font-mono text-[8px] uppercase tracking-wider text-white/30">
+        <span>sym</span><span>last</span><span className="text-right">24h</span>
+      </div>
+      <div className="flex flex-col divide-y divide-white/6">
+        {WAR_ROOM_WATCHLIST.map((sym) => {
+          const q = quotes.find((x) => x.symbol === sym);
+          const supported = (CRYPTO_SYMBOLS as readonly string[]).includes(sym);
+          const up = (q?.change24h ?? 0) >= 0;
+          return (
+            <button
+              key={sym}
+              type="button"
+              onClick={() => onSelect(sym)}
+              className={clsx(
+                "grid grid-cols-[52px_1fr_52px] items-center gap-2 px-2 py-1 text-left transition hover:bg-white/[0.035]",
+                selected === sym && "bg-accent/[0.08]"
+              )}
+            >
+              <span className="font-mono text-[11px] text-white/85">{sym}</span>
+              <span className="font-mono text-[10px] tabular-nums text-white/65">
+                {supported && cryptoOnline ? formatPrice(q?.price ?? null) : "no source"}
+              </span>
+              <span className={clsx("text-right font-mono text-[10px] tabular-nums", !supported || q?.change24h == null ? "text-white/30" : up ? "text-emerald-300" : "text-rose-300")}>
+                {supported && cryptoOnline ? formatChange(q?.change24h ?? null) : "—"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function MainChartPanel({
+  selected,
+  quote,
+  cryptoOnline,
+  selectedIsCrypto
+}: {
+  selected: string;
+  quote: CryptoQuote | null;
+  cryptoOnline: boolean;
+  selectedIsCrypto: boolean;
+}) {
+  const up = (quote?.change24h ?? 0) >= 0;
+  return (
+    <Panel
+      title={`main candlestick · ${selected}/USD`}
+      icon={<LineChart className="h-3.5 w-3.5" />}
+      right={<Pill tone={selectedIsCrypto ? "ok" : "muted"}>{selectedIsCrypto ? "line only · OHLC adapter-ready" : "no source"}</Pill>}
+      glow
+    >
+      <div className="flex items-end justify-between gap-3">
+        <div className="flex flex-col">
+          <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">last</span>
+          <span className="font-mono text-3xl font-semibold tabular-nums text-white">
+            {selectedIsCrypto && cryptoOnline ? formatPrice(quote?.price ?? null) : "—"}
+          </span>
+        </div>
+        <span className={clsx("font-mono text-xl tabular-nums", quote?.change24h == null ? "text-white/35" : up ? "text-emerald-300" : "text-rose-300")}>
+          {selectedIsCrypto && cryptoOnline ? formatChange(quote?.change24h ?? null) : "—"}
+        </span>
+      </div>
+      {selectedIsCrypto ? (
+        <PriceChartLW symbol={selected} up={up} fullscreen />
+      ) : (
+        <AdapterReady what={`${selected} · no live chart source`} detail="Equities, FX and metals need a keyed market provider. No candles, last price or volume are fabricated." />
+      )}
+    </Panel>
+  );
+}
+
+function ComparisonPanel({ quotes, cryptoOnline }: { quotes: CryptoQuote[]; cryptoOnline: boolean }) {
+  return (
+    <Panel title="BTC / ETH comparison" icon={<Activity className="h-3.5 w-3.5" />} right={<Pill tone="ok">real quotes</Pill>}>
+      <div className="grid grid-cols-2 gap-2">
+        {(["BTC", "ETH"] as const).map((sym) => {
+          const q = quotes.find((x) => x.symbol === sym) ?? null;
+          return (
+            <MiniChart key={sym} symbol={sym} quote={q} online={cryptoOnline} active={false} onClick={() => undefined} />
+          );
+        })}
+      </div>
+      <p className="font-mono text-[8.5px] uppercase tracking-wider text-white/35">CoinGecko line samples · no synthetic spread or correlation</p>
+    </Panel>
+  );
+}
+
+function VolumePanel({ selected, selectedIsCrypto }: { selected: string; selectedIsCrypto: boolean }) {
+  return (
+    <Panel title="volume / VWAP" icon={<Gauge className="h-3.5 w-3.5" />} right={<Pill tone={selectedIsCrypto ? "ok" : "muted"}>{selectedIsCrypto ? "volume real" : "no source"}</Pill>}>
+      {selectedIsCrypto ? (
+        <>
+          <PriceChartLW symbol={selected} up fullscreen={false} />
+          <p className="font-mono text-[8.5px] uppercase tracking-wider text-white/35">volume from CoinGecko history · VWAP adapter-ready</p>
+        </>
+      ) : (
+        <AdapterReady what={`${selected} volume · no source`} detail="VWAP needs trade-level or OHLCV data. No synthetic volume shown." />
+      )}
+    </Panel>
+  );
+}
+
+function BreadthPanel({
+  quotes,
+  cryptoOnline,
+  avgChange
+}: {
+  quotes: CryptoQuote[];
+  cryptoOnline: boolean;
+  avgChange: number | null;
+}) {
+  return (
+    <Panel title="market breadth / heat" icon={<Grid3x3 className="h-3.5 w-3.5" />} right={<Pill tone="ok">crypto real</Pill>}>
+      <CryptoHeatmap quotes={quotes} cryptoOnline={cryptoOnline} />
+      <StatRow label="crypto avg 24h" value={cryptoOnline && avgChange != null ? formatChange(avgChange) : "—"} />
+      <AdapterReady what="equity breadth · no source" detail="Advance/decline, sector breadth and volatility maps need an equities provider." />
+    </Panel>
+  );
+}
+
+function MacroFxPanel() {
+  return (
+    <Panel title="macro / FX strip chart" icon={<Globe2 className="h-3.5 w-3.5" />} right={<Pill tone="muted">adapter-ready</Pill>}>
+      <div className="grid grid-cols-2 gap-1">
+        {MACRO_STRIP.map((s) => (
+          <div key={s} className="flex items-center justify-between border border-white/8 bg-white/[0.01] px-1.5 py-1" style={HATCH}>
+            <span className="font-mono text-[10px] text-white/55">{s}</span>
+            <span className="font-mono text-[8px] uppercase tracking-wider text-white/30">no source</span>
+          </div>
+        ))}
+      </div>
+      <AdapterReady what="macro strip · no live values" detail="DXY, US10Y, VIX, FX and metals need TwelveData/FMP or another keyed source." />
+    </Panel>
+  );
+}
+
+function OrderFlowStack() {
+  const binance = statusForModule("crypto").adapters.find((a) => a.def.id === "binance")?.status ?? "adapter-ready";
+  const note = binance === "connected" ? "depth endpoint not wired in UI" : "Binance depth adapter-ready · no live orderbook source";
+  return (
+    <div className="grid min-h-0 grid-rows-3 gap-1.5">
+      {["Order Book", "Time & Sales", "Liquidity / Depth"].map((title) => (
+        <Panel key={title} title={title.toLowerCase()} icon={<Signal className="h-3.5 w-3.5" />} right={<Pill tone="muted">no source</Pill>} bodyClassName="p-2">
+          <div className="flex h-full min-h-[48px] items-center justify-center border border-dashed border-white/10 bg-white/[0.008] px-2 text-center font-mono text-[9px] uppercase tracking-wider text-white/38" style={HATCH}>
+            {note}
+          </div>
+        </Panel>
+      ))}
+    </div>
+  );
+}
+
+function VerticalNewsTape({
+  chip,
+  onChip,
+  items,
+  state,
+  err,
+  missionBusy,
+  onCreateMission,
+  onSaveToBrain
+}: {
+  chip: string;
+  onChip: (c: { label: string; cat: NewsCategory | null }) => void;
+  items: NewsItem[];
+  state: "loading" | "ok" | "error" | "adapter";
+  err?: string;
+  missionBusy: boolean;
+  onCreateMission: (n: NewsItem) => void;
+  onSaveToBrain: (n: NewsItem) => void;
+}) {
+  return (
+    <Panel title="vertical news tape" icon={<Newspaper className="h-3.5 w-3.5" />} bodyClassName="min-h-0">
+      <div className="flex flex-wrap gap-1">
+        {NEWS_CHIPS.slice(0, 6).map((c) => (
+          <button
+            key={c.label}
+            type="button"
+            onClick={() => onChip(c)}
+            className={clsx("border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wider", c.label === chip ? "border-accent/40 bg-accent/[0.08] text-accent" : "border-white/10 bg-white/[0.02] text-white/45")}
+          >
+            {c.label}{c.cat == null ? " · ready" : ""}
+          </button>
+        ))}
+      </div>
+      {state === "error" && <p className="font-mono text-[10px] text-rose-300">{err}</p>}
+      {state === "adapter" && <AdapterReady what="news category · adapter-ready" detail="No live wire for this category." />}
+      {state === "loading" && items.length === 0 && <p className="font-mono text-[10px] uppercase tracking-wider text-white/35">loading real wire...</p>}
+      <ul className="min-h-0 flex-1 divide-y divide-white/6 overflow-auto">
+        {items.map((n) => (
+          <li key={n.id} className="flex flex-col gap-1 py-1.5">
+            <a href={n.url ?? "#"} target="_blank" rel="noreferrer noopener" className="text-[11px] leading-snug text-white/80 hover:text-accent">
+              {n.title}
+            </a>
+            <div className="flex items-center justify-between gap-2 font-mono text-[8px] uppercase tracking-wider text-white/35">
+              <span>{n.source} · {timeAgo(n.time)}</span>
+              <span>{n.category}</span>
+            </div>
+            <div className="flex gap-1">
+              <NewsAction Icon={Rocket} label={missionBusy ? "busy" : "mission"} disabled={missionBusy} onClick={() => onCreateMission(n)} />
+              <NewsAction Icon={Save} label="save" onClick={() => onSaveToBrain(n)} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+function AiAnalystPanel({
+  selected,
+  quote,
+  selectedIsCrypto,
+  cryptoOnline,
+  newsItems,
+  alert,
+  cost,
+  telegram,
+  adapters,
+  missions,
+  approvals
+}: {
+  selected: string;
+  quote: CryptoQuote | null;
+  selectedIsCrypto: boolean;
+  cryptoOnline: boolean;
+  newsItems: NewsItem[];
+  alert: boolean;
+  cost: ReturnType<typeof computeCostBoard>;
+  telegram: ReturnType<typeof getTelegramBridgeStatus>;
+  adapters: ReturnType<typeof adapterSummary>;
+  missions: number;
+  approvals: number;
+}) {
+  const relatedNews = newsItems.filter((n) => n.title.toUpperCase().includes(selected)).slice(0, 3);
+  return (
+    <Panel title="AI Analyst" icon={<Bot className="h-3.5 w-3.5" />} right={<Pill tone="muted">analysis adapter-ready</Pill>}>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+        <StatRow label="symbol" value={selected} />
+        <StatRow label="source" value={selectedIsCrypto ? "CoinGecko" : "no source"} tone={selectedIsCrypto ? "ok" : "muted"} />
+        <StatRow label="last" value={selectedIsCrypto && cryptoOnline ? formatPrice(quote?.price ?? null) : "—"} />
+        <StatRow label="24h" value={selectedIsCrypto && cryptoOnline ? formatChange(quote?.change24h ?? null) : "—"} />
+        <StatRow label="market cap" value={selectedIsCrypto && cryptoOnline ? formatMarketCap(quote?.marketCap ?? null) : "—"} />
+        <StatRow label="related news" value={relatedNews.length} />
+      </div>
+      <div className="border-t border-white/6 pt-2">
+        <p className="font-mono text-[9px] uppercase tracking-wider text-white/40">
+          context only · no recommendation · no buy/sell signal · model analysis adapter-ready
+        </p>
+      </div>
+      {relatedNews.length > 0 ? (
+        <ul className="space-y-1">
+          {relatedNews.map((n) => (
+            <li key={n.id} className="truncate font-mono text-[9px] text-white/55">{n.source} · {n.title}</li>
+          ))}
+        </ul>
+      ) : (
+        <AdapterReady what="symbol-specific analysis" detail="No model output or strategy engine is connected. This panel only summarizes available real context." />
+      )}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-white/6 pt-1.5">
+        <StatRow label="adapter errors" value={alert ? "yes" : "none"} tone={alert ? "bad" : "ok"} />
+        <StatRow label="cloud avoided" value={formatUsd(cost.estimatedCloudCostAvoidedUSD)} />
+        <StatRow label="telegram" value={telegram.live} />
+        <StatRow label="adapters" value={`${adapters.connected} live / ${adapters.ready} ready`} />
+        <StatRow label="missions" value={missions} />
+        <StatRow label="approvals" value={approvals} tone={approvals > 0 ? "warn" : undefined} />
+      </div>
+    </Panel>
+  );
+}
 
 function TopBar({
   now,
@@ -872,7 +1254,6 @@ function NewsRoom({
   onSaveToBrain: (n: NewsItem) => void;
 }) {
   const hero = items[0] ?? null;
-  void NEWS_CATEGORIES; // category set is reflected via NEWS_CHIPS
   return (
     <Panel title="news room" icon={<Newspaper className="h-3.5 w-3.5" />}>
       {/* category ribbon */}
