@@ -24,6 +24,17 @@ interface Props {
   presentation?: boolean;
 }
 
+const ATLAS_CANVAS_KEY = "promptready-os.atlas.canvas";
+
+function resetAtlasView(onMode: (m: AtlasCanvasMode) => void) {
+  try {
+    window.localStorage.removeItem(ATLAS_CANVAS_KEY);
+  } catch {
+    // ignore
+  }
+  onMode("cinema");
+}
+
 export function CinemaModeSwitch({ mode, onMode, presentation }: Props) {
   // Auto-fade after 4s without mousemove inside the scene; full opacity on move.
   const [faded, setFaded] = useState(false);
@@ -73,6 +84,24 @@ export function CinemaModeSwitch({ mode, onMode, presentation }: Props) {
           </button>
         );
       })}
+      <span
+        aria-hidden
+        className="mx-1 h-4 w-px bg-white/10"
+      />
+      <span
+        className="px-1.5 font-mono text-[9px] uppercase tracking-wider text-white/40"
+        title="Current canvas mode (debug)"
+      >
+        mode:{mode}
+      </span>
+      <button
+        type="button"
+        onClick={() => resetAtlasView(onMode)}
+        className="inline-flex h-7 items-center gap-1 rounded px-2 font-mono text-[10px] uppercase tracking-wider text-white/55 transition hover:bg-white/[0.06] hover:text-white/85"
+        title="Clear saved Atlas view-mode and return to Cinema"
+      >
+        Reset
+      </button>
     </nav>
   );
 }
