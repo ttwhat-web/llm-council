@@ -58,12 +58,15 @@ import {
 import { getSamples, type Sample } from "@/services/marketSamples";
 import { adapterSummary, statusForModule } from "@/services/adapters";
 import { PriceChartLW } from "@/components/market-lab/PriceChartLW";
-import { CandlestickChart } from "@/components/market-lab/CandlestickChart";
+import { CandlestickChart, type Overlay, type HlineMain, type RsiPane } from "@/components/market-lab/CandlestickChart";
 import { ComparisonChart } from "@/components/market-lab/ComparisonChart";
 import { OrderBookPanel } from "@/components/market-lab/OrderBookPanel";
 import { TimeAndSalesPanel } from "@/components/market-lab/TimeAndSalesPanel";
 import { DepthPanel } from "@/components/market-lab/DepthPanel";
-import { binancePairFor } from "@/services/providers/binance";
+import { ScriptLabEditor } from "@/components/market-lab/ScriptLabEditor";
+import { binancePairFor, type Candle } from "@/services/providers/binance";
+import { runScript, type ScriptResult } from "@/services/scripts/engine";
+import { getActiveId, listScripts } from "@/services/scripts/store";
 import { computeCostBoard, formatUsd } from "@/services/cost";
 import { getTelegramBridgeStatus } from "@/services/telegramLive";
 import { useMissionStore } from "@/store/mission";
@@ -253,6 +256,113 @@ export default function MarketLabPage() {
   const approvals = workflowRuns.filter((r) => r.status === "awaiting-approval").length;
   const aiAlert = adapters.error > 0;
 
+  // --- Layout + Script Lab state -------------------------------------------
+  const [layout, setLayout] = useState<1 | 2 | 4>(() => {
+    if (typeof window === "undefined") return 1;
+    const raw = window.localStorage.getItem("promptready-os.market-lab.layout");
+    return raw === "2" ? 2 : raw === "4" ? 4 : 1;
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("promptready-os.market-lab.layout", String(layout));
+    } catch {
+      // ignore
+    }
+  }, [layout]);
+
+  // Candles per selected symbol so script + indicators stay symbol-scoped.
+  const [candlesBySymbol, setCandlesBySymbol] = useState<Record<string, Candle[]>>({});
+  const onCandlesLoaded = useCallback((sym: string) => (candles: Candle[]) => {
+    setCandlesBySymbol((prev) => (prev[sym] === candles ? prev : { ...prev, [sym]: candles }));
+  }, []);
+
+  // Active script body + id (persisted via the script store).
+  const [scriptId, setScriptId] = useState<string>(() => getActiveId());
+  const [scriptBody, setScriptBody] = useState<string>(() => {
+    const list = listScripts();
+    const a = list.find((s) => s.id === getActiveId()) ?? list[0];
+    return a ? a.body : "";
+  });
+  const [scriptResult, setScriptResult] = useState<ScriptResult | null>(null);
+  const [scriptExpanded, setScriptExpanded] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("promptready-os.market-lab.script.open") === "1";
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("promptready-os.market-lab.script.open", scriptExpanded ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }, [scriptExpanded]);
+
+  const onScriptChange = useCallback((body: string, id: string) => {
+    setScriptBody(body);
+    setScriptId(id);
+  }, []);
+
+  const runActiveScript = useCallback(() => {
+    const candles = candlesBySymbol[selected] ?? [];
+    const r = runScript(scriptBody, candles);
+    setScriptResult(r);
+  }, [scriptBody, candlesBySymbol, selected]);
+
+  // Re-run on candle update (after a successful script).
+  useEffect(() => {
+    if (!scriptResult || !scriptResult.ok) return;
+    const candles = candlesBySymbol[selected];
+    if (!candles || candles.length === 0) return;
+    const r = runScript(scriptBody, candles);
+    setScriptResult(r);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candlesBySymbol[selected]]);
+
+  // Derive overlays + rsi pane for the selected chart.
+  const { mainOverlays, mainHlines, rsiPane } = useMemo(() => {
+    const overlays: Overlay[] = [];
+    const hlines: HlineMain[] = [];
+    const rsiPlots: { values: number[]; label: string; color: string }[] = [];
+    const rsiHlines: { value: number; label: string; color: string }[] = [];
+    if (scriptResult && scriptResult.ok) {
+      for (const p of scriptResult.plots) {
+        if (p.kind === "line") {
+          if (p.pane === "main") {
+            overlays.push({ kind: "line", values: p.values, label: p.label, color: p.color });
+          } else {
+            rsiPlots.push({ values: p.values, label: p.label, color: p.color });
+          }
+        } else {
+          overlays.push({
+            kind: "bands",
+            upper: p.upper,
+            mid: p.mid,
+            lower: p.lower,
+            label: p.label,
+            color: p.color
+          });
+        }
+      }
+      for (const h of scriptResult.hlines) {
+        if (h.pane === "main") {
+          hlines.push({ value: h.value, label: h.label, color: h.color });
+        } else {
+          rsiHlines.push({ value: h.value, label: h.label, color: h.color });
+        }
+      }
+    }
+    const rsi: RsiPane | null =
+      rsiPlots.length || rsiHlines.length ? { plots: rsiPlots, hlines: rsiHlines } : null;
+    return { mainOverlays: overlays, mainHlines: hlines, rsiPane: rsi };
+  }, [scriptResult]);
+
+  // Companion symbols for 2/4 layouts.
+  const companionSymbols = useMemo(() => {
+    const pool = ["BTC", "ETH", "SOL", "BNB", "XRP"].filter((s) => s !== selected);
+    if (layout === 1) return [];
+    if (layout === 2) return pool.slice(0, 1);
+    return pool.slice(0, 3);
+  }, [layout, selected]);
+
   if (tvMode) {
     return (
       <TvWall
@@ -269,6 +379,8 @@ export default function MarketLabPage() {
     );
   }
 
+  const chartHeight = layout === 4 ? 220 : layout === 2 ? 340 : 460;
+
   return (
     <div className="flex min-h-[calc(100vh-43px)] w-full flex-col gap-1.5 bg-black px-2 py-2">
       <WarRoomHeader
@@ -284,7 +396,7 @@ export default function MarketLabPage() {
       />
       <MacroStrip />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 xl:grid-cols-[210px_minmax(0,1fr)_330px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 xl:grid-cols-[170px_minmax(0,1fr)_300px]">
         <WarRoomWatchlist
           quotes={quotes}
           cryptoOnline={cryptoOnline}
@@ -292,28 +404,129 @@ export default function MarketLabPage() {
           onSelect={openSymbol}
         />
 
-        <main className="grid min-h-0 grid-rows-[minmax(360px,1.25fr)_minmax(230px,0.75fr)] gap-1.5">
-          <div className="grid min-h-0 grid-cols-1 gap-1.5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-            <MainChartPanel
-              selected={selected}
-              quote={selectedQuote}
-              cryptoOnline={cryptoOnline}
-              selectedIsCrypto={selectedIsCrypto}
-            />
-            <div className="grid min-h-0 grid-rows-2 gap-1.5">
-              <ComparisonPanel quotes={quotes} cryptoOnline={cryptoOnline} />
-              <VolumePanel selected={selected} selectedIsCrypto={selectedIsCrypto} />
+        <main className="flex min-h-0 flex-col gap-1.5">
+          {/* layout switcher · 1 / 2 / 4 */}
+          <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1">
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-white/55">
+              chart layout
+            </span>
+            <div role="tablist" aria-label="Chart layout" className="flex items-center gap-0.5 rounded border border-white/10 bg-white/[0.03] p-0.5">
+              {[1, 2, 4].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  role="tab"
+                  aria-selected={layout === n}
+                  onClick={() => setLayout(n as 1 | 2 | 4)}
+                  title={`${n} chart layout · WORKS`}
+                  className={clsx(
+                    "rounded px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider transition",
+                    layout === n
+                      ? "bg-accent/[0.18] text-accent"
+                      : "text-white/55 hover:bg-white/[0.07]"
+                  )}
+                >
+                  {n} chart{n > 1 ? "s" : ""}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="grid min-h-0 grid-cols-1 gap-1.5 lg:grid-cols-3">
-            <BreadthPanel quotes={quotes} cryptoOnline={cryptoOnline} avgChange={avgChange} />
-            <MacroFxPanel />
-            <OrderFlowStack selected={selected} />
+          {/* dominant chart area */}
+          <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+            {layout === 1 ? (
+              <ChartFrame
+                selected={selected}
+                isCrypto={selectedIsCrypto}
+                quote={selectedQuote}
+                cryptoOnline={cryptoOnline}
+              >
+                <CandlestickChart
+                  symbol={selected}
+                  height={chartHeight}
+                  onCandles={onCandlesLoaded(selected)}
+                  overlays={mainOverlays}
+                  hlinesMain={mainHlines}
+                  rsi={rsiPane}
+                />
+              </ChartFrame>
+            ) : (
+              <div
+                className={clsx(
+                  "grid min-h-0 flex-1 gap-1.5",
+                  layout === 2 ? "grid-cols-2" : "grid-cols-2 grid-rows-2"
+                )}
+              >
+                <ChartFrame
+                  selected={selected}
+                  isCrypto={selectedIsCrypto}
+                  quote={selectedQuote}
+                  cryptoOnline={cryptoOnline}
+                  compact
+                >
+                  <CandlestickChart
+                    symbol={selected}
+                    height={chartHeight}
+                    onCandles={onCandlesLoaded(selected)}
+                    overlays={mainOverlays}
+                    hlinesMain={mainHlines}
+                    rsi={rsiPane}
+                  />
+                </ChartFrame>
+                {companionSymbols.map((sym) => {
+                  const q = quotes.find((qq) => qq.symbol === sym) ?? null;
+                  return (
+                    <ChartFrame
+                      key={sym}
+                      selected={sym}
+                      isCrypto={true}
+                      quote={q}
+                      cryptoOnline={cryptoOnline}
+                      compact
+                    >
+                      <CandlestickChart
+                        symbol={sym}
+                        height={chartHeight}
+                        onCandles={onCandlesLoaded(sym)}
+                      />
+                    </ChartFrame>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* collapsible script lab editor */}
+            <ScriptLabEditor
+              result={scriptResult}
+              candlesAvailable={(candlesBySymbol[selected]?.length ?? 0) > 0}
+              scriptBody={scriptBody}
+              activeId={scriptId}
+              onChange={onScriptChange}
+              onRun={runActiveScript}
+              expanded={scriptExpanded}
+              onToggleExpanded={() => setScriptExpanded((v) => !v)}
+            />
           </div>
         </main>
 
-        <aside className="grid min-h-0 grid-rows-[minmax(260px,1fr)_minmax(210px,0.72fr)] gap-1.5">
+        {/* right rail · order flow + news + analyst */}
+        <aside className="grid min-h-0 grid-rows-[minmax(170px,1fr)_minmax(150px,0.9fr)_minmax(180px,1.1fr)_minmax(150px,0.9fr)] gap-1.5">
+          <Panel
+            title="order book"
+            icon={<Signal className="h-3.5 w-3.5" />}
+            right={<Pill tone={binancePairFor(selected) ? "ok" : "muted"}>{binancePairFor(selected) ? "binance · live" : "no source"}</Pill>}
+            bodyClassName="p-2"
+          >
+            <OrderBookPanel symbol={selected} rows={10} />
+          </Panel>
+          <Panel
+            title="time & sales"
+            icon={<Signal className="h-3.5 w-3.5" />}
+            right={<Pill tone={binancePairFor(selected) ? "ok" : "muted"}>{binancePairFor(selected) ? "binance · live" : "no source"}</Pill>}
+            bodyClassName="p-2"
+          >
+            <TimeAndSalesPanel symbol={selected} rows={10} />
+          </Panel>
           <VerticalNewsTape
             chip={newsChip}
             onChip={onChip}
@@ -342,6 +555,58 @@ export default function MarketLabPage() {
 
       <Ticker quotes={quotes} items={items} cryptoOnline={cryptoOnline} />
     </div>
+  );
+}
+
+function ChartFrame({
+  selected,
+  isCrypto,
+  quote,
+  cryptoOnline,
+  compact = false,
+  children
+}: {
+  selected: string;
+  isCrypto: boolean;
+  quote: CryptoQuote | null;
+  cryptoOnline: boolean;
+  compact?: boolean;
+  children: React.ReactNode;
+}) {
+  const hasBinance = binancePairFor(selected) != null;
+  const up = (quote?.change24h ?? 0) >= 0;
+  return (
+    <Panel
+      title={`${selected}/${hasBinance ? "USDT" : "USD"} · ${compact ? "compact" : "main"}`}
+      icon={<LineChart className="h-3.5 w-3.5" />}
+      right={
+        <Pill tone={hasBinance ? "ok" : isCrypto ? "ok" : "muted"}>
+          {hasBinance ? "binance · live ohlc" : isCrypto ? "line only · ohlc adapter-ready" : "no source"}
+        </Pill>
+      }
+      glow={!compact}
+      bodyClassName="p-2 flex flex-col gap-1.5 min-h-0"
+    >
+      {!compact && (
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex flex-col">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">last · coingecko</span>
+            <span className="font-mono text-2xl font-semibold tabular-nums text-white">
+              {isCrypto && cryptoOnline ? formatPrice(quote?.price ?? null) : "—"}
+            </span>
+          </div>
+          <span
+            className={clsx(
+              "font-mono text-lg tabular-nums",
+              quote?.change24h == null ? "text-white/35" : up ? "text-emerald-300" : "text-rose-300"
+            )}
+          >
+            {isCrypto && cryptoOnline ? formatChange(quote?.change24h ?? null) : "—"}
+          </span>
+        </div>
+      )}
+      {children}
+    </Panel>
   );
 }
 
