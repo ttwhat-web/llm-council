@@ -58,12 +58,17 @@ import {
 import { getSamples, type Sample } from "@/services/marketSamples";
 import { adapterSummary, statusForModule } from "@/services/adapters";
 import { PriceChartLW } from "@/components/market-lab/PriceChartLW";
-import { CandlestickChart, type Overlay, type HlineMain, type RsiPane } from "@/components/market-lab/CandlestickChart";
+import { CandlestickChart } from "@/components/market-lab/CandlestickChart";
+import type { Overlay, Hline as HlineMain, RsiPaneData as RsiPane } from "@/components/market-lab/chart-engine/types";
 import { ComparisonChart } from "@/components/market-lab/ComparisonChart";
 import { OrderBookPanel } from "@/components/market-lab/OrderBookPanel";
 import { TimeAndSalesPanel } from "@/components/market-lab/TimeAndSalesPanel";
 import { DepthPanel } from "@/components/market-lab/DepthPanel";
 import { ScriptLabEditor } from "@/components/market-lab/ScriptLabEditor";
+import { ChartSlot } from "@/components/market-lab/panels/ChartSlot";
+import { TerminalPanel } from "@/components/market-lab/panels/TerminalPanel";
+import { FlowImbalancePanel } from "@/components/market-lab/FlowImbalancePanel";
+import { LiquidityHeatmapPanel } from "@/components/market-lab/LiquidityHeatmapPanel";
 import { binancePairFor, type Candle } from "@/services/providers/binance";
 import { runScript, type ScriptResult } from "@/services/scripts/engine";
 import { getActiveId, listScripts } from "@/services/scripts/store";
@@ -256,19 +261,14 @@ export default function MarketLabPage() {
   const approvals = workflowRuns.filter((r) => r.status === "awaiting-approval").length;
   const aiAlert = adapters.error > 0;
 
-  // --- Layout + Script Lab state -------------------------------------------
-  const [layout, setLayout] = useState<1 | 2 | 4>(() => {
-    if (typeof window === "undefined") return 1;
-    const raw = window.localStorage.getItem("promptready-os.market-lab.layout");
-    return raw === "2" ? 2 : raw === "4" ? 4 : 1;
-  });
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("promptready-os.market-lab.layout", String(layout));
-    } catch {
-      // ignore
-    }
-  }, [layout]);
+  // --- Layout v2 (preset-driven) + Script Lab state -----------------------
+  const [layout, miniSymbols, setLayoutState] = useLayoutV2();
+  const setLayout = (id: LayoutId) => setLayoutState({ layout: id });
+  const setMiniSymbol = (i: number, sym: string) => {
+    const next = [...miniSymbols];
+    next[i] = sym;
+    setLayoutState({ miniSymbols: next });
+  };
 
   // Candles per selected symbol so script + indicators stay symbol-scoped.
   const [candlesBySymbol, setCandlesBySymbol] = useState<Record<string, Candle[]>>({});
@@ -355,14 +355,6 @@ export default function MarketLabPage() {
     return { mainOverlays: overlays, mainHlines: hlines, rsiPane: rsi };
   }, [scriptResult]);
 
-  // Companion symbols for 2/4 layouts.
-  const companionSymbols = useMemo(() => {
-    const pool = ["BTC", "ETH", "SOL", "BNB", "XRP"].filter((s) => s !== selected);
-    if (layout === 1) return [];
-    if (layout === 2) return pool.slice(0, 1);
-    return pool.slice(0, 3);
-  }, [layout, selected]);
-
   if (tvMode) {
     return (
       <TvWall
@@ -379,22 +371,21 @@ export default function MarketLabPage() {
     );
   }
 
-  const chartHeight = layout === 4 ? 220 : layout === 2 ? 340 : 460;
+  const mainHeight = layout === "1" ? 540 : layout === "1+4" ? 380 : layout === "wall" ? 320 : 460;
 
   return (
     <div className="flex min-h-[calc(100vh-43px)] w-full flex-col gap-1.5 bg-black px-2 py-2">
-      <WarRoomHeader
-        now={now}
+      {/* command bar (compact) */}
+      <CommandBar
         selected={selected}
         command={command}
         onCommand={setCommand}
         onOpenSymbol={openSymbol}
         crypto={crypto}
         adapters={adapters}
-        cryptoOnline={cryptoOnline}
-        onTvMode={() => setTvMode(true)}
+        layout={layout}
+        onLayout={setLayout}
       />
-      <MacroStrip />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 xl:grid-cols-[170px_minmax(0,1fr)_300px]">
         <WarRoomWatchlist
@@ -405,128 +396,89 @@ export default function MarketLabPage() {
         />
 
         <main className="flex min-h-0 flex-col gap-1.5">
-          {/* layout switcher · 1 / 2 / 4 */}
-          <div className="flex items-center justify-between gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1">
-            <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-white/55">
-              chart layout
-            </span>
-            <div role="tablist" aria-label="Chart layout" className="flex items-center gap-0.5 rounded border border-white/10 bg-white/[0.03] p-0.5">
-              {[1, 2, 4].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  role="tab"
-                  aria-selected={layout === n}
-                  onClick={() => setLayout(n as 1 | 2 | 4)}
-                  title={`${n} chart layout · WORKS`}
-                  className={clsx(
-                    "rounded px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider transition",
-                    layout === n
-                      ? "bg-accent/[0.18] text-accent"
-                      : "text-white/55 hover:bg-white/[0.07]"
-                  )}
-                >
-                  {n} chart{n > 1 ? "s" : ""}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* dominant main chart — always present */}
+          <ChartSlot
+            symbol={selected}
+            onSymbol={openSymbol}
+            options={WATCHLIST_SYMBOLS}
+            height={mainHeight}
+            overlays={mainOverlays}
+            hlinesMain={mainHlines}
+            rsi={rsiPane}
+            onCandles={onCandlesLoaded(selected)}
+            title="main chart · custom engine"
+          />
 
-          {/* dominant chart area */}
-          <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-            {layout === 1 ? (
-              <ChartFrame
-                selected={selected}
-                isCrypto={selectedIsCrypto}
-                quote={selectedQuote}
-                cryptoOnline={cryptoOnline}
-              >
-                <CandlestickChart
-                  symbol={selected}
-                  height={chartHeight}
-                  onCandles={onCandlesLoaded(selected)}
-                  overlays={mainOverlays}
-                  hlinesMain={mainHlines}
-                  rsi={rsiPane}
-                />
-              </ChartFrame>
-            ) : (
-              <div
-                className={clsx(
-                  "grid min-h-0 flex-1 gap-1.5",
-                  layout === 2 ? "grid-cols-2" : "grid-cols-2 grid-rows-2"
-                )}
-              >
-                <ChartFrame
-                  selected={selected}
-                  isCrypto={selectedIsCrypto}
-                  quote={selectedQuote}
-                  cryptoOnline={cryptoOnline}
-                  compact
-                >
-                  <CandlestickChart
-                    symbol={selected}
-                    height={chartHeight}
-                    onCandles={onCandlesLoaded(selected)}
-                    overlays={mainOverlays}
-                    hlinesMain={mainHlines}
-                    rsi={rsiPane}
-                  />
-                </ChartFrame>
-                {companionSymbols.map((sym) => {
-                  const q = quotes.find((qq) => qq.symbol === sym) ?? null;
-                  return (
-                    <ChartFrame
-                      key={sym}
-                      selected={sym}
-                      isCrypto={true}
-                      quote={q}
-                      cryptoOnline={cryptoOnline}
-                      compact
-                    >
-                      <CandlestickChart
-                        symbol={sym}
-                        height={chartHeight}
-                        onCandles={onCandlesLoaded(sym)}
-                      />
-                    </ChartFrame>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* collapsible script lab editor */}
-            <ScriptLabEditor
-              result={scriptResult}
-              candlesAvailable={(candlesBySymbol[selected]?.length ?? 0) > 0}
-              scriptBody={scriptBody}
-              activeId={scriptId}
-              onChange={onScriptChange}
-              onRun={runActiveScript}
-              expanded={scriptExpanded}
-              onToggleExpanded={() => setScriptExpanded((v) => !v)}
+          {/* preset-driven bottom of center column */}
+          {layout === "1+4" && (
+            <MiniGrid
+              symbols={miniSymbols}
+              onSymbol={setMiniSymbol}
+              onCandles={onCandlesLoaded}
             />
-          </div>
+          )}
+          {layout === "orderflow" && (
+            <div className="grid min-h-0 grid-cols-2 gap-1.5">
+              <FlowImbalancePanel symbol={selected} />
+              <LiquidityHeatmapPanel symbol={selected} />
+            </div>
+          )}
+          {layout === "macro" && (
+            <>
+              <MacroStrip />
+              <MiniGrid
+                symbols={miniSymbols}
+                onSymbol={setMiniSymbol}
+                onCandles={onCandlesLoaded}
+              />
+            </>
+          )}
+          {layout === "wall" && (
+            <>
+              <MiniGrid
+                symbols={miniSymbols}
+                onSymbol={setMiniSymbol}
+                onCandles={onCandlesLoaded}
+                compact
+              />
+              <div className="grid min-h-0 grid-cols-2 gap-1.5">
+                <FlowImbalancePanel symbol={selected} />
+                <LiquidityHeatmapPanel symbol={selected} />
+              </div>
+            </>
+          )}
+
+          {/* collapsible script lab editor */}
+          <ScriptLabEditor
+            result={scriptResult}
+            candlesAvailable={(candlesBySymbol[selected]?.length ?? 0) > 0}
+            scriptBody={scriptBody}
+            activeId={scriptId}
+            onChange={onScriptChange}
+            onRun={runActiveScript}
+            expanded={scriptExpanded}
+            onToggleExpanded={() => setScriptExpanded((v) => !v)}
+          />
         </main>
 
         {/* right rail · order flow + news + analyst */}
         <aside className="grid min-h-0 grid-rows-[minmax(170px,1fr)_minmax(150px,0.9fr)_minmax(180px,1.1fr)_minmax(150px,0.9fr)] gap-1.5">
-          <Panel
+          <TerminalPanel
             title="order book"
-            icon={<Signal className="h-3.5 w-3.5" />}
-            right={<Pill tone={binancePairFor(selected) ? "ok" : "muted"}>{binancePairFor(selected) ? "binance · live" : "no source"}</Pill>}
-            bodyClassName="p-2"
+            sub={binancePairFor(selected) ? "binance · live" : "no source"}
+            tone={binancePairFor(selected) ? "ok" : "muted"}
+            bodyClassName="p-1 min-h-0"
           >
             <OrderBookPanel symbol={selected} rows={10} />
-          </Panel>
-          <Panel
+          </TerminalPanel>
+          <TerminalPanel
             title="time & sales"
-            icon={<Signal className="h-3.5 w-3.5" />}
-            right={<Pill tone={binancePairFor(selected) ? "ok" : "muted"}>{binancePairFor(selected) ? "binance · live" : "no source"}</Pill>}
-            bodyClassName="p-2"
+            sub={binancePairFor(selected) ? "binance · live" : "no source"}
+            tone={binancePairFor(selected) ? "ok" : "muted"}
+            bodyClassName="p-1 min-h-0"
           >
             <TimeAndSalesPanel symbol={selected} rows={10} />
-          </Panel>
+          </TerminalPanel>
           <VerticalNewsTape
             chip={newsChip}
             onChip={onChip}
@@ -554,6 +506,214 @@ export default function MarketLabPage() {
       </div>
 
       <Ticker quotes={quotes} items={items} cryptoOnline={cryptoOnline} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Layout v2 hook · persists layout preset + mini-chart symbols
+// ---------------------------------------------------------------------------
+
+const STORAGE_LAYOUT_V2 = "promptready-os.marketlab.layout.v2";
+
+type LayoutId = "1" | "1+4" | "orderflow" | "macro" | "wall";
+
+const VALID_LAYOUTS: LayoutId[] = ["1", "1+4", "orderflow", "macro", "wall"];
+
+interface LayoutV2 {
+  layout: LayoutId;
+  miniSymbols: string[];
+}
+
+const DEFAULT_LAYOUT_V2: LayoutV2 = {
+  layout: "1+4",
+  miniSymbols: ["ETH", "SOL", "BNB", "XRP"]
+};
+
+const WATCHLIST_SYMBOLS = ["BTC", "ETH", "SOL", "BNB", "XRP", "AAPL", "TSLA", "NVDA", "EURUSD", "XAUUSD"];
+
+function readLayoutV2(): LayoutV2 {
+  if (typeof window === "undefined") return DEFAULT_LAYOUT_V2;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_LAYOUT_V2);
+    if (!raw) return DEFAULT_LAYOUT_V2;
+    const parsed = JSON.parse(raw) as Partial<LayoutV2>;
+    const layout: LayoutId =
+      typeof parsed.layout === "string" && (VALID_LAYOUTS as string[]).includes(parsed.layout)
+        ? (parsed.layout as LayoutId)
+        : DEFAULT_LAYOUT_V2.layout;
+    const minis =
+      Array.isArray(parsed.miniSymbols) && parsed.miniSymbols.length === 4
+        ? parsed.miniSymbols.map((s) => String(s).toUpperCase()).slice(0, 4)
+        : DEFAULT_LAYOUT_V2.miniSymbols;
+    return { layout, miniSymbols: minis };
+  } catch {
+    return DEFAULT_LAYOUT_V2;
+  }
+}
+
+function writeLayoutV2(v: LayoutV2) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_LAYOUT_V2, JSON.stringify(v));
+  } catch {
+    // ignore
+  }
+}
+
+function useLayoutV2(): [LayoutId, string[], (patch: Partial<LayoutV2>) => void] {
+  const [state, setState] = useState<LayoutV2>(() => readLayoutV2());
+  useEffect(() => writeLayoutV2(state), [state]);
+  const patch = (p: Partial<LayoutV2>) => setState((prev) => ({ ...prev, ...p }));
+  return [state.layout, state.miniSymbols, patch];
+}
+
+// ---------------------------------------------------------------------------
+// Compact command bar (replaces SurfaceHeader / WarRoomHeader sizing)
+// ---------------------------------------------------------------------------
+
+const LAYOUT_PRESETS: Array<{ id: LayoutId; label: string; hint: string }> = [
+  { id: "1", label: "1", hint: "Single dominant chart" },
+  { id: "1+4", label: "1 + 4", hint: "Main + 4 mini charts" },
+  { id: "orderflow", label: "orderflow", hint: "Main + flow imbalance + bookmap" },
+  { id: "macro", label: "macro", hint: "Main + macro strip + 4 mini" },
+  { id: "wall", label: "wall", hint: "Full density · everything visible" }
+];
+
+function CommandBar({
+  selected,
+  command,
+  onCommand,
+  onOpenSymbol,
+  crypto,
+  adapters,
+  layout,
+  onLayout
+}: {
+  selected: string;
+  command: string;
+  onCommand: (v: string) => void;
+  onOpenSymbol: (s: string) => void;
+  crypto: ReturnType<typeof useCryptoFeed>;
+  adapters: ReturnType<typeof adapterSummary>;
+  layout: LayoutId;
+  onLayout: (id: LayoutId) => void;
+}) {
+  const cgOk = crypto.state === "ok";
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-white/10 bg-white/[0.012] px-2 py-1">
+      <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
+        market lab · pro
+      </span>
+      <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/35">
+        {new Date().toLocaleTimeString("en-GB", { hour12: false })}
+      </span>
+      <span className="text-white/15">·</span>
+      <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+        symbol
+      </span>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onOpenSymbol(command);
+        }}
+        className="flex items-center gap-1"
+      >
+        <input
+          value={command}
+          onChange={(e) => onCommand(e.target.value.toUpperCase())}
+          aria-label="Symbol input"
+          spellCheck={false}
+          className="no-drag w-20 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-wider text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+          placeholder="BTC"
+        />
+        <button
+          type="submit"
+          title="Open symbol · WORKS"
+          aria-label="Open symbol · WORKS"
+          className="rounded border border-accent/40 bg-accent/[0.1] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent transition hover:bg-accent/[0.15]"
+        >
+          open
+        </button>
+        <span className="font-mono text-[9px] uppercase tracking-wider text-white/35">
+          · {selected}
+        </span>
+      </form>
+      <span className="text-white/15">·</span>
+      <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+        layout
+      </span>
+      <div role="tablist" aria-label="Layout preset" className="flex items-center gap-0.5 rounded border border-white/10 bg-white/[0.03] p-0.5">
+        {LAYOUT_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            role="tab"
+            aria-selected={layout === p.id}
+            onClick={() => onLayout(p.id)}
+            title={`${p.hint} · WORKS`}
+            className={clsx(
+              "rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition",
+              layout === p.id ? "bg-accent/[0.18] text-accent" : "text-white/55 hover:bg-white/[0.07]"
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <span className="ml-auto flex items-center gap-1.5">
+        <span
+          className={clsx(
+            "rounded border px-1.5 py-px font-mono text-[9px] uppercase tracking-wider",
+            cgOk
+              ? "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200"
+              : "border-rose-400/30 bg-rose-500/[0.08] text-rose-200"
+          )}
+          title={`CoinGecko · ${crypto.state}`}
+        >
+          cg · {crypto.state}
+        </span>
+        <span
+          className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-white/55"
+          title="Adapter summary (errors · ok · planned · pending)"
+        >
+          ad {adapters.error}/{adapters.connected}/{adapters.ready}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function MiniGrid({
+  symbols,
+  onSymbol,
+  onCandles,
+  compact = false
+}: {
+  symbols: string[];
+  onSymbol: (i: number, sym: string) => void;
+  onCandles: (sym: string) => (candles: Candle[]) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={clsx(
+        "grid min-h-0 gap-1.5",
+        compact ? "grid-cols-4" : "grid-cols-2 lg:grid-cols-4"
+      )}
+    >
+      {symbols.map((s, i) => (
+        <ChartSlot
+          key={i}
+          symbol={s}
+          onSymbol={(sym) => onSymbol(i, sym)}
+          options={WATCHLIST_SYMBOLS}
+          height={compact ? 180 : 220}
+          compact
+          onCandles={onCandles(s)}
+          title={`mini · slot ${i + 1}`}
+        />
+      ))}
     </div>
   );
 }
