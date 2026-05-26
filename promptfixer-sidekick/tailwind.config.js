@@ -10,26 +10,26 @@ module.exports = {
     extend: {
       colors: {
         ink: {
-          950: "#07080b",
-          900: "#0b0d12",
-          800: "#11141b",
-          700: "#181c25",
-          600: "#222633",
-          500: "#2c3140"
+          950: "#0a0612",
+          900: "#15101e",
+          800: "#1f1730",
+          700: "#2b1e3e",
+          600: "#352749",
+          500: "#4a4e8f"
         },
         accent: {
-          DEFAULT: "#7c9bff",
-          soft: "#b3c4ff",
-          glow: "#5d7dff"
+          DEFAULT: "#a490c2",
+          soft: "#c7b8db",
+          glow: "#4a4e8f"
         }
       },
       fontFamily: {
-        sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Inter", "system-ui", "sans-serif"],
+        sans: ["FreeSans", "Liberation Sans", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"],
         mono: ["SF Mono", "JetBrains Mono", "Menlo", "monospace"]
       },
       boxShadow: {
-        glass: "0 10px 40px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)",
-        glow: "0 0 40px -8px rgba(124,155,255,0.45)"
+        glass: "0 10px 40px -10px rgba(21,16,30,0.7), inset 0 1px 0 rgba(230,230,250,0.06)",
+        glow: "0 0 40px -8px rgba(164,144,194,0.55)"
       },
       backdropBlur: {
         xs: "2px"

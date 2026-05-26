@@ -19,20 +19,20 @@ export default function OperatorLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen w-full bg-bg">
       <OperatorRail />
       <div className="flex min-h-screen flex-1 flex-col pb-16 md:pb-0">
-        <header className="flex items-center justify-between gap-3 border-b border-white/6 bg-white/[0.012] px-4 py-2 md:px-6">
+        <header className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.02] px-4 py-2 md:px-6">
           <div className="flex items-center gap-2">
             <Link
               href="/"
-              className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45 transition hover:text-white/80"
+              className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/70 transition hover:text-white"
             >
-              operator<span className="text-white/30">.center</span>
+              operator<span className="text-white/55">.center</span>
             </Link>
             <LaunchBadge compact />
           </div>
           <div className="flex items-center gap-2">
             <Link
               href="/launch"
-              className="hidden rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-medium text-white/75 transition hover:bg-white/[0.08] md:inline-block"
+              className="hidden rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-white/90 transition hover:bg-white/[0.12] hover:border-white/25 md:inline-block"
             >
               Launch readiness
             </Link>
