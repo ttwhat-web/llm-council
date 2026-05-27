@@ -333,12 +333,14 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+    <section className="flex flex-col gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]">
       <header className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 text-accent" />
-        <h2 className="text-[13px] font-semibold text-white">{title}</h2>
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/[0.10] ring-1 ring-accent/30">
+          <Icon className="h-3.5 w-3.5 text-accent" />
+        </span>
+        <h2 className="text-[13px] font-semibold tracking-tight text-white">{title}</h2>
       </header>
-      {sub && <p className="text-[11.5px] text-white/55">{sub}</p>}
+      {sub && <p className="text-[11.5px] leading-relaxed text-white/60">{sub}</p>}
       <div className="mt-1">{children}</div>
     </section>
   );
@@ -356,14 +358,14 @@ function Row({
   ok?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-white/6 bg-white/[0.012] px-2.5 py-1.5">
-      <span className="text-[11.5px] text-white/55">{label}</span>
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.07] bg-white/[0.018] px-2.5 py-1.5 transition hover:border-white/[0.12] hover:bg-white/[0.03]">
+      <span className="text-[11.5px] text-white/60">{label}</span>
       <span
         className={clsx(
           "flex items-center gap-1 text-[12px]",
           mono && "font-mono",
           ok === true && "text-emerald-200",
-          ok === false && "text-white/45"
+          ok === false && "text-white/50"
         )}
       >
         {ok === true && <CheckCircle2 className="h-3 w-3 text-emerald-300" />}

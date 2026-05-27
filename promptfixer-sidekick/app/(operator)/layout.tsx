@@ -19,20 +19,22 @@ export default function OperatorLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen w-full bg-bg">
       <OperatorRail />
       <div className="flex min-h-screen flex-1 flex-col pb-16 md:pb-0">
-        <header className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.02] px-4 py-2 md:px-6">
-          <div className="flex items-center gap-2">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/[0.08] bg-ink-950/70 px-4 py-2 backdrop-blur-xl md:px-6">
+          <div className="flex items-center gap-2.5">
             <Link
               href="/"
-              className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/70 transition hover:text-white"
+              className="group inline-flex items-center font-mono text-[10.5px] uppercase tracking-[0.22em] text-white/75 transition hover:text-white"
             >
-              operator<span className="text-white/55">.center</span>
+              operator
+              <span className="text-white/45 transition group-hover:text-accent">.center</span>
             </Link>
+            <span aria-hidden className="h-3 w-px bg-white/10" />
             <LaunchBadge compact />
           </div>
           <div className="flex items-center gap-2">
             <Link
               href="/launch"
-              className="hidden rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-white/90 transition hover:bg-white/[0.12] hover:border-white/25 md:inline-block"
+              className="hidden rounded-lg border border-white/[0.12] bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/85 transition hover:border-accent/35 hover:bg-accent/[0.08] hover:text-accent md:inline-block"
             >
               Launch readiness
             </Link>

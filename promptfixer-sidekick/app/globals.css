@@ -54,6 +54,51 @@ body {
   background: rgba(164, 144, 194, 0.32);
 }
 
+::selection {
+  background: rgba(164, 144, 194, 0.32);
+  color: #ffffff;
+}
+
+::-moz-selection {
+  background: rgba(164, 144, 194, 0.32);
+  color: #ffffff;
+}
+
+:focus-visible {
+  outline: none;
+}
+button:focus-visible,
+a:focus-visible {
+  box-shadow: 0 0 0 2px rgba(10, 6, 18, 1), 0 0 0 4px rgba(164, 144, 194, 0.45);
+  border-radius: 8px;
+}
+
+/* Accent hairline — used under page titles for premium hierarchy */
+.accent-hairline {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(164, 144, 194, 0.55) 0%,
+    rgba(164, 144, 194, 0.18) 28%,
+    rgba(164, 144, 194, 0) 62%
+  );
+}
+
+/* Subtle inner glow lift, applied to cards on hover for a tactile feel */
+.lift-on-hover {
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lift-on-hover:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(230, 230, 250, 0.08),
+    0 12px 32px -16px rgba(164, 144, 194, 0.45);
+}
+
 .no-drag {
   -webkit-app-region: no-drag;
 }
@@ -70,6 +115,15 @@ select {
 
 button {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Calm the default focus ring on form controls — we surface our own via
+   ring-2 on the accent token. Keeps the polished look without trashing
+   keyboard-only outlines (focus-visible above re-adds an offset glow). */
+textarea:focus,
+input:focus,
+select:focus {
+  outline: none;
 }
 
 /* ── Midnight Galaxy contrast floor ──────────────────────────────────────

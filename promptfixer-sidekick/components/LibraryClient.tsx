@@ -97,8 +97,8 @@ export function LibraryClient() {
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <nav className="flex items-center gap-1 rounded-xl border border-white/8 bg-white/[0.02] p-1">
+    <div className="flex flex-col gap-4">
+      <nav className="flex items-center gap-1 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-1 shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]">
         {TABS.map((t) => {
           const active = tab === t.id;
           return (
@@ -107,10 +107,10 @@ export function LibraryClient() {
               type="button"
               onClick={() => setTab(t.id)}
               className={clsx(
-                "inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium transition",
+                "inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-medium transition-all duration-200",
                 active
-                  ? "bg-accent/15 text-accent shadow-[inset_0_0_0_1px_rgba(124,155,255,0.25)]"
-                  : "text-white/65 hover:bg-white/5 hover:text-white/85"
+                  ? "bg-accent/[0.14] text-accent shadow-[inset_0_0_0_1px_rgba(164,144,194,0.28),0_8px_24px_-12px_rgba(164,144,194,0.45)]"
+                  : "text-white/65 hover:bg-white/[0.04] hover:text-white/90"
               )}
             >
               <t.Icon className="h-3.5 w-3.5" />
@@ -118,7 +118,7 @@ export function LibraryClient() {
               <span
                 className={clsx(
                   "rounded font-mono text-[9.5px] uppercase tracking-wider",
-                  active ? "text-accent/75" : "text-white/40"
+                  active ? "text-accent/80" : "text-white/40"
                 )}
               >
                 {counts[t.id]}
@@ -187,9 +187,9 @@ function ReceiptsTab({
         left={`${receipts.length} mission${receipts.length === 1 ? "" : "s"} archived · local only`}
         onClear={onClear}
       />
-      <ul className="flex flex-col divide-y divide-white/5 rounded-2xl border border-white/8 bg-white/[0.02]">
+      <ul className="flex flex-col divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]">
         {receipts.map((r) => (
-          <li key={r.id} className="flex items-start gap-3 px-4 py-3">
+          <li key={r.id} className="flex items-start gap-3 px-4 py-3.5 transition hover:bg-white/[0.018]">
             <div className="flex flex-1 flex-col gap-1.5 leading-tight">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="rounded border border-white/10 bg-white/[0.04] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-white/55">
@@ -269,9 +269,9 @@ function StacksTab({
     );
   }
   return (
-    <ul className="flex flex-col divide-y divide-white/5 rounded-2xl border border-white/8 bg-white/[0.02]">
+    <ul className="flex flex-col divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]">
       {stacks.map((s) => (
-        <li key={s.id} className="flex items-start gap-3 px-4 py-3">
+        <li key={s.id} className="flex items-start gap-3 px-4 py-3.5 transition hover:bg-white/[0.018]">
           <div className="flex flex-1 flex-col gap-1 leading-tight">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="rounded border border-white/10 bg-white/[0.04] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-white/55">
@@ -323,9 +323,9 @@ function DraftsTab({
     );
   }
   return (
-    <ul className="flex flex-col divide-y divide-white/5 rounded-2xl border border-white/8 bg-white/[0.02]">
+    <ul className="flex flex-col divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]">
       {drafts.map((d) => (
-        <li key={d.id} className="flex items-start gap-3 px-4 py-3">
+        <li key={d.id} className="flex items-start gap-3 px-4 py-3.5 transition hover:bg-white/[0.018]">
           <div className="flex flex-1 flex-col gap-1 leading-tight">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="rounded border border-accent/30 bg-accent/[0.06] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-accent">
@@ -383,16 +383,25 @@ function EmptyState({
   cta?: { href: string; label: string };
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.012] px-5 py-10 text-center">
-      <p className="text-[13px] text-white/85">{title}</p>
-      <p className="mt-1 text-[12px] text-white/45">{body}</p>
+    <div className="relative overflow-hidden rounded-2xl border border-dashed border-white/10 bg-white/[0.012] px-6 py-12 text-center">
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-24 w-48 -translate-y-1/2 rounded-full bg-accent/[0.18] blur-3xl"
+      />
+      <div className="relative mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-accent shadow-[inset_0_1px_0_rgba(230,230,250,0.08)]">
+        <Archive className="h-4 w-4" />
+      </div>
+      <p className="relative text-[13.5px] font-medium text-white/90">{title}</p>
+      <p className="relative mx-auto mt-1.5 max-w-[44ch] text-[12px] leading-relaxed text-white/55">
+        {body}
+      </p>
       {cta && (
         <Link
           href={cta.href}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-accent/90 px-3 py-1.5 text-[12px] font-semibold text-white shadow-glow transition hover:bg-accent"
+          className="relative mt-5 inline-flex items-center gap-1.5 rounded-xl bg-accent/90 px-3.5 py-2 text-[12px] font-semibold text-white shadow-glow transition hover:bg-accent hover:shadow-[0_0_48px_-6px_rgba(164,144,194,0.65)]"
         >
           {cta.label}
-          <ArrowRight className="h-3.5 w-3.5" />
+          <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
         </Link>
       )}
     </div>

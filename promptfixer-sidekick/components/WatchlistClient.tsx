@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { LineChart, Loader2, Plus, Trash2 } from "lucide-react";
 import {
   addSymbol,
   loadWatchlist,
@@ -92,7 +92,7 @@ export function WatchlistClient() {
         <button
           type="submit"
           disabled={!ticker.trim()}
-          className="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/[0.08] px-2.5 py-1 text-[12px] font-medium text-accent transition hover:bg-accent/[0.16] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg border border-accent/35 bg-accent/[0.10] px-3 py-1.5 text-[12px] font-medium text-accent transition hover:border-accent/55 hover:bg-accent/[0.18] hover:shadow-[0_8px_28px_-12px_rgba(164,144,194,0.6)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:shadow-none"
         >
           <Plus className="h-3.5 w-3.5" />
           Add
@@ -100,14 +100,26 @@ export function WatchlistClient() {
       </form>
 
       {list.length === 0 ? (
-        <p className="text-[11.5px] text-white/55">
-          No symbols yet. Capture the tickers you care about — when live data
-          adapters ship, this list seeds the Terminal market panel.
-        </p>
+        <div className="relative overflow-hidden rounded-2xl border border-dashed border-white/10 bg-white/[0.012] px-6 py-8 text-center">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-20 w-40 -translate-y-1/2 rounded-full bg-accent/[0.14] blur-3xl"
+          />
+          <div className="relative mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-accent shadow-[inset_0_1px_0_rgba(230,230,250,0.08)]">
+            <LineChart className="h-4 w-4" />
+          </div>
+          <p className="relative text-[12.5px] font-medium text-white/85">
+            No symbols yet.
+          </p>
+          <p className="relative mx-auto mt-1 max-w-[44ch] text-[11.5px] leading-relaxed text-white/55">
+            Capture the tickers you care about — when live data adapters
+            ship, this list seeds the Terminal market panel.
+          </p>
+        </div>
       ) : (
-        <ul className="flex flex-col divide-y divide-white/5 rounded-2xl border border-white/8 bg-white/[0.02]">
+        <ul className="flex flex-col divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]">
           {list.map((s) => (
-            <li key={s.id} className="flex items-center gap-3 px-4 py-2">
+            <li key={s.id} className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-white/[0.018]">
               <span className="font-mono text-[12.5px] uppercase tracking-wider text-white">
                 {s.ticker}
               </span>

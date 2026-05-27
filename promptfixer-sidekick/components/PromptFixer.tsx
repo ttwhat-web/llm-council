@@ -1133,21 +1133,25 @@ export function PromptFixer({ variant = "web" }: Props) {
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30 shadow-glow">
-              <span className="font-mono text-[11px] tracking-wider text-accent">[ ]</span>
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30 shadow-glow">
+              <span
+                aria-hidden
+                className="absolute -inset-px rounded-2xl bg-gradient-to-br from-accent/10 via-transparent to-transparent"
+              />
+              <span className="relative font-mono text-[11px] tracking-wider text-accent">[ ]</span>
             </div>
             <div className="leading-tight">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold tracking-tight text-white">
-                  operator<span className="text-white/40">.center</span>
+                <span className="text-[15px] font-semibold tracking-tight text-white">
+                  operator<span className="text-white/45">.center</span>
                 </span>
-                <span className="rounded-md border border-accent/25 bg-accent/[0.06] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.2em] text-accent">
+                <span className="rounded-md border border-accent/30 bg-accent/[0.08] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.22em] text-accent">
                   Mission Control
                 </span>
                 <LaunchBadge compact />
               </div>
               {!compact && (
-                <div className="text-[11px] text-white/45">
+                <div className="mt-0.5 text-[11.5px] text-white/55">
                   Dispatch missions. Audit telemetry. Replay the ones that worked.
                 </div>
               )}
@@ -1673,16 +1677,16 @@ function ColumnHeader({
   reactor?: boolean;
 }) {
   return (
-    <header className="flex items-baseline justify-between border-b border-white/5 pb-2">
-      <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.18em] text-white/65">
+    <header className="flex items-baseline justify-between border-b border-white/[0.07] pb-2.5">
+      <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.2em] text-white/75">
         {reactor && (
-          <span className="relative inline-block h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_6px_2px_rgba(124,155,255,0.5)]">
-            <span className="absolute inset-0 animate-[pulse_2s_ease-in-out_infinite] rounded-full bg-accent/35" />
+          <span className="relative inline-block h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_2px_rgba(164,144,194,0.55)]">
+            <span className="absolute inset-0 animate-[pulse_2s_ease-in-out_infinite] rounded-full bg-accent/45" />
           </span>
         )}
         {label}
       </span>
-      <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">
+      <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-white/35">
         {tag}
       </span>
     </header>
@@ -1691,11 +1695,15 @@ function ColumnHeader({
 
 function PipelineEmpty() {
   return (
-    <div className="rounded-xl border border-dashed border-white/8 bg-white/[0.01] px-3 py-3 text-center">
-      <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.18em] text-white/35">
+    <div className="relative overflow-hidden rounded-xl border border-dashed border-white/[0.09] bg-white/[0.012] px-3 py-4 text-center">
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-12 w-32 -translate-y-1/2 rounded-full bg-accent/[0.14] blur-2xl"
+      />
+      <div className="relative mb-1 text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
         Reactor idle
       </div>
-      <div className="text-[11px] text-white/50">
+      <div className="relative text-[11.5px] leading-relaxed text-white/55">
         Load an input on the left, then{" "}
         <span className="text-accent">Run Mission</span> to start the pipeline.
       </div>
@@ -1713,28 +1721,41 @@ function OutputEmpty({
   onCommand: () => void;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/8 bg-white/[0.01] px-3 py-8 text-center">
-      <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/35">
+    <div className="relative flex flex-1 flex-col items-center justify-center gap-3 overflow-hidden rounded-xl border border-dashed border-white/[0.09] bg-white/[0.012] px-3 py-10 text-center">
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-28 w-52 -translate-y-1/2 rounded-full bg-accent/[0.18] blur-3xl"
+      />
+      <span
+        aria-hidden
+        className="relative mb-1 flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-accent shadow-[inset_0_1px_0_rgba(230,230,250,0.08)]"
+      >
+        <Wand2 className="h-4 w-4" />
+      </span>
+      <div className="relative text-[10px] font-medium uppercase tracking-[0.22em] text-white/45">
         Awaiting Mission
       </div>
-      <div className="max-w-[240px] text-[12px] text-white/55">
-        Submit your input from <span className="text-white/85">Mission Input</span>, or
-        press <kbd className="rounded border border-white/10 bg-white/[0.04] px-1 font-mono text-[10px]">⌘K</kbd>{" "}
+      <div className="relative max-w-[260px] text-[12px] leading-relaxed text-white/60">
+        Submit your input from{" "}
+        <span className="text-white/85">Mission Input</span>, or press{" "}
+        <kbd className="rounded border border-white/10 bg-white/[0.05] px-1 font-mono text-[10px] text-white/80">
+          ⌘K
+        </kbd>{" "}
         for commands.
       </div>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="relative mt-1 flex items-center gap-2">
         <button
           type="button"
           onClick={onRun}
           disabled={disabled}
-          className="no-drag rounded-lg bg-accent/85 px-2.5 py-1 text-[11px] font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+          className="no-drag rounded-lg bg-accent/90 px-3 py-1.5 text-[11.5px] font-semibold text-white shadow-glow transition hover:bg-accent hover:shadow-[0_0_44px_-6px_rgba(164,144,194,0.7)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:shadow-glow"
         >
           Run Mission
         </button>
         <button
           type="button"
           onClick={onCommand}
-          className="no-drag rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-[11px] text-white/75 transition hover:bg-white/[0.06]"
+          className="no-drag rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 font-mono text-[11px] text-white/80 transition hover:border-accent/30 hover:bg-accent/[0.06] hover:text-accent"
         >
           ⌘K
         </button>

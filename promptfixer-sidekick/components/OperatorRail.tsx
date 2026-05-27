@@ -83,17 +83,18 @@ export function OperatorRail() {
   return (
     <aside
       aria-label="Operator navigation"
-      className="hidden shrink-0 flex-col items-center gap-1 border-r border-white/6 bg-white/[0.012] py-3 md:flex"
+      className="hidden shrink-0 flex-col items-center gap-1.5 border-r border-white/[0.06] bg-white/[0.012] py-3.5 md:flex"
       style={{ width: 56 }}
     >
       <Link
         href="/"
         title="operator.center"
-        className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/15 ring-1 ring-accent/30 shadow-glow transition hover:bg-accent/[0.22]"
+        className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/15 ring-1 ring-accent/30 shadow-glow transition duration-200 hover:bg-accent/[0.22] hover:ring-accent/45 active:scale-95"
       >
         <span className="font-mono text-[11px] tracking-wider text-accent">[ ]</span>
       </Link>
-      <nav className="mt-2 flex flex-col gap-1">
+      <span aria-hidden className="my-1 h-px w-6 bg-white/[0.06]" />
+      <nav className="flex flex-col gap-1">
         {OPERATOR_NAV.map((item) => {
           const active = isActive(pathname, item);
           return (
@@ -102,17 +103,22 @@ export function OperatorRail() {
               href={item.href}
               title={item.label}
               className={clsx(
-                "group relative flex h-9 w-9 items-center justify-center rounded-lg transition",
+                "group relative flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-200",
                 active
-                  ? "bg-accent/[0.12] text-accent ring-1 ring-accent/30"
-                  : "text-white/55 hover:bg-white/[0.04] hover:text-white"
+                  ? "bg-accent/[0.14] text-accent ring-1 ring-accent/35 shadow-[inset_0_1px_0_rgba(230,230,250,0.06)]"
+                  : "text-white/60 hover:bg-white/[0.05] hover:text-white"
               )}
             >
-              <item.Icon className="h-4 w-4" />
+              <item.Icon
+                className={clsx(
+                  "h-4 w-4 transition-transform duration-200",
+                  !active && "group-hover:scale-110"
+                )}
+              />
               {active && (
                 <span
                   aria-hidden
-                  className="absolute -left-0.5 h-5 w-0.5 rounded-r bg-accent shadow-[0_0_8px_1px_rgba(124,155,255,0.6)]"
+                  className="absolute -left-[3px] h-5 w-[2px] rounded-r bg-accent shadow-[0_0_10px_1px_rgba(164,144,194,0.7)]"
                 />
               )}
             </Link>

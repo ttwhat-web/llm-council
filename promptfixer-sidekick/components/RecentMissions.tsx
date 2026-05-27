@@ -60,16 +60,16 @@ export function RecentMissions({ reloadKey, onCopyShareUrl, compact }: Props) {
   return (
     <section
       className={clsx(
-        "rounded-2xl border border-white/6 bg-white/[0.012]",
+        "rounded-2xl border border-white/[0.07] bg-white/[0.018] shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]",
         compact && "text-[11px]"
       )}
     >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 transition hover:bg-white/[0.02]"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 transition hover:bg-white/[0.03]"
       >
-        <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.2em] text-white/55">
+        <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.22em] text-white/65">
           {open ? (
             <ChevronDown className="h-3 w-3 text-white/40" />
           ) : (

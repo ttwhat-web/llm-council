@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import {
+  BookOpen,
   Loader2,
   Pencil,
   Plus,
@@ -111,9 +112,16 @@ export function MemoryNotesClient() {
 
       {visible.length === 0 ? (
         notes.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.012] px-5 py-8 text-center">
-            <p className="text-[12.5px] text-white/85">No notes yet.</p>
-            <p className="mt-1 text-[11.5px] text-white/50">
+          <div className="relative overflow-hidden rounded-2xl border border-dashed border-white/10 bg-white/[0.012] px-6 py-10 text-center">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-24 w-40 -translate-y-1/2 rounded-full bg-accent/[0.16] blur-3xl"
+            />
+            <div className="relative mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-accent shadow-[inset_0_1px_0_rgba(230,230,250,0.08)]">
+              <BookOpen className="h-4 w-4" />
+            </div>
+            <p className="relative text-[13px] font-medium text-white/90">No notes yet.</p>
+            <p className="relative mx-auto mt-1.5 max-w-[46ch] text-[11.5px] leading-relaxed text-white/55">
               Capture decisions, briefs, summaries — anything you want
               available as mission context. Nothing is sent to a server.
             </p>
@@ -124,9 +132,9 @@ export function MemoryNotesClient() {
           </p>
         )
       ) : (
-        <ul className="flex flex-col divide-y divide-white/5 rounded-2xl border border-white/8 bg-white/[0.02]">
+        <ul className="flex flex-col divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]">
           {visible.map((n) => (
-            <li key={n.id} className="flex items-start gap-3 px-4 py-3">
+            <li key={n.id} className="flex items-start gap-3 px-4 py-3.5 transition hover:bg-white/[0.018]">
               <div className="flex flex-1 flex-col gap-1 leading-tight">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[12.5px] font-semibold text-white">{n.title}</span>

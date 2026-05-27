@@ -91,17 +91,18 @@ export default function MemoryPage() {
       />
 
       {/* --------------- Notes (real, local) --------------- */}
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-3.5">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/85">
+          <h2 className="flex items-center gap-2 text-[12.5px] font-semibold uppercase tracking-[0.2em] text-white/90">
+            <span aria-hidden className="h-1 w-1 rounded-full bg-accent shadow-[0_0_6px_1px_rgba(164,144,194,0.6)]" />
             Notes
           </h2>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
             local · this browser
           </span>
         </div>
         <MemoryNotesClient />
-        <p className="text-[11px] text-white/45">
+        <p className="text-[11.5px] leading-relaxed text-white/50">
           Attach notes to a mission from the &ldquo;Memory&rdquo; button in Mission
           Control. Attached notes are prepended as a Markdown context block to
           the mission input.
@@ -109,12 +110,13 @@ export default function MemoryPage() {
       </section>
 
       {/* --------------- Sources (placeholder) --------------- */}
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-3.5">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/85">
+          <h2 className="flex items-center gap-2 text-[12.5px] font-semibold uppercase tracking-[0.2em] text-white/90">
+            <span aria-hidden className="h-1 w-1 rounded-full bg-white/35" />
             Sources
           </h2>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
             planned connectors
           </span>
         </div>
@@ -122,10 +124,10 @@ export default function MemoryPage() {
           {SOURCES.map((s) => (
             <article
               key={s.id}
-              className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4"
+              className="lift-on-hover flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]"
             >
               <header className="flex items-start gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.05] ring-1 ring-white/8">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.05] ring-1 ring-white/[0.10] shadow-[inset_0_1px_0_rgba(230,230,250,0.06)]">
                   <s.Icon className="h-4 w-4 text-accent" />
                 </span>
                 <div className="flex flex-1 flex-col leading-tight">

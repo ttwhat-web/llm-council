@@ -63,29 +63,31 @@ export default function TerminalPage() {
       />
 
       {/* --------------- Watchlist (real, local) --------------- */}
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-3.5">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/85">
+          <h2 className="flex items-center gap-2 text-[12.5px] font-semibold uppercase tracking-[0.2em] text-white/90">
+            <span aria-hidden className="h-1 w-1 rounded-full bg-accent shadow-[0_0_6px_1px_rgba(164,144,194,0.6)]" />
             Watchlist
           </h2>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
             local · this browser
           </span>
         </div>
         <WatchlistClient />
-        <p className="text-[11px] text-white/45">
+        <p className="text-[11.5px] leading-relaxed text-white/50">
           No live prices are connected. The list seeds the Terminal panel
           when a market-data adapter is wired.
         </p>
       </section>
 
       {/* --------------- Planned panels --------------- */}
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-3.5">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/85">
+          <h2 className="flex items-center gap-2 text-[12.5px] font-semibold uppercase tracking-[0.2em] text-white/90">
+            <span aria-hidden className="h-1 w-1 rounded-full bg-white/35" />
             Operator-tier panels
           </h2>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
             planned
           </span>
         </div>
@@ -106,17 +108,19 @@ export default function TerminalPage() {
           {PANELS.map((p) => (
             <article
               key={p.id}
-              className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-4"
+              className="lift-on-hover flex flex-col gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]"
             >
               <header className="flex items-center gap-2">
-                <p.Icon className="h-4 w-4 text-accent" />
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.05] ring-1 ring-white/[0.10] shadow-[inset_0_1px_0_rgba(230,230,250,0.06)]">
+                  <p.Icon className="h-4 w-4 text-accent" />
+                </span>
                 <h3 className="text-[13px] font-semibold text-white">{p.name}</h3>
-                <span className="ml-auto inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-white/55">
+                <span className="ml-auto inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-white/55">
                   <span className="h-1 w-1 rounded-full bg-white/30" />
                   not wired yet
                 </span>
               </header>
-              <p className="text-[12px] text-white/55">{p.blurb}</p>
+              <p className="text-[12px] leading-relaxed text-white/60">{p.blurb}</p>
             </article>
           ))}
         </div>

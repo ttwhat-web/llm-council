@@ -31,15 +31,15 @@ export function MissionLog({ entries, busy, visible = 6, compact }: Props) {
   return (
     <div
       className={clsx(
-        "rounded-2xl border border-white/6 bg-white/[0.015] px-3 py-2",
-        compact && "px-2 py-1.5"
+        "rounded-2xl border border-white/[0.07] bg-white/[0.018] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]",
+        compact && "px-2 py-2"
       )}
     >
-      <div className="flex items-center justify-between pb-1">
-        <div className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/35">
+      <div className="flex items-center justify-between pb-1.5">
+        <div className="text-[9.5px] font-medium uppercase tracking-[0.22em] text-white/50">
           Mission log
         </div>
-        <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/35">
+        <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-wider text-white/45">
           {busy && (
             <span className="inline-flex items-center gap-1 text-accent">
               <span className="relative h-1 w-1 rounded-full bg-accent shadow-[0_0_5px_2px_rgba(124,155,255,0.45)]">

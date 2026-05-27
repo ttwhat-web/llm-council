@@ -154,7 +154,7 @@ export function UpgradeModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 px-4 backdrop-blur-md"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
@@ -307,14 +307,20 @@ function PlanCard({
   return (
     <div
       className={clsx(
-        "flex flex-col gap-2 rounded-2xl border bg-white/[0.02] p-4 transition",
+        "relative flex flex-col gap-2 overflow-hidden rounded-2xl border bg-white/[0.02] p-4 shadow-[inset_0_1px_0_rgba(230,230,250,0.05)] transition-all duration-200",
         plan.highlight
-          ? "border-accent/35 shadow-glow"
+          ? "border-accent/40 shadow-[0_24px_60px_-24px_rgba(164,144,194,0.55),inset_0_1px_0_rgba(230,230,250,0.06)]"
           : active
-            ? "border-emerald-400/35"
-            : "border-white/8"
+            ? "border-emerald-400/40"
+            : "border-white/[0.10] hover:border-white/[0.18]"
       )}
     >
+      {plan.highlight && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-20 w-32 -translate-y-1/2 rounded-full bg-accent/[0.18] blur-3xl"
+        />
+      )}
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-white">{plan.name}</span>
         <span className="text-xs text-white/65">{plan.price}</span>
@@ -342,12 +348,12 @@ function PlanCard({
         onClick={onPick}
         disabled={busy}
         className={clsx(
-          "no-drag mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+          "no-drag mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50",
           plan.highlight
-            ? "bg-accent/90 text-white shadow-glow hover:bg-accent"
+            ? "bg-accent/90 text-white shadow-glow hover:bg-accent hover:shadow-[0_0_48px_-6px_rgba(164,144,194,0.7)]"
             : isTeam
-              ? "border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.08]"
-              : "border border-white/10 bg-white/[0.03] text-white/85 hover:bg-white/[0.06]"
+              ? "border border-white/[0.12] bg-white/[0.04] text-white/85 hover:border-white/20 hover:bg-white/[0.08]"
+              : "border border-white/[0.12] bg-white/[0.03] text-white/90 hover:border-white/20 hover:bg-white/[0.07]"
         )}
       >
         {plan.id === "free" ? "Use Free" : isTeam ? "Talk to us" : "Use Pro Preview"}

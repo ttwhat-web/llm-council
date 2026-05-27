@@ -121,15 +121,15 @@ function Pill({
   return (
     <span
       className={clsx(
-        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5",
+        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 transition-colors",
         tone === "warn"
-          ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+          ? "border-amber-500/35 bg-amber-500/10 text-amber-200"
           : muted
-            ? "border-white/6 bg-white/[0.02] text-white/45"
-            : "border-white/8 bg-white/[0.04] text-white/75"
+            ? "border-white/[0.07] bg-white/[0.025] text-white/55"
+            : "border-white/[0.10] bg-white/[0.05] text-white/85"
       )}
     >
-      <span className="text-white/35">{label}</span>
+      <span className="text-white/45">{label}</span>
       <span className="font-mono">{value}</span>
     </span>
   );
@@ -155,9 +155,9 @@ function Light({
     muted: "text-white/55"
   }[tone];
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md border border-white/8 bg-white/[0.04] px-1.5 py-0.5">
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.05] px-1.5 py-0.5">
       <span className={clsx("relative inline-block h-1.5 w-1.5 rounded-full", dot)}>
-        {pulse && <span className="absolute inset-0 animate-ping rounded-full bg-accent/40" />}
+        {pulse && <span className="absolute inset-0 animate-ping rounded-full bg-accent/50" />}
       </span>
       <span className={clsx("font-mono", text_)}>{text}</span>
     </span>

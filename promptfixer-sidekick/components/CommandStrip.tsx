@@ -68,19 +68,19 @@ export function CommandStrip({ onOpen, onPrefilled, onCommand, compact }: Props)
   return (
     <div
       className={clsx(
-        "flex flex-wrap items-center gap-1.5 rounded-xl border border-white/6 bg-white/[0.015] px-2 py-1.5",
+        "flex flex-wrap items-center gap-1.5 rounded-xl border border-white/[0.07] bg-white/[0.018] px-2 py-1.5 shadow-[inset_0_1px_0_rgba(230,230,250,0.04)]",
         compact && "px-1.5 py-1"
       )}
     >
       <button
         type="button"
         onClick={onOpen}
-        className="no-drag inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/[0.08] px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-accent transition hover:bg-accent/[0.14]"
+        className="no-drag inline-flex items-center gap-1 rounded-md border border-accent/35 bg-accent/[0.10] px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider text-accent transition hover:border-accent/55 hover:bg-accent/[0.18]"
         title="Command palette (Cmd/Ctrl + K)"
       >
         <span>⌘K</span>
       </button>
-      <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/30">
+      <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
         commands
       </span>
       <span className="text-white/15">·</span>
@@ -91,7 +91,7 @@ export function CommandStrip({ onOpen, onPrefilled, onCommand, compact }: Props)
             type="button"
             onClick={() => c.fire?.({ onOpen, onPrefilled, onCommand })}
             title={c.hint}
-            className="no-drag rounded-md border border-white/6 bg-white/[0.02] px-1.5 py-0.5 font-mono text-[11px] text-white/60 transition hover:border-white/12 hover:bg-white/[0.06] hover:text-white/90"
+            className="no-drag rounded-md border border-white/[0.07] bg-white/[0.025] px-2 py-0.5 font-mono text-[11px] text-white/70 transition hover:-translate-y-px hover:border-accent/35 hover:bg-accent/[0.08] hover:text-accent"
           >
             {c.label}
           </button>
