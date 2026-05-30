@@ -39,7 +39,6 @@ import {
   Zap
 } from "lucide-react";
 
-import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { TerminalPanel } from "@/components/market-lab/panels/TerminalPanel";
 import { EmptyAdapterPanel } from "@/components/market-lab/panels/EmptyAdapterPanel";
 
@@ -80,6 +79,12 @@ import {
 // Local alias so the existing rendering code keeps a single ServerService type.
 type ServerService = BridgeServiceOut;
 
+interface RestartHint {
+  state: "running" | "ok" | "error";
+  at: number;
+  detail?: string;
+}
+
 // ---------------------------------------------------------------------------
 // page
 // ---------------------------------------------------------------------------
@@ -90,6 +95,7 @@ export default function ServerPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState<ServerService | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>(() => listAudit());
+  const [lastRestart, setLastRestart] = useState<Record<string, RestartHint>>({});
 
   // Live data slots (all stay null until the agent ships).
   const [status, setStatus] = useState<ServerStatus | null>(null);
@@ -260,9 +266,16 @@ export default function ServerPage() {
     if (!confirmRestart || !activeProfile) return;
     const svc = confirmRestart;
     setConfirmRestart(null);
-    await bridgeRestart(activeProfile, svc.kind, svc.name);
+    const rid = svc.id;
+    setLastRestart((prev) => ({ ...prev, [rid]: { state: "running", at: Date.now() } }));
+    const r = await bridgeRestart(activeProfile, svc.kind, svc.name);
     setAudit(listAudit());
-    // Re-probe + re-list services so the row reflects the new state.
+    setLastRestart((prev) => ({
+      ...prev,
+      [rid]: r.ok
+        ? { state: "ok", at: Date.now(), detail: `restarted · ${r.data?.stdout?.split("\n")[0] ?? "no output"}` }
+        : { state: "error", at: Date.now(), detail: r.error ?? "unknown error" }
+    }));
     void refreshServices();
   };
 
@@ -298,15 +311,28 @@ export default function ServerPage() {
   };
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1700px] flex-col gap-2 px-3 py-3">
-      <SurfaceHeader
-        eyebrow="server · command center"
-        title="Server Command Center"
-        sub="Remote VPS / service monitoring · SSH key auth · allowlisted commands · audited."
-        right={
+    <div className="mx-auto flex h-full w-full max-w-[1700px] flex-col gap-1.5 px-2 py-2">
+      {/* compact single-row command bar · replaces the marketing header */}
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-white/10 bg-white/[0.012] px-2 py-1">
+        <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
+          server · command center
+        </span>
+        <span className="text-white/15">·</span>
+        <span className="inline-flex items-center gap-1 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+          <Shield className="h-3 w-3 text-accent" />
+          ssh key only · no password · no arbitrary commands
+        </span>
+        <span className="text-white/15">·</span>
+        <span
+          className="font-mono text-[9px] uppercase tracking-wider text-white/45"
+          title={`allowlist: ${ALLOWED_COMMANDS.join(", ")}`}
+        >
+          allowlist · audited
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1.5">
           <span
             className={clsx(
-              "rounded border px-1.5 py-px font-mono text-[9.5px] uppercase tracking-wider",
+              "rounded border px-1.5 py-px font-mono text-[9px] uppercase tracking-wider",
               agentStatus === "ready"
                 ? "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200"
                 : "border-amber-400/30 bg-amber-500/[0.08] text-amber-200"
@@ -315,21 +341,7 @@ export default function ServerPage() {
           >
             agent · {agentStatus}
           </span>
-        }
-      />
-
-      {/* security banner · honest contract */}
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5 font-mono text-[10px] uppercase tracking-wider text-white/55">
-        <Shield className="h-3.5 w-3.5 text-accent" />
-        <span>ssh key only</span>
-        <span className="text-white/15">·</span>
-        <span>no password storage</span>
-        <span className="text-white/15">·</span>
-        <span>no arbitrary commands</span>
-        <span className="text-white/15">·</span>
-        <span>allowlist: {ALLOWED_COMMANDS.join(", ")}</span>
-        <span className="text-white/15">·</span>
-        <span>every action audited</span>
+        </span>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 xl:grid-cols-[260px_minmax(0,1fr)]">
@@ -368,6 +380,7 @@ export default function ServerPage() {
                   onRefresh={refreshServices}
                   onRestart={onConfirmRestart}
                   onDeployBlocked={onDeployBlocked}
+                  lastRestart={lastRestart}
                 />
                 <LogsViewer
                   lines={logs}
@@ -565,7 +578,7 @@ function StatusCards({
       tone={err ? "warn" : status ? "ok" : "muted"}
       status={
         err
-          ? "agent not wired"
+          ? "error"
           : fetchedAt
             ? new Date(fetchedAt).toLocaleTimeString("en-GB", { hour12: false })
             : "—"
@@ -588,12 +601,28 @@ function StatusCards({
           <StatTile key={it.label} {...it} />
         ))}
       </div>
-      {!status && (
+      {err && <InlineError label="probe-status failed" detail={err} />}
+      {!status && !err && (
         <p className="mt-1.5 rounded border border-dashed border-white/12 bg-white/[0.012] px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-white/45">
           adapter-ready · agent not wired · values will populate when the SSH bridge ships
         </p>
       )}
     </TerminalPanel>
+  );
+}
+
+function InlineError({ label, detail }: { label: string; detail: string }) {
+  return (
+    <div
+      role="alert"
+      className="mt-1.5 flex items-start gap-1.5 rounded border border-rose-400/30 bg-rose-500/[0.06] px-2 py-1.5"
+    >
+      <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-rose-300" />
+      <div className="flex min-w-0 flex-col">
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-rose-200">{label}</span>
+        <span className="break-all font-mono text-[10.5px] text-white/80">{detail}</span>
+      </div>
+    </div>
   );
 }
 
@@ -636,7 +665,8 @@ function ServicesPanel({
   fetchedAt,
   onRefresh,
   onRestart,
-  onDeployBlocked
+  onDeployBlocked,
+  lastRestart
 }: {
   services: ServerService[];
   err: string | null;
@@ -644,6 +674,7 @@ function ServicesPanel({
   onRefresh: () => void;
   onRestart: (s: ServerService) => void;
   onDeployBlocked: () => void;
+  lastRestart: Record<string, RestartHint>;
 }) {
   return (
     <TerminalPanel
@@ -652,7 +683,7 @@ function ServicesPanel({
       tone={err ? "warn" : services.length ? "ok" : "muted"}
       status={
         err
-          ? "agent not wired"
+          ? "error"
           : fetchedAt
             ? new Date(fetchedAt).toLocaleTimeString("en-GB", { hour12: false })
             : "—"
@@ -683,14 +714,23 @@ function ServicesPanel({
       bodyClassName="p-2 min-h-0"
     >
       {services.length === 0 ? (
-        <EmptyAdapterPanel
-          text="services adapter-ready"
-          subtext={err ?? "agent not wired · no service inventory"}
-        />
+        err ? (
+          <InlineError label="services failed" detail={err} />
+        ) : (
+          <EmptyAdapterPanel
+            text="services adapter-ready"
+            subtext="no service inventory yet · refresh to probe"
+          />
+        )
       ) : (
         <ul className="flex min-h-0 flex-col gap-1 overflow-auto scrollbar-thin">
           {services.map((s) => (
-            <ServiceRow key={s.id} svc={s} onRestart={onRestart} />
+            <ServiceRow
+              key={s.id}
+              svc={s}
+              onRestart={onRestart}
+              hint={lastRestart[s.id] ?? null}
+            />
           ))}
         </ul>
       )}
@@ -707,40 +747,72 @@ const SERVICE_TONE: Record<ServerService["state"], string> = {
 
 function ServiceRow({
   svc,
-  onRestart
+  onRestart,
+  hint
 }: {
   svc: ServerService;
   onRestart: (s: ServerService) => void;
+  hint: RestartHint | null;
 }) {
   return (
-    <li className="flex items-center justify-between gap-2 rounded border border-white/8 bg-white/[0.012] px-2 py-1">
-      <div className="flex flex-col">
-        <span className="font-mono text-[11px] text-white/90">{svc.name}</span>
-        <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
-          {svc.kind}
-          {svc.detail ? ` · ${svc.detail}` : ""}
-        </span>
+    <li className="flex flex-col gap-1 rounded border border-white/8 bg-white/[0.012] px-2 py-1">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="font-mono text-[11px] text-white/90">{svc.name}</span>
+          <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
+            {svc.kind}
+            {svc.detail ? ` · ${svc.detail}` : ""}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={clsx(
+              "rounded border px-1.5 py-px font-mono text-[9px] uppercase tracking-wider",
+              SERVICE_TONE[svc.state]
+            )}
+          >
+            {svc.state}
+          </span>
+          <button
+            type="button"
+            onClick={() => onRestart(svc)}
+            disabled={hint?.state === "running"}
+            title={`Restart ${svc.name} · WORKS · opens confirm modal · allowlisted`}
+            aria-label={`Restart ${svc.name} · WORKS`}
+            className="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-500/[0.06] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200 transition hover:bg-amber-500/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {hint?.state === "running" ? "restarting…" : "restart"}
+          </button>
+        </div>
       </div>
-      <div className="flex items-center gap-1.5">
-        <span
-          className={clsx(
-            "rounded border px-1.5 py-px font-mono text-[9px] uppercase tracking-wider",
-            SERVICE_TONE[svc.state]
-          )}
-        >
-          {svc.state}
-        </span>
-        <button
-          type="button"
-          onClick={() => onRestart(svc)}
-          title={`Restart ${svc.name} · WORKS · opens confirm modal · allowlisted`}
-          aria-label={`Restart ${svc.name} · WORKS`}
-          className="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-500/[0.06] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200 transition hover:bg-amber-500/[0.12]"
-        >
-          restart
-        </button>
-      </div>
+      {hint && hint.state !== "running" && (
+        <RestartHintRow hint={hint} />
+      )}
     </li>
+  );
+}
+
+function RestartHintRow({ hint }: { hint: RestartHint }) {
+  const cls =
+    hint.state === "ok"
+      ? "border-emerald-400/30 bg-emerald-500/[0.05] text-emerald-200"
+      : "border-rose-400/30 bg-rose-500/[0.06] text-rose-200";
+  return (
+    <div
+      role="status"
+      className={clsx(
+        "flex items-start gap-1.5 rounded border px-1.5 py-0.5 font-mono text-[9.5px]",
+        cls
+      )}
+    >
+      <span className="uppercase tracking-wider">
+        {hint.state === "ok" ? "ok" : "error"}
+      </span>
+      <span className="uppercase tracking-wider text-white/45">
+        {new Date(hint.at).toLocaleTimeString("en-GB", { hour12: false })}
+      </span>
+      <span className="min-w-0 break-all text-white/80">{hint.detail}</span>
+    </div>
   );
 }
 
@@ -766,7 +838,7 @@ function LogsViewer({
       tone={err ? "warn" : lines.length ? "ok" : "muted"}
       status={
         err
-          ? "agent not wired"
+          ? "error"
           : fetchedAt
             ? new Date(fetchedAt).toLocaleTimeString("en-GB", { hour12: false })
             : "—"
@@ -785,10 +857,14 @@ function LogsViewer({
       bodyClassName="p-2 min-h-0"
     >
       {lines.length === 0 ? (
-        <EmptyAdapterPanel
-          text="logs adapter-ready"
-          subtext={err ?? "agent not wired · no journal access"}
-        />
+        err ? (
+          <InlineError label="logs failed" detail={err} />
+        ) : (
+          <EmptyAdapterPanel
+            text="logs adapter-ready"
+            subtext="no journal yet · refresh to fetch the last 200 lines"
+          />
+        )
       ) : (
         <pre className="min-h-0 flex-1 overflow-auto rounded border border-white/8 bg-black/60 p-2 font-mono text-[10px] leading-snug text-white/80 scrollbar-thin">
           {lines.join("\n")}

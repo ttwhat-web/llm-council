@@ -699,7 +699,9 @@ function MiniGrid({
     <div
       className={clsx(
         "grid min-h-0 gap-1.5",
-        compact ? "grid-cols-4" : "grid-cols-2 lg:grid-cols-4"
+        // 2×2 tile grid · never a single long strip. `compact` mode (used
+        // by the "wall" preset) puts 4 in a row to fit more data on screen.
+        compact ? "grid-cols-4" : "grid-cols-2 grid-rows-2"
       )}
     >
       {symbols.map((s, i) => (
@@ -708,7 +710,7 @@ function MiniGrid({
           symbol={s}
           onSymbol={(sym) => onSymbol(i, sym)}
           options={WATCHLIST_SYMBOLS}
-          height={compact ? 180 : 220}
+          height={compact ? 170 : 200}
           compact
           onCandles={onCandles(s)}
           title={`mini · slot ${i + 1}`}

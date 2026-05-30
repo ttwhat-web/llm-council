@@ -320,6 +320,22 @@ export function ChartCanvas({
         {hovered && !compact && (
           <TooltipBadge candle={hovered} interval={interval} />
         )}
+        {state.error && state.candles.length === 0 && (
+          <div
+            role="alert"
+            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-sm"
+          >
+            <div className="flex max-w-[80%] flex-col items-center gap-1 rounded border border-rose-400/40 bg-rose-500/[0.08] px-3 py-2 text-center">
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-rose-200">
+                binance fetch failed
+              </span>
+              <span className="break-all font-mono text-[11px] text-white/85">{state.error}</span>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
+                {symbol} · {interval} · check network / API rate limit
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

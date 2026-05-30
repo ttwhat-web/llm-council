@@ -1,165 +1,117 @@
-# Working Feature Audit · operator-next
+# Working Feature Audit · operator-next · hardening sprint
 
-Audit method: read each surface's primary action buttons, classify against the
-project taxonomy (WORKS · COPY ONLY · OPEN EXTERNAL · REQUIRES KEY ·
-REQUIRES DESKTOP · DISABLED · planned), and verify by file inspection.
-Every row below has been read directly from source.
+Method: read each surface, classify against project taxonomy, capture
+the exact issue and the minimal fix needed.
 
-Tooltip discipline: every WORKS / OPEN EXTERNAL button on the surfaces below
-already carries a `title=...` attribute that ends with one of the taxonomy
-labels — verified by `grep "title=.*WORKS\\|title=.*OPEN EXTERNAL"` across
-`promptready-os/src/components` and `promptready-os/src/modules`.
+## Server Command Center
 
-## Atlas (Cinema scene)
+### Profile rail
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Cinema (header)   | `modules/atlas/AtlasPage.tsx:251-258`        | Persists `cinema` to localStorage canvas key                      | WORKS  |
-| C key             | `components/atlas-cinema/AtlasCinema.tsx:57` | Same as above                                                     | WORKS  |
-| Orbit node click  | `components/atlas-cinema/CinemaOrbit.tsx:85` | Selects orbit · opens inspector                                   | WORKS  |
-| Inspector · Focus | `CinemaInspector.tsx`                        | Dispatches `cinema:focus` event                                   | WORKS  |
-| Inspector · Open in Blueprint | `CinemaInspector.tsx`            | Switches canvas mode to blueprint                                 | WORKS  |
-| Inspector · Create mission | `CinemaInspector.tsx`               | Calls `useMissionStore.getState().dispatch(...)` (only when type ∈ MISSION_TARGETS and no current mission) | WORKS / DISABLED |
-| Mode switch (G/B/O/L) | `CinemaModeSwitch.tsx`                   | Switches canvas mode                                              | WORKS  |
-| Reset (mode switch) | `CinemaModeSwitch.tsx` (this sprint)       | Clears `promptready-os.atlas.canvas` localStorage key, returns to cinema | WORKS |
-| Presentation toggle | `CinemaHud.tsx`                            | Toggles HUD chrome hide                                           | WORKS  |
-| Mode debug chip   | `CinemaModeSwitch.tsx`                       | Shows current mode value (debug)                                  | WORKS (display only) |
+| Action / button       | File · line                          | Current behavior                                                  | Class           | Fix needed |
+|-----------------------|--------------------------------------|-------------------------------------------------------------------|-----------------|------------|
+| `add`                 | `ServerPage.tsx:382` (rail header)   | Opens add-profile dialog                                          | WORKS           | none       |
+| profile click         | `ServerPage.tsx:411`                 | Sets active, audits `profile-activate`, auto-fires probe          | WORKS           | none       |
+| hover trash           | `ServerPage.tsx:432`                 | Removes profile, clears active if needed, audits `profile-delete` | WORKS           | none       |
+| Add Profile · save    | `ServerPage.tsx::AddProfileDialog`   | Validates name/host/user/port, normalizes allowlists, upserts     | WORKS           | none       |
+| Add Profile · ssh key path | same                            | Stored as `sshKeyPath?` on profile                                | WORKS (local)   | none       |
+| Add Profile · allowlist inputs | same                        | csv parsed + per-character validated `^[A-Za-z0-9._-]+$`          | WORKS           | none       |
 
-## Atlas (Blueprint / Operations / Live)
+### Status / services / logs / restart
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Section card click | `AtlasPage.tsx::SectionCard`                | Selects section, opens DetailPanel                                | WORKS  |
-| Export Blueprint  | `AtlasPage.tsx:265 (onExport)`               | Serializes atlas to markdown and triggers download                | WORKS  |
-| Zoom + / −        | `AtlasPage.tsx::ZoomControls`                | Adjusts CSS transform on the grid                                 | WORKS  |
-| HomeModeToggle    | `AtlasPage.tsx::HomeModeToggle`              | Toggle blueprint / operations / live                              | WORKS  |
-| DispatchPanel · run | `panels/DispatchPanel.tsx`                 | Calls mission store dispatch                                      | WORKS (when missions empty otherwise) |
+| Action / button       | File · line                          | Current behavior                                                  | Class                | Fix needed |
+|-----------------------|--------------------------------------|-------------------------------------------------------------------|----------------------|------------|
+| status `refresh`      | `ServerPage.tsx::StatusCards`         | Calls `bridgeProbeStatus`; only the tiny header pill shows the error | BROKEN (silent error) | **show explicit inline error banner inside the panel** |
+| services `refresh`    | `ServerPage.tsx::ServicesPanel`       | Calls `bridgeListPm2/Docker/Systemd` in parallel; aggregated error only in header pill | BROKEN (silent error) | **show explicit inline error banner with each adapter's error broken out** |
+| logs `refresh`        | `ServerPage.tsx::LogsViewer`          | Picks first allowlisted name, fetches; error only in header pill  | BROKEN (silent error) | **inline error banner with the actual command line / error** |
+| services `restart`    | `ServerPage.tsx::ServiceRow`          | Opens confirm modal, on confirm calls `bridgeRestart`; result audited only | BROKEN (silent result) | **show inline result line (success or actual error) on the row after the call** |
+| services `deploy`     | `ServerPage.tsx::ServicesPanel`       | Permanently disabled; click logs `deploy-blocked`                 | DISABLED · planned   | none       |
+| `clear` audit         | `ServerPage.tsx::AuditLogPanel`       | Clears audit; the clear itself is audited                         | WORKS                | none       |
+| Confirm modal         | `ServerPage.tsx::ConfirmModal`        | ESC closes, click outside cancels, confirm fires action           | WORKS                | none       |
 
-## Market Lab (Market Intelligence Center)
+### Agent bridge
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Watchlist click   | `MarketLabPage.tsx::Watchlists`              | Selects symbol; chart updates                                     | WORKS  |
-| **Timeframe pills (1D · 7D · 1M · 3M · 1Y)** | `components/market-lab/PriceChartLW.tsx` (new) | Fetches CoinGecko `/coins/{id}/market_chart`, repaints chart      | WORKS  |
-| Tab: price        | `MarketLabPage.tsx::ChartWall`               | Renders TradingView Lightweight Charts line + volume histogram    | WORKS  |
-| Tab: heatmap      | `MarketLabPage.tsx::CryptoHeatmap`           | Renders real 24h % per crypto                                     | WORKS  |
-| Tab: flow / news impact / correlation / sentiment / timeline | `MarketLabPage.tsx::ChartWall` | Honest "adapter-ready" placeholders — no fake data                | DISABLED · planned |
-| Mini-chart (BTC/ETH/SOL/BNB/XRP) | `MarketLabPage.tsx::MiniChart` | Renders sparklines from real `marketSamples`                      | WORKS  |
-| Stack 1x/2x/4x/6x | `MarketLabPage.tsx::ChartWall`               | Layout grid change                                                | WORKS  |
-| Fullscreen / TV   | `MarketLabPage.tsx::ChartWall`               | Inline fullscreen toggle                                          | WORKS  |
-| TV market mode    | `MarketLabPage.tsx::TopBar`                  | Renders `TvWall` (separate wall layout)                           | WORKS  |
-| News chips        | `MarketLabPage.tsx::NewsRoom`                | Real fetch for AI / crypto / markets / tech / business via `fetchNewsBest`; rest are honest "adapter-ready" | WORKS · DISABLED |
-| News item · Open  | `NewsRoom`                                   | window.open                                                       | OPEN EXTERNAL |
-| News item · Brief mission | `NewsRoom · onCreateMission`         | Dispatches a mission to brief the headline                        | WORKS |
-| News item · Save to Brain | `NewsRoom · onSaveToBrain`           | Adds memory doc                                                   | WORKS |
-| Stocks / FX / Commodities tiles | `MarketLabPage.tsx`            | Show symbol labels only — NO numbers, NO fake prices              | DISABLED · planned (adapter-ready) |
-| Trading order tickets | (none)                                   | **No trading buttons exist** — no buy/sell/place-order anywhere   | not present (deliberate) |
+| Item                  | File · line                          | Current behavior                                                  | Class | Fix |
+|-----------------------|--------------------------------------|-------------------------------------------------------------------|-------|-----|
+| `isBridgeAvailable`   | `serverAgentBridge.ts`                | `window.__TAURI_IPC__` or `window.__TAURI__.invoke` present       | WORKS | none |
+| `audited()` wrapper   | `serverAgentBridge.ts`                | Two audit rows per call (`before` and `after`); after always uses `result: blocked` on failure | BROKEN (semantic) | **use `error` for SSH / transport failures, `blocked` only for allowlist / agent-not-available** |
+| `bridgeProbeStatus`   | `serverAgentBridge.ts`                | Calls Rust `server_probe_status`                                  | WORKS (depends on agent) | none |
+| `bridgeListPm2/Docker/Systemd` | same                         | Calls Rust list endpoints                                         | WORKS (depends on agent) | none |
+| `bridgeFetchLogs`     | same                                  | Sends `{ kind, name, tail }`                                      | WORKS (depends on agent) | none |
+| `bridgeRestart`       | same                                  | Sends `{ kind, name }`                                            | WORKS (depends on agent) | none |
 
-## Intelligence Terminal
+### Rust agent
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Council models    | `IntelligenceTerminalPage.tsx`               | Sends prompt to councilSweep, renders responses + judge synthesis | WORKS  |
-| Provider chips    | `IntelligenceTerminalPage.tsx`               | Reflect real adapter status (ok / error / muted)                  | WORKS  |
+| Item                  | File · line                          | Current behavior                                                  | Class | Fix |
+|-----------------------|--------------------------------------|-------------------------------------------------------------------|-------|-----|
+| `validate_profile`    | `src-tauri/src/server.rs`             | Rejects bad host/user/port                                        | WORKS | none |
+| `valid_name`          | same                                  | `^[A-Za-z0-9._-]{1,64}$`                                          | WORKS | none |
+| SSH flags             | same                                  | `BatchMode=yes · PasswordAuthentication=no · KbdInteractiveAuthentication=no · StrictHostKeyChecking=accept-new · ConnectTimeout=8` | WORKS | none |
+| Per-kind allowlists   | same                                  | Checked before `logs` / `restart` (returns "not in allowlist")    | WORKS | none |
+| Allowlist enforcement on `list-systemd` | same                | Iterates only `profile.allowed_systemd_services`                  | WORKS | none |
 
-## Voice Console
+## Market Lab Pro
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Text command      | `modules/voice/VoiceConsolePage.tsx`         | Parses + executes via `commandParser`                             | WORKS  |
-| Paste cleaner     | `modules/voice/TestConsole.tsx`              | Runs `pasteClean` on input                                        | WORKS  |
-| Test console      | `modules/voice/TestConsole.tsx`              | Visible · runs locally                                            | WORKS  |
-| Native speech (Push-to-talk) | `modules/voice/useSpeech.ts`      | macOS WKWebView lacks SpeechRecognition; shows planned message    | DISABLED · planned (REQUIRES DESKTOP) |
-| Mic enable        | `useSpeech.ts`                               | Hold-to-record posture only; never auto-listens                   | DISABLED (no SpeechRecognition support) |
+### Layout & header
 
-## Media Dock (floating, bottom-right)
+| Item                  | File · line                          | Current behavior                                                  | Class | Fix |
+|-----------------------|--------------------------------------|-------------------------------------------------------------------|-------|-----|
+| CommandBar            | `MarketLabPage.tsx::CommandBar`       | symbol input · layout preset pill · cg/binance health             | WORKS | none |
+| Layout preset switcher| same                                  | `1 · 1+4 · orderflow · macro · wall` · persisted v2               | WORKS | none |
+| Watchlist             | `Watchlist.tsx`                       | 10 symbols · real CG quotes for crypto · `—` for the rest         | WORKS | none |
+| News tape             | `NewsTape.tsx`                        | real `fetchNewsBest`                                              | WORKS | none |
+| Macro strip           | `MacroStrip.tsx`                      | BTC/ETH 24h % real; BTC.D real (CoinGecko global); rest adapter   | WORKS / adapter-ready | none |
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Open / Close      | `components/MediaDock.tsx`                   | Toggle floating panel                                             | WORKS  |
-| Size mini/medium/large | `MediaDock.tsx`                         | Resize panel                                                      | WORKS  |
-| Tabs YT/Spotify/Apple/Custom | `MediaDock.tsx`                   | Switch search target                                              | WORKS  |
-| Mode chips        | `MediaDock.tsx`                              | Preselect tab + suggested presets                                 | WORKS  |
-| Search (YT/Spotify/Apple) | `MediaDock.tsx::openExternalSearch`  | Opens provider search URL in new tab                              | OPEN EXTERNAL |
-| Load custom URL   | `MediaDock.tsx::loadFromInput`               | Embeds YT/Spotify/Apple if recognized; else falls back            | WORKS (when allowed) |
-| Open external (custom) | `MediaDock.tsx::openExternalUrl`        | window.open                                                       | OPEN EXTERNAL |
-| Picture-in-Picture | `MediaDock.tsx::enterPip`                   | Only available for native `<audio>` path; iframes can't PiP       | WORKS / honestly disabled |
-| Market TV         | `MediaDock.tsx` mode chip                    | Label only — no live TV stream                                    | LABEL ONLY |
+### Main chart (custom canvas engine)
 
-## Connector Dock (new this sprint, floating)
+| Item                  | File · line                          | Current behavior                                                  | Class | Fix |
+|-----------------------|--------------------------------------|-------------------------------------------------------------------|-------|-----|
+| Candles, volume       | `ChartCanvas.tsx`                     | Real Binance klines, redrawn on viewport/data change              | WORKS | none |
+| Wheel zoom / drag pan | `useChartInteraction.ts`              | Wheel anchored at cursor; pointer drag; double-click resets       | WORKS | none |
+| Keyboard +/- arrows R | same                                  | Only when chart is focused (tabIndex=0)                           | WORKS | none |
+| Hover tooltip         | `ChartCanvas.tsx::TooltipBadge`       | OHLCV + time on hover                                             | WORKS | none |
+| Interval pills        | `ChartCanvas.tsx`                     | 1m..1D                                                            | WORKS | none |
+| Crosshair             | same                                  | Drawn on hover, with price label on right axis                    | WORKS | none |
+| Error display         | same                                  | Error string sits in a small top-right corner only                | BROKEN (small) | **bigger inline error message inside the chart container when Binance fails** |
+| Drawing tools         | n/a                                   | **Not implemented** anywhere                                       | not present (correct) | none — keep absent until real |
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Open / Close      | `components/ConnectorDock.tsx`               | Toggle floating panel                                             | WORKS  |
-| Gmail             | `ConnectorDock.tsx`                          | Opens `https://mail.google.com` in new tab                        | OPEN EXTERNAL |
-| Outlook           | `ConnectorDock.tsx`                          | Opens `https://outlook.live.com/mail/` in new tab                 | OPEN EXTERNAL |
-| WhatsApp          | `ConnectorDock.tsx`                          | Opens `https://web.whatsapp.com` in new tab                       | OPEN EXTERNAL |
-| Telegram          | `ConnectorDock.tsx`                          | Opens `https://web.telegram.org` in new tab                       | OPEN EXTERNAL |
-| Custom URL        | `ConnectorDock.tsx::onSubmitCustom`          | Opens normalized URL in new tab; records in recents (max 8)       | OPEN EXTERNAL |
-| Clear recents     | `ConnectorDock.tsx::clearRecents`            | Clears localStorage `connector-dock.recents`                      | WORKS  |
-| Recent link click | `ConnectorDock.tsx`                          | Reopens recent URL                                                | OPEN EXTERNAL |
+### Mini charts (1+4 preset)
 
-## Settings · Workspace / Plans / Personalization
+| Item                  | File · line                          | Current behavior                                                  | Class | Fix |
+|-----------------------|--------------------------------------|-------------------------------------------------------------------|-------|-----|
+| MiniGrid              | `MarketLabPage.tsx:687`               | `grid-cols-2 lg:grid-cols-4` · single row on lg+ → **long strips** | BROKEN | **switch to `grid-cols-2 grid-rows-2` so each mini is a square tile** |
+| Per-mini ChartSlot    | `ChartSlot.tsx`                       | Renders ChartCanvas with `compact={true}`, height 220             | WORKS | none |
+| Symbol selector       | `ChartSlot.tsx`                       | Dropdown of `WATCHLIST_SYMBOLS`                                   | WORKS | none |
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Workspace switch  | `components/WorkspaceMenuCard.tsx`           | Persists workspace defaults                                       | WORKS  |
-| Plans CORE/DESK/ELITE | `components/PlansCard.tsx`               | Local selector; no Stripe wired                                   | WORKS (local) |
-| Theme switcher    | `components/ThemeSwitcher.tsx` (in header)   | Persists theme to localStorage                                    | WORKS  |
-| Backgrounds       | `components/PersonalizationCard.tsx` etc.    | Sets `body[data-bg]`                                              | WORKS  |
-| OllamaSetupCard   | `components/OllamaSetupCard.tsx`             | Detects local Ollama via `probeOllama`                            | WORKS (when Ollama present) |
-| Button Audit      | `components/ButtonAuditCard.tsx`             | Scans rendered buttons for taxonomy labels                        | WORKS  |
+### Order flow panels
 
-## Settings · Remote (Comms / Phone / Telegram / Email)
+| Item                  | File · line                          | Current behavior                                                  | Class | Fix |
+|-----------------------|--------------------------------------|-------------------------------------------------------------------|-------|-----|
+| OrderBookPanel        | `OrderBookPanel.tsx`                  | Real Binance `/api/v3/depth`; spread bar; status pill in header   | WORKS | none |
+| Time & Sales          | `TimeAndSalesPanel.tsx`               | Real `/api/v3/trades`; aggressor-colored                          | WORKS | none |
+| Depth (cum. SVG)      | `DepthPanel.tsx`                      | Real `/api/v3/depth` limit 100                                    | WORKS | none |
+| Flow imbalance        | `FlowImbalancePanel.tsx`              | Derived from depth + trades                                       | WORKS | none |
+| Bookmap heatmap       | `LiquidityHeatmapPanel.tsx`           | Honest snapshot heatmap with pinned "adapter-ready" banner        | WORKS (banner is honest) | none |
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| **Open Gmail (new this sprint)** | `components/EmailRuntimeCard.tsx` | Launches mail.google.com                                          | OPEN EXTERNAL |
-| **Open Outlook (new this sprint)** | `components/EmailRuntimeCard.tsx` | Launches outlook.live.com                                        | OPEN EXTERNAL |
-| Collapse / Expand | `EmailRuntimeCard.tsx`                       | Persists section state                                            | WORKS  |
-| **Open WhatsApp Web (new this sprint)** | `components/CommunicationsRuntimeCard.tsx` | Launches web.whatsapp.com                              | OPEN EXTERNAL |
-| **Open Telegram Web (new this sprint)** | `components/CommunicationsRuntimeCard.tsx` | Launches web.telegram.org                              | OPEN EXTERNAL |
-| Telegram link code | `SettingsPage.tsx::TelegramCompanionCard`   | Generates / clears local link code in atlas store                 | WORKS  |
-| Telegram bridge sim | `SettingsPage.tsx` Phase 18                | Local command console echoes bridge messages                      | WORKS (local) |
+### Script Lab
 
-## Marketplace
+| Item                  | File · line                          | Current behavior                                                  | Class | Fix |
+|-----------------------|--------------------------------------|-------------------------------------------------------------------|-------|-----|
+| Editor                | `ScriptLabEditor.tsx`                 | Save/new/delete, Cmd/Ctrl+Enter to run                            | WORKS | none |
+| Engine                | `services/scripts/engine.ts`          | Custom tokenizer + Pratt parser + tree-walking evaluator. NO eval | WORKS | none |
+| Indicators            | `services/scripts/indicators.ts`      | SMA · EMA · Wilder RSI · Bollinger Bands                          | WORKS | none |
+| Overlays sync         | `ChartCanvas.tsx`                     | Overlays are part of the canvas redraw cycle (same deps)          | WORKS | none |
+| RSI lower pane        | `ChartCanvas.tsx`                     | Second canvas, lifecycle gated on `rsi != null`                   | WORKS | none |
+| Error display         | `ScriptLabEditor.tsx::ResultLine`     | Inline error with line number                                     | WORKS | none |
+| Buy/sell markers      | n/a                                   | Not emitted by engine (engine has no signal primitive)            | not present (correct) | keep absent |
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Install agent     | `modules/marketplace/MarketplacePage.tsx`    | Local install · adds to agents store                              | WORKS  |
-| Open external (creator URL) | `MarketplacePage.tsx`              | window.open                                                       | OPEN EXTERNAL |
+## Fix list for this sprint
 
-## Workflows
+| # | Item                                                         | Files                                                     |
+|---|--------------------------------------------------------------|-----------------------------------------------------------|
+| 1 | Visible inline error banners on Server status/services/logs  | `modules/server/ServerPage.tsx`                           |
+| 2 | Distinguish `error` vs `blocked` in audit `after` rows       | `services/serverAgentBridge.ts`                           |
+| 3 | Mini chart strip → 2×2 tile grid                             | `modules/market-lab/MarketLabPage.tsx`                    |
+| 4 | Show last restart result line on each service row            | `modules/server/ServerPage.tsx`                           |
+| 5 | Show explicit "binance error" banner in main chart on failure| `components/market-lab/chart-engine/ChartCanvas.tsx`      |
 
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Run workflow      | `modules/workflows/WorkflowsPage.tsx`        | Dispatches via `workflowRunner`                                   | WORKS  |
-| Approve / Reject  | `WorkflowsPage.tsx`                          | Updates atlas store `workflowRuns`                                | WORKS  |
-
-## Agents
-
-| Label             | File                                         | Behavior                                                          | Status |
-|-------------------|----------------------------------------------|-------------------------------------------------------------------|--------|
-| Run agent         | `modules/agents/AgentsPage.tsx`              | Calls `agentRuntime`                                              | WORKS  |
-| Toggle enabled    | `AgentsPage.tsx`                             | Updates agents store                                              | WORKS  |
-
-## Summary
-
-* No fake trading order tickets exist (never added).
-* No fake inbox / message data exists on any surface.
-* External openers always use `window.open(..., "_blank", "noopener,noreferrer")`.
-* Embedding is only attempted for media providers (YouTube, Spotify, Apple Music)
-  that explicitly allow it via official embed endpoints. Gmail / Outlook /
-  WhatsApp / Telegram are not iframed — they open in the user's browser, with
-  an honest pill saying so.
-* Every button reviewed carries a `title` attribute that matches the project
-  taxonomy and is also surfaced in the Settings → Button Audit card.
-
-Patches in this sprint:
-* lightweight-charts terminal chart (PriceChartLW.tsx) with real CoinGecko line + volume.
-* ConnectorDock global mount.
-* Open-Gmail / Open-Outlook on EmailRuntimeCard.
-* Open-WhatsApp-Web / Open-Telegram-Web on CommunicationsRuntimeCard.
-
-Build · `promptready-os`: 1692 modules, CSS 55.51 kB, JS 1173.38 kB. Clean.
-Build · `promptfixer-sidekick`: clean.
+Builds: both pass before / after the changes below.

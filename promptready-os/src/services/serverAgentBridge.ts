@@ -145,12 +145,18 @@ async function audited<T>(
     };
   }
   // AFTER: record the outcome.
+  const blockedKeywords = ["not available", "not wired", "not in allowlist", "invalid host", "invalid ssh user", "invalid port"];
+  const result: "ok" | "blocked" | "error" = response.ok
+    ? "ok"
+    : blockedKeywords.some((k) => (response.error ?? "").toLowerCase().includes(k))
+      ? "blocked"
+      : "error";
   appendAudit({
     action: ctx.beforeAction,
     profileId: ctx.profile.id,
     profileName: ctx.profile.name,
     detail: `after · ${command} · ${response.error ?? "ok"} · ${response.duration_ms ?? 0}ms`,
-    result: response.ok ? "ok" : "blocked"
+    result
   });
   return response;
 }
