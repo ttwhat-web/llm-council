@@ -7,6 +7,7 @@ use tauri::{
 };
 
 mod runtime;
+mod server;
 
 const CMDK_SHORTCUT: &str = "CmdOrCtrl+K";
 const OVERLAY_SHORTCUT: &str = "CmdOrCtrl+Shift+O";
@@ -51,7 +52,14 @@ fn main() {
             runtime::runtime_get_env_status,
             runtime::runtime_telegram_send,
             runtime::runtime_telegram_poll_once,
-            runtime::runtime_provider_fetch
+            runtime::runtime_provider_fetch,
+            server::server_agent_status,
+            server::server_probe_status,
+            server::server_list_pm2,
+            server::server_list_docker,
+            server::server_list_systemd,
+            server::server_logs,
+            server::server_restart
         ])
         .system_tray(build_tray())
         .on_system_tray_event(|app, event| match event {

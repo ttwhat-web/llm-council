@@ -18,6 +18,17 @@ export interface ServerProfile {
   port: number;
   tags: string[];
   notes?: string;
+  /**
+   * Optional path to a private SSH key on the local machine running
+   * the Tauri agent (NOT stored on a remote, NOT a key body). When
+   * empty, the agent uses the default SSH lookup (e.g. ~/.ssh/config,
+   * ssh-agent). The key file itself is never read by the frontend.
+   */
+  sshKeyPath?: string;
+  /** Per-kind allowlists · only names in these arrays can be acted on. */
+  allowedPm2Apps: string[];
+  allowedDockerContainers: string[];
+  allowedSystemdServices: string[];
   createdAt: number;
 }
 
@@ -46,15 +57,22 @@ function write(profiles: ServerProfile[]) {
 function isProfile(p: unknown): p is ServerProfile {
   if (!p || typeof p !== "object") return false;
   const o = p as Record<string, unknown>;
-  return (
-    typeof o.id === "string" &&
-    typeof o.name === "string" &&
-    typeof o.host === "string" &&
-    typeof o.sshUser === "string" &&
-    typeof o.port === "number" &&
-    Array.isArray(o.tags) &&
-    typeof o.createdAt === "number"
-  );
+  if (
+    typeof o.id !== "string" ||
+    typeof o.name !== "string" ||
+    typeof o.host !== "string" ||
+    typeof o.sshUser !== "string" ||
+    typeof o.port !== "number" ||
+    !Array.isArray(o.tags) ||
+    typeof o.createdAt !== "number"
+  ) {
+    return false;
+  }
+  // Migrate older saved profiles missing the per-kind allowlists.
+  if (!Array.isArray(o.allowedPm2Apps)) o.allowedPm2Apps = [];
+  if (!Array.isArray(o.allowedDockerContainers)) o.allowedDockerContainers = [];
+  if (!Array.isArray(o.allowedSystemdServices)) o.allowedSystemdServices = [];
+  return true;
 }
 
 export function newProfileId(): string {

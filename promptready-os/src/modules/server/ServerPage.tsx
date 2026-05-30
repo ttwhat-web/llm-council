@@ -54,22 +54,31 @@ import {
 } from "@/store/servers";
 import {
   deriveAlerts,
-  fetchLogs,
   formatUptime,
-  getAgentReason,
-  getAgentStatus,
-  listServices,
-  probeStatus,
   ALLOWED_COMMANDS,
-  type ServerService,
   type ServerStatus
 } from "@/services/serverAgent";
+import {
+  bridgeAgentStatus,
+  bridgeFetchLogs,
+  bridgeListDocker,
+  bridgeListPm2,
+  bridgeListSystemd,
+  bridgeProbeStatus,
+  bridgeRestart,
+  isBridgeAvailable,
+  type ServiceKind,
+  type ServiceOut as BridgeServiceOut
+} from "@/services/serverAgentBridge";
 import {
   appendAudit,
   clearAudit,
   listAudit,
   type AuditEntry
 } from "@/services/serverAudit";
+
+// Local alias so the existing rendering code keeps a single ServerService type.
+type ServerService = BridgeServiceOut;
 
 // ---------------------------------------------------------------------------
 // page
@@ -100,8 +109,22 @@ export default function ServerPage() {
     [profiles, activeId]
   );
 
-  const agentStatus = getAgentStatus();
-  const agentReason = getAgentReason();
+  const bridgeOn = isBridgeAvailable();
+  const [agentLabel, setAgentLabel] = useState<"ready" | "not-wired">(bridgeOn ? "ready" : "not-wired");
+  useEffect(() => {
+    let cancelled = false;
+    void bridgeAgentStatus().then((r) => {
+      if (cancelled) return;
+      setAgentLabel(r && r.ok ? "ready" : "not-wired");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const agentStatus = agentLabel;
+  const agentReason = bridgeOn
+    ? "tauri ipc available"
+    : "agent not available · run in desktop app";
   const recordAudit = (entry: Parameters<typeof appendAudit>[0]) => {
     const next = appendAudit(entry);
     setAudit(next);
@@ -155,47 +178,67 @@ export default function ServerPage() {
 
   const refreshStatus = async () => {
     if (!activeProfile) return;
-    recordAudit({
-      action: "probe-attempt",
-      profileId: activeProfile.id,
-      profileName: activeProfile.name,
-      detail: `agent=${agentStatus}`,
-      result: agentStatus === "ready" ? "ok" : "blocked"
-    });
-    const r = await probeStatus(activeProfile);
-    setStatus(r.ok ? r.data : null);
-    setStatusErr(r.ok ? null : r.error ?? "unknown");
-    setStatusAt(r.at);
+    const r = await bridgeProbeStatus(activeProfile);
+    setAudit(listAudit());
+    if (r.ok && r.data) {
+      const d = r.data;
+      const mapped: ServerStatus = {
+        online: d.online,
+        latencyMs: d.latency_ms,
+        cpuPct: d.cpu_pct,
+        memPct: d.mem_pct,
+        diskPct: d.disk_pct,
+        uptimeSec: d.uptime_sec
+      };
+      setStatus(mapped);
+      setStatusErr(null);
+    } else {
+      setStatus(null);
+      setStatusErr(r.error ?? "unknown");
+    }
+    setStatusAt(Date.now());
   };
 
   const refreshServices = async () => {
     if (!activeProfile) return;
-    recordAudit({
-      action: "services-attempt",
-      profileId: activeProfile.id,
-      profileName: activeProfile.name,
-      detail: `agent=${agentStatus}`,
-      result: agentStatus === "ready" ? "ok" : "blocked"
-    });
-    const r = await listServices(activeProfile);
-    setServices(r.ok && r.data ? r.data : []);
-    setServicesErr(r.ok ? null : r.error ?? "unknown");
-    setServicesAt(r.at);
+    const [pm2, dk, sd] = await Promise.all([
+      bridgeListPm2(activeProfile),
+      bridgeListDocker(activeProfile),
+      bridgeListSystemd(activeProfile)
+    ]);
+    setAudit(listAudit());
+    const out: ServerService[] = [];
+    if (pm2.ok && pm2.data) out.push(...pm2.data);
+    if (dk.ok && dk.data) out.push(...dk.data);
+    if (sd.ok && sd.data) out.push(...sd.data);
+    setServices(out);
+    const err = pm2.error || dk.error || sd.error;
+    setServicesErr(out.length === 0 ? err ?? null : null);
+    setServicesAt(Date.now());
   };
 
   const refreshLogs = async () => {
     if (!activeProfile) return;
-    recordAudit({
-      action: "logs-attempt",
-      profileId: activeProfile.id,
-      profileName: activeProfile.name,
-      detail: `tail=200 · agent=${agentStatus}`,
-      result: agentStatus === "ready" ? "ok" : "blocked"
-    });
-    const r = await fetchLogs(activeProfile, 200);
-    setLogs(r.ok && r.data ? r.data : []);
-    setLogsErr(r.ok ? null : r.error ?? "unknown");
-    setLogsAt(r.at);
+    // Default log target is the first allowlisted systemd service ·
+    // falling back to the first docker container or pm2 app. No raw
+    // free-form command input anywhere.
+    const target = pickDefaultLogTarget(activeProfile);
+    if (!target) {
+      setLogs([]);
+      setLogsErr("no log target · add a name to a per-kind allowlist on this profile");
+      setLogsAt(Date.now());
+      return;
+    }
+    const r = await bridgeFetchLogs(activeProfile, target.kind, target.name, 200);
+    setAudit(listAudit());
+    if (r.ok && r.data) {
+      setLogs(r.data.lines);
+      setLogsErr(null);
+    } else {
+      setLogs([]);
+      setLogsErr(r.error ?? "unknown");
+    }
+    setLogsAt(Date.now());
   };
 
   // Auto-probe whenever the active profile changes.
@@ -213,16 +256,14 @@ export default function ServerPage() {
     setConfirmRestart(svc);
   };
 
-  const onRestartConfirmed = () => {
+  const onRestartConfirmed = async () => {
     if (!confirmRestart || !activeProfile) return;
-    recordAudit({
-      action: "restart-confirm",
-      profileId: activeProfile.id,
-      profileName: activeProfile.name,
-      detail: `service=${confirmRestart.name} (${confirmRestart.kind}) · cmd=restart-service · ${agentReason}`,
-      result: "blocked"
-    });
+    const svc = confirmRestart;
     setConfirmRestart(null);
+    await bridgeRestart(activeProfile, svc.kind, svc.name);
+    setAudit(listAudit());
+    // Re-probe + re-list services so the row reflects the new state.
+    void refreshServices();
   };
 
   const onRestartCancel = () => {
@@ -970,6 +1011,10 @@ function AddProfileDialog({
   const [port, setPort] = useState(22);
   const [tags, setTags] = useState("");
   const [notes, setNotes] = useState("");
+  const [sshKeyPath, setSshKeyPath] = useState("");
+  const [allowedPm2, setAllowedPm2] = useState("");
+  const [allowedDocker, setAllowedDocker] = useState("");
+  const [allowedSystemd, setAllowedSystemd] = useState("");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -990,6 +1035,11 @@ function AddProfileDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!valid) return;
+    const splitCsv = (s: string) =>
+      s
+        .split(",")
+        .map((x) => x.trim())
+        .filter((x) => x.length > 0 && /^[A-Za-z0-9._-]+$/.test(x));
     onSubmit({
       id: newProfileId(),
       name: name.trim(),
@@ -1001,6 +1051,10 @@ function AddProfileDialog({
         .map((t) => t.trim())
         .filter((t) => t.length > 0),
       notes: notes.trim() || undefined,
+      sshKeyPath: sshKeyPath.trim() || undefined,
+      allowedPm2Apps: splitCsv(allowedPm2),
+      allowedDockerContainers: splitCsv(allowedDocker),
+      allowedSystemdServices: splitCsv(allowedSystemd),
       createdAt: Date.now()
     });
   };
@@ -1083,6 +1137,40 @@ function AddProfileDialog({
             className="w-full rounded border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
           />
         </Field>
+        <Field label="ssh key path (optional · on this device only)">
+          <input
+            value={sshKeyPath}
+            onChange={(e) => setSshKeyPath(e.target.value)}
+            placeholder="~/.ssh/id_ed25519 (leave blank to use ~/.ssh/config)"
+            className="w-full rounded border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+          />
+        </Field>
+
+        <Field label="allowlist · pm2 apps (comma separated)">
+          <input
+            value={allowedPm2}
+            onChange={(e) => setAllowedPm2(e.target.value)}
+            placeholder="api, worker"
+            className="w-full rounded border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+          />
+        </Field>
+        <Field label="allowlist · docker containers (comma separated)">
+          <input
+            value={allowedDocker}
+            onChange={(e) => setAllowedDocker(e.target.value)}
+            placeholder="postgres, redis, app"
+            className="w-full rounded border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+          />
+        </Field>
+        <Field label="allowlist · systemd services (comma separated)">
+          <input
+            value={allowedSystemd}
+            onChange={(e) => setAllowedSystemd(e.target.value)}
+            placeholder="nginx, caddy, fail2ban"
+            className="w-full rounded border border-white/10 bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-white placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+          />
+        </Field>
+
         <Field label="notes (optional)">
           <textarea
             value={notes}
@@ -1122,6 +1210,18 @@ function AddProfileDialog({
       </form>
     </div>
   );
+}
+
+function pickDefaultLogTarget(
+  profile: ServerProfile
+): { kind: ServiceKind; name: string } | null {
+  if (profile.allowedSystemdServices.length > 0)
+    return { kind: "systemd", name: profile.allowedSystemdServices[0] };
+  if (profile.allowedDockerContainers.length > 0)
+    return { kind: "docker", name: profile.allowedDockerContainers[0] };
+  if (profile.allowedPm2Apps.length > 0)
+    return { kind: "pm2", name: profile.allowedPm2Apps[0] };
+  return null;
 }
 
 function Field({
