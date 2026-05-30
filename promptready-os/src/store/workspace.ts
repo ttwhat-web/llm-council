@@ -22,6 +22,7 @@ export type NavId =
   | "agents"
   | "workflows"
   | "marketplace"
+  | "server"
   | "settings";
 
 export const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
@@ -36,6 +37,7 @@ export const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
   { id: "agents", label: "Agents" },
   { id: "workflows", label: "Workflows" },
   { id: "marketplace", label: "Marketplace" },
+  { id: "server", label: "Server" },
   { id: "settings", label: "Settings" }
 ];
 

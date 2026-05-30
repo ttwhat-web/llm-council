@@ -13,6 +13,7 @@ import {
   Map as MapIcon,
   Mic,
   Package,
+  Server as ServerIcon,
   Settings as SettingsIcon,
   Terminal as TerminalIcon,
   Workflow
@@ -39,6 +40,7 @@ const NAV_ID_BY_PATH: Record<string, NavId> = {
   "/agents": "agents",
   "/workflows": "workflows",
   "/marketplace": "marketplace",
+  "/server": "server",
   "/settings": "settings"
 };
 
@@ -106,7 +108,8 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: "/agents", label: "Agents", Icon: Bot },
       { to: "/voice", label: "Voice · Jarvis Console", Icon: Mic },
-      { to: "/marketplace", label: "Marketplace", Icon: Package }
+      { to: "/marketplace", label: "Marketplace", Icon: Package },
+      { to: "/server", label: "Server · Command Center", Icon: ServerIcon }
     ]
   },
   {
