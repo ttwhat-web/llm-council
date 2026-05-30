@@ -50,11 +50,11 @@ export function TerminalPanel({
   return (
     <section
       className={clsx(
-        "flex min-h-0 flex-col overflow-hidden rounded-md border border-white/10 bg-black/40",
+        "flex min-h-0 min-w-0 max-w-full flex-col overflow-hidden rounded-md border border-white/10 bg-black/40",
         className
       )}
     >
-      <header className="flex items-center justify-between gap-2 border-b border-white/10 px-2 py-1">
+      <header className="flex min-w-0 items-center justify-between gap-2 border-b border-white/10 px-2 py-1">
         <div className="flex min-w-0 items-center gap-1.5">
           <span
             aria-hidden
@@ -83,7 +83,7 @@ export function TerminalPanel({
           {right}
         </div>
       </header>
-      <div className={clsx("flex min-h-0 flex-1 flex-col p-1.5", bodyClassName)}>{children}</div>
+      <div className={clsx("flex min-h-0 min-w-0 flex-1 flex-col p-1.5", bodyClassName)}>{children}</div>
     </section>
   );
 }

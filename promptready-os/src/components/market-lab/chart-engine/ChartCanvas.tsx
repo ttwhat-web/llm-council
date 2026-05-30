@@ -267,10 +267,10 @@ export function ChartCanvas({
     : noDataMessage;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-1">
+    <div className="flex h-full min-h-0 min-w-0 max-w-full flex-col gap-1 overflow-hidden">
       {/* compact header strip */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      <div className="flex max-w-full min-w-0 flex-wrap items-center justify-between gap-2 overflow-hidden">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/85">
             {symbol}/USDT
           </span>
@@ -294,7 +294,7 @@ export function ChartCanvas({
           )}
         </div>
         {!compact && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <div
               role="tablist"
               aria-label="Candle interval"
@@ -337,7 +337,7 @@ export function ChartCanvas({
         ref={containerRef}
         tabIndex={focusable ? 0 : -1}
         aria-label={`${symbol} chart · wheel = zoom · drag = pan · double-click = reset · R / arrows / + - keyboard`}
-        className="relative flex min-h-0 flex-1 flex-col gap-1 rounded-md border border-white/10 bg-black/60 outline-none focus-visible:border-accent/40"
+        className="relative flex min-h-0 min-w-0 max-w-full flex-1 flex-col gap-1 overflow-hidden rounded-md border border-white/10 bg-black/60 outline-none focus-visible:border-accent/40"
         onWheel={handlers.onWheel}
         onPointerDown={handlers.onPointerDown}
         onPointerMove={handlers.onPointerMove}
@@ -347,11 +347,14 @@ export function ChartCanvas({
         onKeyDown={handlers.onKeyDown}
         style={{ height }}
       >
-        <canvas ref={canvasRef} style={{ flexShrink: 0, cursor: "crosshair" }} />
+        <canvas
+          ref={canvasRef}
+          style={{ flexShrink: 0, cursor: "crosshair", maxWidth: "100%", minWidth: 0 }}
+        />
         {rsi && (
           <canvas
             ref={rsiCanvasRef}
-            style={{ flexShrink: 0, cursor: "crosshair" }}
+            style={{ flexShrink: 0, cursor: "crosshair", maxWidth: "100%", minWidth: 0 }}
           />
         )}
         {hovered && !compact && (

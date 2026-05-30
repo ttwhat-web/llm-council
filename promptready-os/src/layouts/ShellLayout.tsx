@@ -4,24 +4,17 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import {
   Activity,
-  Bot,
+  AppWindow,
   Brain,
   Cpu,
-  Database,
-  FileText,
   LineChart,
   Map as MapIcon,
-  Mic,
-  Package,
   Server as ServerIcon,
-  Settings as SettingsIcon,
-  Terminal as TerminalIcon,
-  Workflow
+  Settings as SettingsIcon
 } from "lucide-react";
 import { KbdHint } from "@/components/primitives/KbdHint";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { MediaDock } from "@/components/MediaDock";
-import { ConnectorDock } from "@/components/ConnectorDock";
 import { CommandPalette } from "@/components/CommandPalette";
 import { useUiModeStore } from "@/store/uiMode";
 import { useWorkspace, DEFAULT_HOME_PATHS, type NavId } from "@/store/workspace";
@@ -30,34 +23,19 @@ import { useEffect, useRef } from "react";
 // Map nav route → workspace nav id, used to filter the rail.
 const NAV_ID_BY_PATH: Record<string, NavId> = {
   "/": "atlas",
-  "/mission-control": "mission-control",
   "/market-lab": "market-lab",
-  "/terminal": "terminal",
-  "/voice": "voice",
-  "/memory": "memory",
-  "/library": "library",
-  "/brain": "brain",
-  "/agents": "agents",
-  "/workflows": "workflows",
-  "/marketplace": "marketplace",
   "/server": "server",
+  "/apps": "apps",
+  "/atlas": "atlas",
   "/settings": "settings"
 };
 
 /**
- * Shell layout · Operator Core frame.
+ * Shell layout · Operator.Center frame.
  *
- * UX RESET 01 · the left rail is now grouped into five operator
- * sections instead of a flat ten-icon list:
- *
- *   ATLAS    · home
- *   WORK     · Mission Control · Workflows · Delivery
- *   BRAIN    · Memory · Brain · Terminal
- *   OPERATOR · Agents · Marketplace
- *   SYSTEM   · Settings
- *
- * Every existing route is preserved · only the visual grouping and a
- * small mono group letter changed. No new pages.
+ * Primary rail is intentionally small: Market Lab, Server, Apps, Atlas,
+ * Settings. Legacy surfaces remain routable through direct URLs and the
+ * command palette, but they no longer clutter the main workstation.
  */
 
 interface NavItem {
@@ -66,58 +44,12 @@ interface NavItem {
   Icon: typeof Activity;
 }
 
-interface NavGroup {
-  id: string;
-  letter: string;
-  label: string;
-  items: NavItem[];
-}
-
-const GROUPS: NavGroup[] = [
-  {
-    id: "atlas",
-    letter: "A",
-    label: "Atlas",
-    items: [{ to: "/", label: "Atlas · home", Icon: MapIcon }]
-  },
-  {
-    id: "work",
-    letter: "W",
-    label: "Work",
-    items: [
-      { to: "/mission-control", label: "Mission Control", Icon: Workflow },
-      { to: "/workflows", label: "Workflows", Icon: Activity },
-      { to: "/library", label: "Delivery · Operations Archive", Icon: FileText }
-    ]
-  },
-  {
-    id: "brain",
-    letter: "B",
-    label: "Brain",
-    items: [
-      { to: "/memory", label: "Memory", Icon: Database },
-      { to: "/brain", label: "Brain · Repos · Health", Icon: Brain },
-      { to: "/terminal", label: "Intelligence Terminal", Icon: TerminalIcon },
-      { to: "/market-lab", label: "Market Lab · MIC", Icon: LineChart }
-    ]
-  },
-  {
-    id: "operator",
-    letter: "O",
-    label: "Operator",
-    items: [
-      { to: "/agents", label: "Agents", Icon: Bot },
-      { to: "/voice", label: "Voice · Jarvis Console", Icon: Mic },
-      { to: "/marketplace", label: "Marketplace", Icon: Package },
-      { to: "/server", label: "Server · Command Center", Icon: ServerIcon }
-    ]
-  },
-  {
-    id: "system",
-    letter: "S",
-    label: "System",
-    items: [{ to: "/settings", label: "Settings · Runtime · Remote · Policies", Icon: SettingsIcon }]
-  }
+const PRIMARY_NAV: NavItem[] = [
+  { to: "/market-lab", label: "Market Lab", Icon: LineChart },
+  { to: "/server", label: "Server", Icon: ServerIcon },
+  { to: "/apps", label: "Apps", Icon: AppWindow },
+  { to: "/atlas", label: "Atlas", Icon: MapIcon },
+  { to: "/settings", label: "Settings", Icon: SettingsIcon }
 ];
 
 export function ShellLayout() {
@@ -138,44 +70,36 @@ export function ShellLayout() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="flex h-screen w-screen max-w-full overflow-hidden">
       {/* ---- left rail (hidden in Second Screen mode) ---- */}
       {!secondScreen && (
-      <aside className="flex w-[68px] shrink-0 flex-col items-center justify-between border-r border-white/6 py-3">
+      <aside className="flex w-[68px] shrink-0 flex-col items-center justify-between border-r border-white/8 bg-black/25 py-3">
         <div className="flex flex-col items-center gap-4">
           <div
-            className="flex h-9 w-9 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30 shadow-glow"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-accent/25 bg-white/[0.025]"
             title="Operator.Center · Core · Atlas"
           >
             <span className="font-mono text-[11px] tracking-wider text-accent">[ ]</span>
           </div>
 
-          <nav className="flex flex-col items-stretch gap-3">
-            {GROUPS.map((group, gi) => (
-              <div key={group.id} className="flex flex-col items-center gap-1">
-                <span
-                  className="select-none font-mono text-[9px] uppercase tracking-[0.22em] text-white/30"
-                  title={group.label}
-                >
-                  {group.letter}
-                </span>
-                {group.items
-                  .filter(({ to }) => {
-                    const id = NAV_ID_BY_PATH[to];
-                    return !id || !workspace.hiddenNav.includes(id);
-                  })
-                  .map(({ to, label, Icon }) => (
+          <nav className="flex flex-col items-stretch gap-1.5" aria-label="Primary navigation">
+            {PRIMARY_NAV
+              .filter(({ to }) => {
+                const id = NAV_ID_BY_PATH[to];
+                return !id || !workspace.hiddenNav.includes(id);
+              })
+              .map(({ to, label, Icon }) => (
                   <NavLink
                     key={to}
                     to={to}
-                    end={to === "/"}
+                    end
                     title={label}
                     className={({ isActive }) =>
                       clsx(
-                        "group relative flex h-10 w-10 items-center justify-center rounded-xl transition",
+                        "group relative flex h-10 w-10 items-center justify-center rounded-md border transition",
                         isActive
-                          ? "bg-accent/12 text-accent shadow-[inset_0_0_0_1px_rgba(124,155,255,0.25)]"
-                          : "text-white/55 hover:bg-white/5 hover:text-white/85"
+                          ? "border-accent/30 bg-accent/[0.11] text-accent"
+                          : "border-transparent text-white/50 hover:border-white/10 hover:bg-white/[0.055] hover:text-white/85"
                       )
                     }
                   >
@@ -185,18 +109,13 @@ export function ShellLayout() {
                         {isActive && (
                           <span
                             aria-hidden
-                            className="absolute -left-0.5 h-5 w-0.5 rounded-r bg-accent shadow-[0_0_8px_1px_rgba(124,155,255,0.6)]"
+                            className="absolute -left-0.5 h-5 w-0.5 rounded-r bg-accent"
                           />
                         )}
                       </>
                     )}
                   </NavLink>
-                ))}
-                {gi < GROUPS.length - 1 && (
-                  <span className="mt-2 h-px w-6 bg-white/8" aria-hidden />
-                )}
-              </div>
-            ))}
+              ))}
           </nav>
         </div>
 
@@ -205,33 +124,29 @@ export function ShellLayout() {
       )}
 
       {/* ---- main column ---- */}
-      <main className="flex flex-1 flex-col overflow-hidden">
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {!secondScreen && (
-        <header className="drag-region flex items-center justify-between border-b border-white/6 px-5 py-2">
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
+        <header className="drag-region flex min-w-0 items-center justify-between gap-3 overflow-hidden border-b border-white/6 px-5 py-2">
+          <div className="flex min-w-0 items-center gap-2 truncate font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
             <span className="text-accent">[ ]</span>
-            <span>Operator.Center · Core</span>
+            <span>Operator.Center</span>
             <span className="text-white/25">·</span>
-            <span>AI Mission Control</span>
+            <span>Workstation</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <StatusRail />
             <ThemeSwitcher />
           </div>
         </header>
         )}
 
-        <div className="flex-1 overflow-auto scrollbar-thin">
+        <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
           <Outlet />
         </div>
       </main>
 
-      {/* Floating media dock · user-selected media only */}
+      {/* Floating App Dock · official web apps open externally */}
       <MediaDock />
-
-      {/* Floating connector dock · external openers for Gmail · Outlook ·
-       *  WhatsApp · Telegram · custom URL. No scraping, no passwords. */}
-      <ConnectorDock />
 
       {/* Global command palette · Cmd/Ctrl+K */}
       <CommandPalette />
@@ -250,7 +165,7 @@ export function ShellLayout() {
  */
 function StatusRail() {
   return (
-    <div className="no-drag flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.18em]">
+    <div className="no-drag hidden items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.18em] xl:flex">
       <StatusChip Icon={Cpu} label="engine" value="rules · ready" tone="ok" />
       <StatusChip Icon={Activity} label="route" value="local-first" tone="ok" />
       <StatusChip Icon={Brain} label="brain" value="local only" tone="muted" />

@@ -27,6 +27,7 @@ import {
   Cpu,
   HardDrive,
   Layers,
+  Pencil,
   Plus,
   RefreshCw,
   Rocket,
@@ -93,6 +94,7 @@ export default function ServerPage() {
   const [profiles, setProfiles] = useState<ServerProfile[]>(() => listProfiles());
   const [activeId, setActiveIdState] = useState<string | null>(() => getActiveProfileId());
   const [showAdd, setShowAdd] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<ServerProfile | null>(null);
   const [confirmRestart, setConfirmRestart] = useState<ServerService | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>(() => listAudit());
   const [lastRestart, setLastRestart] = useState<Record<string, RestartHint>>({});
@@ -131,6 +133,10 @@ export default function ServerPage() {
   const agentReason = bridgeOn
     ? "tauri ipc available"
     : "agent not available · run in desktop app";
+  const canUseSsh = bridgeOn && agentStatus === "ready";
+  const sshUnavailableReason = bridgeOn
+    ? "SSH bridge is not ready in this desktop runtime"
+    : "Desktop app required for SSH operations";
   const recordAudit = (entry: Parameters<typeof appendAudit>[0]) => {
     const next = appendAudit(entry);
     setAudit(next);
@@ -166,6 +172,19 @@ export default function ServerPage() {
     });
   };
 
+  const onEdit = (p: ServerProfile) => {
+    const next = upsertProfile(p);
+    setProfiles(next);
+    setEditingProfile(null);
+    recordAudit({
+      action: "profile-edit",
+      profileId: p.id,
+      profileName: p.name,
+      detail: `host=${p.host}:${p.port} · tags=${p.tags.join(",") || "—"}`,
+      result: "ok"
+    });
+  };
+
   const onDelete = (p: ServerProfile) => {
     const next = removeProfile(p.id);
     setProfiles(next);
@@ -184,6 +203,12 @@ export default function ServerPage() {
 
   const refreshStatus = async () => {
     if (!activeProfile) return;
+    if (!canUseSsh) {
+      setStatus(null);
+      setStatusErr(sshUnavailableReason);
+      setStatusAt(Date.now());
+      return;
+    }
     const r = await bridgeProbeStatus(activeProfile);
     setAudit(listAudit());
     if (r.ok && r.data) {
@@ -207,6 +232,12 @@ export default function ServerPage() {
 
   const refreshServices = async () => {
     if (!activeProfile) return;
+    if (!canUseSsh) {
+      setServices([]);
+      setServicesErr(sshUnavailableReason);
+      setServicesAt(Date.now());
+      return;
+    }
     const [pm2, dk, sd] = await Promise.all([
       bridgeListPm2(activeProfile),
       bridgeListDocker(activeProfile),
@@ -225,6 +256,12 @@ export default function ServerPage() {
 
   const refreshLogs = async () => {
     if (!activeProfile) return;
+    if (!canUseSsh) {
+      setLogs([]);
+      setLogsErr(sshUnavailableReason);
+      setLogsAt(Date.now());
+      return;
+    }
     // Default log target is the first allowlisted systemd service ·
     // falling back to the first docker container or pm2 app. No raw
     // free-form command input anywhere.
@@ -249,12 +286,12 @@ export default function ServerPage() {
 
   // Auto-probe whenever the active profile changes.
   useEffect(() => {
-    if (!activeProfile) return;
+    if (!activeProfile || !canUseSsh) return;
     void refreshStatus();
     void refreshServices();
     void refreshLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id]);
+  }, [activeProfile?.id, canUseSsh]);
 
   const alerts = useMemo(() => deriveAlerts(status, services), [status, services]);
 
@@ -267,6 +304,20 @@ export default function ServerPage() {
     const svc = confirmRestart;
     setConfirmRestart(null);
     const rid = svc.id;
+    if (!canUseSsh) {
+      setLastRestart((prev) => ({
+        ...prev,
+        [rid]: { state: "error", at: Date.now(), detail: sshUnavailableReason }
+      }));
+      recordAudit({
+        action: "restart-confirm",
+        profileId: activeProfile.id,
+        profileName: activeProfile.name,
+        detail: `service=${svc.name} · ${sshUnavailableReason}`,
+        result: "blocked"
+      });
+      return;
+    }
     setLastRestart((prev) => ({ ...prev, [rid]: { state: "running", at: Date.now() } }));
     const r = await bridgeRestart(activeProfile, svc.kind, svc.name);
     setAudit(listAudit());
@@ -345,6 +396,9 @@ export default function ServerPage() {
           >
             agent · {agentStatus}
           </span>
+          <span className="hidden max-w-[240px] truncate font-mono text-[9px] uppercase tracking-wider text-white/40 md:inline">
+            {agentReason}
+          </span>
         </span>
       </div>
 
@@ -355,6 +409,7 @@ export default function ServerPage() {
           activeId={activeId}
           onActivate={onActivate}
           onAdd={() => setShowAdd(true)}
+          onEdit={setEditingProfile}
           onDelete={onDelete}
         />
 
@@ -374,6 +429,8 @@ export default function ServerPage() {
                 fetchedAt={statusAt}
                 onRefresh={refreshStatus}
                 profile={activeProfile}
+                canUseSsh={canUseSsh}
+                disabledReason={sshUnavailableReason}
               />
 
               <div className="grid min-h-0 grid-cols-1 gap-2 lg:grid-cols-[1fr_1fr]">
@@ -385,12 +442,16 @@ export default function ServerPage() {
                   onRestart={onConfirmRestart}
                   onDeployBlocked={onDeployBlocked}
                   lastRestart={lastRestart}
+                  canUseSsh={canUseSsh}
+                  disabledReason={sshUnavailableReason}
                 />
                 <LogsViewer
                   lines={logs}
                   err={logsErr}
                   fetchedAt={logsAt}
                   onRefresh={refreshLogs}
+                  canUseSsh={canUseSsh}
+                  disabledReason={sshUnavailableReason}
                 />
               </div>
 
@@ -410,10 +471,19 @@ export default function ServerPage() {
         />
       )}
 
+      {editingProfile && (
+        <AddProfileDialog
+          key={editingProfile.id}
+          initial={editingProfile}
+          onCancel={() => setEditingProfile(null)}
+          onSubmit={onEdit}
+        />
+      )}
+
       {confirmRestart && activeProfile && (
         <ConfirmModal
           title={`restart ${confirmRestart.name}?`}
-          body={`${confirmRestart.kind} service on ${activeProfile.host}. This will issue the allowlisted command "restart-service". The SSH bridge is not wired today · the action will be recorded as blocked.`}
+          body={`${confirmRestart.kind} service on ${activeProfile.host}. This issues only the allowlisted command "restart-service" through the desktop SSH bridge.`}
           confirmLabel="restart"
           confirmTone="warn"
           onConfirm={onRestartConfirmed}
@@ -433,12 +503,14 @@ function ProfileList({
   activeId,
   onActivate,
   onAdd,
+  onEdit,
   onDelete
 }: {
   profiles: ServerProfile[];
   activeId: string | null;
   onActivate: (id: string) => void;
   onAdd: () => void;
+  onEdit: (p: ServerProfile) => void;
   onDelete: (p: ServerProfile) => void;
 }) {
   return (
@@ -492,15 +564,26 @@ function ProfileList({
                     {p.sshUser}@{p.host}:{p.port}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(p)}
-                  title={`Delete ${p.name} · WORKS`}
-                  aria-label={`Delete ${p.name} · WORKS`}
-                  className="rounded border border-rose-400/25 bg-rose-500/[0.06] p-0.5 text-rose-200/80 opacity-0 transition group-hover:opacity-100 hover:bg-rose-500/[0.12]"
-                >
-                  <Trash2 className="h-2.5 w-2.5" />
-                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(p)}
+                    title={`Edit ${p.name} · WORKS`}
+                    aria-label={`Edit ${p.name} · WORKS`}
+                    className="rounded border border-white/10 bg-white/[0.025] p-0.5 text-white/55 transition hover:bg-white/[0.06] hover:text-white"
+                  >
+                    <Pencil className="h-2.5 w-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(p)}
+                    title={`Delete ${p.name} · WORKS`}
+                    aria-label={`Delete ${p.name} · WORKS`}
+                    className="rounded border border-rose-400/25 bg-rose-500/[0.06] p-0.5 text-rose-200/80 transition hover:bg-rose-500/[0.12]"
+                  >
+                    <Trash2 className="h-2.5 w-2.5" />
+                  </button>
+                </div>
               </div>
               {p.tags.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1">
@@ -532,13 +615,17 @@ function StatusCards({
   err,
   fetchedAt,
   onRefresh,
-  profile
+  profile,
+  canUseSsh,
+  disabledReason
 }: {
   status: ServerStatus | null;
   err: string | null;
   fetchedAt: number | null;
   onRefresh: () => void;
   profile: ServerProfile;
+  canUseSsh: boolean;
+  disabledReason: string;
 }) {
   const items: Array<{ label: string; value: string; Icon: typeof Cpu; tone: "ok" | "warn" | "bad" | "muted" }> = [
     {
@@ -591,9 +678,10 @@ function StatusCards({
         <button
           type="button"
           onClick={onRefresh}
-          title="Refresh status · WORKS"
-          aria-label="Refresh status · WORKS"
-          className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 transition hover:bg-white/[0.06] hover:text-white"
+          disabled={!canUseSsh}
+          title={canUseSsh ? "Refresh status · WORKS" : `Refresh status · DISABLED · ${disabledReason}`}
+          aria-label={canUseSsh ? "Refresh status · WORKS" : `Refresh status · DISABLED · ${disabledReason}`}
+          className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           <RefreshCw className="h-3 w-3" /> refresh
         </button>
@@ -605,10 +693,16 @@ function StatusCards({
           <StatTile key={it.label} {...it} />
         ))}
       </div>
+      {!canUseSsh && (
+        <InlineUnavailable
+          label="desktop required"
+          detail={`${disabledReason}. Profiles are local, but status probes require the Tauri SSH bridge.`}
+        />
+      )}
       {err && <InlineError label="probe-status failed" detail={err} />}
-      {!status && !err && (
+      {canUseSsh && !status && !err && (
         <p className="mt-1.5 rounded border border-dashed border-white/12 bg-white/[0.012] px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-white/45">
-          adapter-ready · agent not wired · values will populate when the SSH bridge ships
+          ready to probe through the desktop SSH bridge
         </p>
       )}
     </TerminalPanel>
@@ -623,6 +717,21 @@ function InlineError({ label, detail }: { label: string; detail: string }) {
     >
       <AlertTriangle className="h-3 w-3 shrink-0 text-rose-300" />
       <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.22em] text-rose-200">
+        {label}
+      </span>
+      <span className="min-w-0 truncate font-mono text-[10.5px] text-white/80">{detail}</span>
+    </div>
+  );
+}
+
+function InlineUnavailable({ label, detail }: { label: string; detail: string }) {
+  return (
+    <div
+      role="status"
+      className="mt-1 flex items-center gap-1.5 rounded border border-amber-400/30 bg-amber-500/[0.06] px-1.5 py-1"
+    >
+      <AlertTriangle className="h-3 w-3 shrink-0 text-amber-300" />
+      <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.22em] text-amber-200">
         {label}
       </span>
       <span className="min-w-0 truncate font-mono text-[10.5px] text-white/80">{detail}</span>
@@ -670,7 +779,9 @@ function ServicesPanel({
   onRefresh,
   onRestart,
   onDeployBlocked,
-  lastRestart
+  lastRestart,
+  canUseSsh,
+  disabledReason
 }: {
   services: ServerService[];
   err: string | null;
@@ -679,6 +790,8 @@ function ServicesPanel({
   onRestart: (s: ServerService) => void;
   onDeployBlocked: () => void;
   lastRestart: Record<string, RestartHint>;
+  canUseSsh: boolean;
+  disabledReason: string;
 }) {
   return (
     <TerminalPanel
@@ -698,7 +811,7 @@ function ServicesPanel({
             type="button"
             onClick={onDeployBlocked}
             disabled
-            title="Deploy · DISABLED · planned (audited as blocked)"
+            title="Deploy · DISABLED · deployment is not implemented"
             aria-label="Deploy · DISABLED · planned"
             className="inline-flex cursor-not-allowed items-center gap-1 rounded border border-white/8 bg-white/[0.012] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/40"
           >
@@ -707,9 +820,10 @@ function ServicesPanel({
           <button
             type="button"
             onClick={onRefresh}
-            title="Refresh services · WORKS"
-            aria-label="Refresh services · WORKS"
-            className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 transition hover:bg-white/[0.06] hover:text-white"
+            disabled={!canUseSsh}
+            title={canUseSsh ? "Refresh services · WORKS" : `Refresh services · DISABLED · ${disabledReason}`}
+            aria-label={canUseSsh ? "Refresh services · WORKS" : `Refresh services · DISABLED · ${disabledReason}`}
+            className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             <RefreshCw className="h-3 w-3" /> refresh
           </button>
@@ -717,13 +831,19 @@ function ServicesPanel({
       }
       bodyClassName="p-2 min-h-0"
     >
+      {!canUseSsh && (
+        <InlineUnavailable
+          label="desktop required"
+          detail={`${disabledReason}. Service inventory and restart use allowlisted SSH commands.`}
+        />
+      )}
       {services.length === 0 ? (
-        err ? (
+        canUseSsh && err ? (
           <InlineError label="services failed" detail={err} />
         ) : (
           <EmptyAdapterPanel
-            text="services adapter-ready"
-            subtext="no service inventory yet · refresh to probe"
+            text={canUseSsh ? "no services loaded" : "services unavailable in browser"}
+            subtext={canUseSsh ? "refresh to probe docker · pm2 · systemd" : disabledReason}
           />
         )
       ) : (
@@ -734,6 +854,8 @@ function ServicesPanel({
               svc={s}
               onRestart={onRestart}
               hint={lastRestart[s.id] ?? null}
+              canUseSsh={canUseSsh}
+              disabledReason={disabledReason}
             />
           ))}
         </ul>
@@ -752,12 +874,22 @@ const SERVICE_TONE: Record<ServerService["state"], string> = {
 function ServiceRow({
   svc,
   onRestart,
-  hint
+  hint,
+  canUseSsh,
+  disabledReason
 }: {
   svc: ServerService;
   onRestart: (s: ServerService) => void;
   hint: RestartHint | null;
+  canUseSsh: boolean;
+  disabledReason: string;
 }) {
+  const restartDisabled = !canUseSsh || hint?.state === "running";
+  const restartTitle = !canUseSsh
+    ? `Restart ${svc.name} · DISABLED · ${disabledReason}`
+    : hint?.state === "running"
+      ? `Restart ${svc.name} · DISABLED · restart already running`
+      : `Restart ${svc.name} · WORKS · opens confirm modal · allowlisted`;
   return (
     <li className="flex flex-col gap-1 rounded border border-white/8 bg-white/[0.012] px-2 py-1">
       <div className="flex items-center justify-between gap-2">
@@ -780,9 +912,13 @@ function ServiceRow({
           <button
             type="button"
             onClick={() => onRestart(svc)}
-            disabled={hint?.state === "running"}
-            title={`Restart ${svc.name} · WORKS · opens confirm modal · allowlisted`}
-            aria-label={`Restart ${svc.name} · WORKS`}
+            disabled={restartDisabled}
+            title={restartTitle}
+            aria-label={
+              restartDisabled
+                ? `Restart ${svc.name} · DISABLED · ${!canUseSsh ? disabledReason : "restart already running"}`
+                : `Restart ${svc.name} · WORKS`
+            }
             className="inline-flex items-center gap-1 rounded border border-white/12 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/75 transition hover:border-amber-400/40 hover:bg-amber-500/[0.08] hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {hint?.state === "running" ? "restarting…" : "restart"}
@@ -828,12 +964,16 @@ function LogsViewer({
   lines,
   err,
   fetchedAt,
-  onRefresh
+  onRefresh,
+  canUseSsh,
+  disabledReason
 }: {
   lines: string[];
   err: string | null;
   fetchedAt: number | null;
   onRefresh: () => void;
+  canUseSsh: boolean;
+  disabledReason: string;
 }) {
   return (
     <TerminalPanel
@@ -851,22 +991,29 @@ function LogsViewer({
         <button
           type="button"
           onClick={onRefresh}
-          title="Refresh logs · WORKS"
-          aria-label="Refresh logs · WORKS"
-          className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 transition hover:bg-white/[0.06] hover:text-white"
+          disabled={!canUseSsh}
+          title={canUseSsh ? "Refresh logs · WORKS" : `Refresh logs · DISABLED · ${disabledReason}`}
+          aria-label={canUseSsh ? "Refresh logs · WORKS" : `Refresh logs · DISABLED · ${disabledReason}`}
+          className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/65 transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           <RefreshCw className="h-3 w-3" /> refresh
         </button>
       }
       bodyClassName="p-2 min-h-0"
     >
+      {!canUseSsh && (
+        <InlineUnavailable
+          label="desktop required"
+          detail={`${disabledReason}. Logs are fetched through allowlisted journal/docker/pm2 targets.`}
+        />
+      )}
       {lines.length === 0 ? (
-        err ? (
+        canUseSsh && err ? (
           <InlineError label="logs failed" detail={err} />
         ) : (
           <EmptyAdapterPanel
-            text="logs adapter-ready"
-            subtext="no journal yet · refresh to fetch the last 200 lines"
+            text={canUseSsh ? "no logs loaded" : "logs unavailable in browser"}
+            subtext={canUseSsh ? "refresh to fetch the last 200 lines" : disabledReason}
           />
         )
       ) : (
@@ -1091,22 +1238,25 @@ function ConfirmModal({
 }
 
 function AddProfileDialog({
+  initial,
   onSubmit,
   onCancel
 }: {
+  initial?: ServerProfile;
   onSubmit: (p: ServerProfile) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [host, setHost] = useState("");
-  const [sshUser, setSshUser] = useState("root");
-  const [port, setPort] = useState(22);
-  const [tags, setTags] = useState("");
-  const [notes, setNotes] = useState("");
-  const [sshKeyPath, setSshKeyPath] = useState("");
-  const [allowedPm2, setAllowedPm2] = useState("");
-  const [allowedDocker, setAllowedDocker] = useState("");
-  const [allowedSystemd, setAllowedSystemd] = useState("");
+  const editing = Boolean(initial);
+  const [name, setName] = useState(initial?.name ?? "");
+  const [host, setHost] = useState(initial?.host ?? "");
+  const [sshUser, setSshUser] = useState(initial?.sshUser ?? "root");
+  const [port, setPort] = useState(initial?.port ?? 22);
+  const [tags, setTags] = useState(initial?.tags.join(", ") ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [sshKeyPath, setSshKeyPath] = useState(initial?.sshKeyPath ?? "");
+  const [allowedPm2, setAllowedPm2] = useState(initial?.allowedPm2Apps.join(", ") ?? "");
+  const [allowedDocker, setAllowedDocker] = useState(initial?.allowedDockerContainers.join(", ") ?? "");
+  const [allowedSystemd, setAllowedSystemd] = useState(initial?.allowedSystemdServices.join(", ") ?? "");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1133,7 +1283,7 @@ function AddProfileDialog({
         .map((x) => x.trim())
         .filter((x) => x.length > 0 && /^[A-Za-z0-9._-]+$/.test(x));
     onSubmit({
-      id: newProfileId(),
+      id: initial?.id ?? newProfileId(),
       name: name.trim(),
       host: host.trim(),
       sshUser: sshUser.trim(),
@@ -1147,7 +1297,7 @@ function AddProfileDialog({
       allowedPm2Apps: splitCsv(allowedPm2),
       allowedDockerContainers: splitCsv(allowedDocker),
       allowedSystemdServices: splitCsv(allowedSystemd),
-      createdAt: Date.now()
+      createdAt: initial?.createdAt ?? Date.now()
     });
   };
 
@@ -1155,7 +1305,7 @@ function AddProfileDialog({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Add server profile"
+      aria-label={editing ? "Edit server profile" : "Add server profile"}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onCancel}
     >
@@ -1167,7 +1317,7 @@ function AddProfileDialog({
         <header className="flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-1.5 text-[13px] font-semibold text-white">
             <Server className="h-3.5 w-3.5 text-accent" />
-            new server profile
+            {editing ? "edit server profile" : "new server profile"}
           </h2>
           <button
             type="button"
@@ -1291,11 +1441,11 @@ function AddProfileDialog({
             <button
               type="submit"
               disabled={!valid}
-              title={valid ? "Save profile · WORKS" : "Fill required fields"}
-              aria-label="Save profile · WORKS"
+              title={valid ? "Save profile · WORKS" : "Save profile · DISABLED · fill required fields"}
+              aria-label={valid ? "Save profile · WORKS" : "Save profile · DISABLED · fill required fields"}
               className="rounded-md border border-accent/40 bg-accent/[0.1] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-accent transition hover:bg-accent/[0.15] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              save
+              {editing ? "save edits" : "save"}
             </button>
           </div>
         </footer>

@@ -24,8 +24,9 @@ import {
 const HOMES: Array<{ id: DefaultHome; label: string }> = [
   { id: "atlas", label: "Atlas" },
   { id: "market-lab", label: "Market Lab" },
-  { id: "voice", label: "Voice · Jarvis" },
-  { id: "terminal", label: "Terminal" }
+  { id: "server", label: "Server" },
+  { id: "apps", label: "Apps" },
+  { id: "settings", label: "Settings" }
 ];
 
 const STARTUPS: Array<{ id: StartupMode; label: string }> = [

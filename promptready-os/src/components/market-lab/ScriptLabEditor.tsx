@@ -91,10 +91,18 @@ export function ScriptLabEditor({
   };
 
   const isBuiltin = useMemo(() => EXAMPLES.some((e) => e.id === activeId), [activeId]);
+  const resultState =
+    !candlesAvailable
+      ? "requires Binance candles"
+      : !result
+        ? "idle"
+        : result.ok
+          ? `${result.plots.length} plot · ${result.hlines.length} hline`
+          : result.error;
 
   return (
     <section
-      className="flex flex-col gap-1.5 rounded-md border border-white/10 bg-black/40 p-2"
+      className="flex flex-col gap-1.5 rounded-md border border-white/10 bg-[#04060d] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
       aria-label="Script Lab"
     >
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -102,17 +110,17 @@ export function ScriptLabEditor({
           <button
             type="button"
             onClick={onToggleExpanded}
-            title={expanded ? "Collapse Script Lab" : "Expand Script Lab"}
-            aria-label="Toggle Script Lab"
+            title={expanded ? "Collapse Script Lab · WORKS" : "Expand Script Lab · WORKS"}
+            aria-label={expanded ? "Collapse Script Lab · WORKS" : "Expand Script Lab · WORKS"}
             className="inline-flex h-6 w-6 items-center justify-center rounded border border-white/10 bg-white/[0.03] text-white/65 transition hover:bg-white/[0.06] hover:text-white"
           >
             {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
           </button>
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-white/85">
+          <span className="font-mono text-[10.5px] uppercase tracking-[0.24em] text-white/85">
             Script Lab
           </span>
-          <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
-            local · sandboxed · sma / ema / rsi / bb / plot / hline
+          <span className="rounded border border-white/10 bg-white/[0.025] px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-white/45">
+            local sandbox · {resultState}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -158,8 +166,8 @@ export function ScriptLabEditor({
             type="button"
             onClick={onDelete}
             disabled={isBuiltin}
-            title={isBuiltin ? "Built-in examples cannot be deleted" : "Delete script · WORKS"}
-            aria-label="Delete script"
+            title={isBuiltin ? "Delete script · DISABLED · built-in examples cannot be deleted" : "Delete script · WORKS"}
+            aria-label={isBuiltin ? "Delete script · DISABLED · built-in example" : "Delete script · WORKS"}
             className="inline-flex items-center gap-1 rounded-md border border-rose-400/25 bg-rose-500/[0.06] px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider text-rose-200/80 transition hover:bg-rose-500/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Trash2 className="h-3 w-3" /> del
@@ -169,7 +177,7 @@ export function ScriptLabEditor({
             onClick={onRun}
             disabled={!candlesAvailable}
             title={candlesAvailable ? "Run script · WORKS" : "Run script · script requires candles"}
-            aria-label="Run script · WORKS"
+            aria-label={candlesAvailable ? "Run script · WORKS" : "Run script · DISABLED · requires Binance candles"}
             className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/[0.1] px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider text-accent transition hover:bg-accent/[0.15] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Play className="h-3 w-3" /> run
@@ -191,8 +199,8 @@ export function ScriptLabEditor({
             }}
             spellCheck={false}
             wrap="off"
-            className="no-drag w-full resize-y rounded-md border border-white/10 bg-black/60 p-2 font-mono text-[11.5px] leading-snug text-white/90 placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
-            style={{ minHeight: 120, height: 160 }}
+            className="no-drag w-full resize-y rounded-md border border-white/10 bg-black/70 p-2 font-mono text-[11.5px] leading-snug text-white/90 placeholder:text-white/30 focus:border-accent/40 focus:outline-none"
+            style={{ minHeight: 150, height: 190 }}
             aria-label="Script body"
             placeholder="// sources: close, open, high, low, volume, hl2, hlc3, ohlc4"
           />

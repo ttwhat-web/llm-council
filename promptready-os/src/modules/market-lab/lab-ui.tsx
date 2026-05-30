@@ -63,21 +63,21 @@ export function Panel({
   return (
     <section
       className={clsx(
-        "flex min-w-0 flex-col rounded-lg border border-white/10 bg-white/[0.02]",
+        "flex min-w-0 max-w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-white/[0.02]",
         glow && "shadow-[0_0_40px_-12px_rgba(255,255,255,0.08)]",
         className
       )}
     >
       {(title || right) && (
-        <div className="flex items-center justify-between gap-2 border-b border-white/6 px-2.5 py-1.5">
-          <span className="flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-accent">
+        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-white/6 px-2.5 py-1.5">
+          <span className="flex min-w-0 items-center gap-1.5 truncate font-mono text-[9.5px] uppercase tracking-[0.2em] text-accent">
             {icon}
             {title}
           </span>
-          {right}
+          <span className="shrink-0">{right}</span>
         </div>
       )}
-      <div className={clsx("flex min-w-0 flex-col gap-2 p-2.5", bodyClassName)}>{children}</div>
+      <div className={clsx("flex min-w-0 max-w-full flex-col gap-2 p-2.5", bodyClassName)}>{children}</div>
     </section>
   );
 }

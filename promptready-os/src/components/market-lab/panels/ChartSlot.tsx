@@ -47,7 +47,7 @@ export function ChartSlot({
       sub={hasBinance ? "binance · live ohlc" : "no source · adapter-ready"}
       tone={hasBinance ? "ok" : "muted"}
       right={
-        <div className="relative">
+        <div className="relative min-w-0">
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -91,17 +91,19 @@ export function ChartSlot({
           )}
         </div>
       }
-      bodyClassName="p-1 min-h-0"
+      bodyClassName="p-1 min-h-0 min-w-0 overflow-hidden"
     >
-      <ChartCanvas
-        symbol={symbol}
-        height={height}
-        compact={compact}
-        overlays={overlays}
-        hlinesMain={hlinesMain}
-        rsi={rsi}
-        onCandles={onCandles}
-      />
+      <div className="min-w-0 max-w-full overflow-hidden">
+        <ChartCanvas
+          symbol={symbol}
+          height={height}
+          compact={compact}
+          overlays={overlays}
+          hlinesMain={hlinesMain}
+          rsi={rsi}
+          onCandles={onCandles}
+        />
+      </div>
     </TerminalPanel>
   );
 }

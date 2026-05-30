@@ -23,25 +23,18 @@ export type NavId =
   | "workflows"
   | "marketplace"
   | "server"
+  | "apps"
   | "settings";
 
 export const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
-  { id: "atlas", label: "Atlas" },
-  { id: "mission-control", label: "Mission Control" },
   { id: "market-lab", label: "Market Lab" },
-  { id: "terminal", label: "Intelligence Terminal" },
-  { id: "voice", label: "Voice · Jarvis" },
-  { id: "memory", label: "Memory" },
-  { id: "library", label: "Library" },
-  { id: "brain", label: "Brain" },
-  { id: "agents", label: "Agents" },
-  { id: "workflows", label: "Workflows" },
-  { id: "marketplace", label: "Marketplace" },
   { id: "server", label: "Server" },
+  { id: "apps", label: "Apps" },
+  { id: "atlas", label: "Atlas" },
   { id: "settings", label: "Settings" }
 ];
 
-export type DefaultHome = "atlas" | "market-lab" | "voice" | "terminal";
+export type DefaultHome = "atlas" | "market-lab" | "server" | "apps" | "settings";
 export type StartupMode = "operator" | "market" | "voice" | "focus";
 export type Density = "compact" | "comfortable";
 
@@ -67,7 +60,15 @@ function read(): WorkspaceState {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw) as Partial<WorkspaceState>;
-    return { ...DEFAULTS, ...parsed };
+    const defaultHome =
+      parsed.defaultHome &&
+      (["atlas", "market-lab", "server", "apps", "settings"] as string[]).includes(parsed.defaultHome)
+        ? parsed.defaultHome
+        : DEFAULTS.defaultHome;
+    const hiddenNav = Array.isArray(parsed.hiddenNav)
+      ? parsed.hiddenNav.filter((id): id is NavId => NAV_ITEMS.some((item) => item.id === id))
+      : DEFAULTS.hiddenNav;
+    return { ...DEFAULTS, ...parsed, defaultHome, hiddenNav };
   } catch {
     return DEFAULTS;
   }
@@ -133,6 +134,7 @@ export function useWorkspace(): WorkspaceState {
 export const DEFAULT_HOME_PATHS: Record<DefaultHome, string> = {
   atlas: "/",
   "market-lab": "/market-lab",
-  voice: "/voice",
-  terminal: "/terminal"
+  server: "/server",
+  apps: "/apps",
+  settings: "/settings"
 };

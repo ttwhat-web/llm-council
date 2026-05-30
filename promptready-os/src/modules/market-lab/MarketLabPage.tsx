@@ -169,7 +169,6 @@ export default function MarketLabPage() {
 
   const [selected, setSelected] = useState<string>("BTC");
   const [command, setCommand] = useState("BTC");
-  const [tvMode, setTvMode] = useState(false);
 
   // News room · local per-category fetch (shared fetcher, no extra polling
   // loop unless this page is mounted — refreshed manually on chip change).
@@ -263,7 +262,10 @@ export default function MarketLabPage() {
 
   // --- Layout v2 (preset-driven) + Script Lab state -----------------------
   const [layout, miniSymbols, setLayoutState] = useLayoutV2();
-  const setLayout = (id: LayoutId) => setLayoutState({ layout: id });
+  const setLayout = (id: LayoutId) => {
+    if (!SUPPORTED_LAYOUTS.includes(id)) return;
+    setLayoutState({ layout: id });
+  };
   const setMiniSymbol = (i: number, sym: string) => {
     const next = [...miniSymbols];
     next[i] = sym;
@@ -355,26 +357,14 @@ export default function MarketLabPage() {
     return { mainOverlays: overlays, mainHlines: hlines, rsiPane: rsi };
   }, [scriptResult]);
 
-  if (tvMode) {
-    return (
-      <TvWall
-        now={now}
-        quotes={quotes}
-        cryptoOnline={cryptoOnline}
-        items={items}
-        avgChange={avgChange}
-        adapters={adapters}
-        approvals={approvals}
-        missions={history.length}
-        onExit={() => setTvMode(false)}
-      />
-    );
-  }
-
-  const mainHeight = layout === "1" ? 540 : layout === "1+4" ? 380 : layout === "wall" ? 320 : 460;
+  const mainHeight = layout === "1" ? 620 : 430;
+  const providerErrors = [
+    crypto.error ? `CoinGecko · ${crypto.error}` : null,
+    newsState === "error" && newsErr ? `News · ${newsErr}` : null
+  ].filter((x): x is string => Boolean(x));
 
   return (
-    <div className="flex min-h-[calc(100vh-43px)] w-full flex-col gap-1.5 bg-black px-2 py-2">
+    <div className="flex min-h-[calc(100vh-43px)] w-full max-w-full min-w-0 flex-col gap-1.5 overflow-hidden bg-[#03050a] px-2 py-2 text-[13px]">
       {/* command bar (compact) */}
       <CommandBar
         selected={selected}
@@ -382,12 +372,15 @@ export default function MarketLabPage() {
         onCommand={setCommand}
         onOpenSymbol={openSymbol}
         crypto={crypto}
+        newsState={newsState}
+        newsErr={newsErr}
         adapters={adapters}
         layout={layout}
         onLayout={setLayout}
       />
+      {providerErrors.length > 0 && <ProviderErrorStrip errors={providerErrors} />}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 xl:grid-cols-[170px_minmax(0,1fr)_300px]">
+      <div className="grid min-h-0 w-full max-w-full min-w-0 flex-1 grid-cols-1 gap-1.5 overflow-hidden xl:grid-cols-[180px_minmax(0,1fr)_minmax(300px,340px)]">
         <WarRoomWatchlist
           quotes={quotes}
           cryptoOnline={cryptoOnline}
@@ -395,7 +388,7 @@ export default function MarketLabPage() {
           onSelect={openSymbol}
         />
 
-        <main className="flex min-h-0 flex-col gap-1.5">
+        <main className="flex min-h-0 min-w-0 flex-col gap-1.5 overflow-hidden">
           {/* dominant main chart — always present */}
           <ChartSlot
             symbol={selected}
@@ -417,36 +410,26 @@ export default function MarketLabPage() {
               onCandles={onCandlesLoaded}
             />
           )}
-          {layout === "orderflow" && (
-            <div className="grid min-h-0 grid-cols-2 gap-1.5">
-              <FlowImbalancePanel symbol={selected} />
-              <LiquidityHeatmapPanel symbol={selected} />
-            </div>
-          )}
-          {layout === "macro" && (
-            <>
-              <MacroStrip />
-              <MiniGrid
-                symbols={miniSymbols}
-                onSymbol={setMiniSymbol}
-                onCandles={onCandlesLoaded}
-              />
-            </>
-          )}
-          {layout === "wall" && (
-            <>
-              <MiniGrid
-                symbols={miniSymbols}
-                onSymbol={setMiniSymbol}
-                onCandles={onCandlesLoaded}
-                compact
-              />
-              <div className="grid min-h-0 grid-cols-2 gap-1.5">
-                <FlowImbalancePanel symbol={selected} />
-                <LiquidityHeatmapPanel symbol={selected} />
-              </div>
-            </>
-          )}
+          <MarketContextStrip
+            selected={selected}
+            quote={selectedQuote}
+            selectedIsCrypto={selectedIsCrypto}
+            cryptoOnline={cryptoOnline}
+            chip={newsChip}
+            onChip={onChip}
+            items={items}
+            state={newsState}
+            err={newsErr}
+            missionBusy={!!current}
+            onCreateMission={onCreateMission}
+            onSaveToBrain={onSaveToBrain}
+            alert={aiAlert}
+            cost={cost}
+            telegram={telegram}
+            adapters={adapters}
+            missions={history.length}
+            approvals={approvals}
+          />
 
           {/* collapsible script lab editor */}
           <ScriptLabEditor
@@ -462,7 +445,7 @@ export default function MarketLabPage() {
         </main>
 
         {/* right rail · order flow + news + analyst */}
-        <aside className="grid min-h-0 grid-rows-[minmax(170px,1fr)_minmax(150px,0.9fr)_minmax(180px,1.1fr)_minmax(150px,0.9fr)] gap-1.5">
+        <aside className="grid min-h-0 min-w-0 overflow-hidden grid-rows-[minmax(190px,1.1fr)_minmax(160px,0.9fr)_minmax(150px,0.8fr)_minmax(170px,0.95fr)] gap-1.5">
           <TerminalPanel
             title="order book"
             sub={binancePairFor(selected) ? "binance · live" : "no source"}
@@ -479,29 +462,15 @@ export default function MarketLabPage() {
           >
             <TimeAndSalesPanel symbol={selected} rows={10} />
           </TerminalPanel>
-          <VerticalNewsTape
-            chip={newsChip}
-            onChip={onChip}
-            items={items}
-            state={newsState}
-            err={newsErr}
-            missionBusy={!!current}
-            onCreateMission={onCreateMission}
-            onSaveToBrain={onSaveToBrain}
-          />
-          <AiAnalystPanel
-            selected={selected}
-            quote={selectedQuote}
-            selectedIsCrypto={selectedIsCrypto}
-            cryptoOnline={cryptoOnline}
-            newsItems={items}
-            alert={aiAlert}
-            cost={cost}
-            telegram={telegram}
-            adapters={adapters}
-            missions={history.length}
-            approvals={approvals}
-          />
+          <TerminalPanel
+            title="liquidity depth"
+            sub={binancePairFor(selected) ? "binance · cumulative" : "no source"}
+            tone={binancePairFor(selected) ? "ok" : "muted"}
+            bodyClassName="p-1 min-h-0"
+          >
+            <DepthPanel symbol={selected} height={126} />
+          </TerminalPanel>
+          <LiquidityHeatmapPanel symbol={selected} />
         </aside>
       </div>
 
@@ -514,11 +483,11 @@ export default function MarketLabPage() {
 // Layout v2 hook · persists layout preset + mini-chart symbols
 // ---------------------------------------------------------------------------
 
-const STORAGE_LAYOUT_V2 = "promptready-os.marketlab.layout.v2";
+const STORAGE_LAYOUT_V2 = "promptready-os.marketlab.layout.v3";
 
 type LayoutId = "1" | "1+4" | "orderflow" | "macro" | "wall";
 
-const VALID_LAYOUTS: LayoutId[] = ["1", "1+4", "orderflow", "macro", "wall"];
+const SUPPORTED_LAYOUTS: LayoutId[] = ["1", "1+4"];
 
 interface LayoutV2 {
   layout: LayoutId;
@@ -526,7 +495,7 @@ interface LayoutV2 {
 }
 
 const DEFAULT_LAYOUT_V2: LayoutV2 = {
-  layout: "1+4",
+  layout: "1",
   miniSymbols: ["ETH", "SOL", "BNB", "XRP"]
 };
 
@@ -538,10 +507,7 @@ function readLayoutV2(): LayoutV2 {
     const raw = window.localStorage.getItem(STORAGE_LAYOUT_V2);
     if (!raw) return DEFAULT_LAYOUT_V2;
     const parsed = JSON.parse(raw) as Partial<LayoutV2>;
-    const layout: LayoutId =
-      typeof parsed.layout === "string" && (VALID_LAYOUTS as string[]).includes(parsed.layout)
-        ? (parsed.layout as LayoutId)
-        : DEFAULT_LAYOUT_V2.layout;
+    const layout = normalizeLayoutId(parsed.layout);
     const minis =
       Array.isArray(parsed.miniSymbols) && parsed.miniSymbols.length === 4
         ? parsed.miniSymbols.map((s) => String(s).toUpperCase()).slice(0, 4)
@@ -552,10 +518,16 @@ function readLayoutV2(): LayoutV2 {
   }
 }
 
+function normalizeLayoutId(value: unknown): LayoutId {
+  return typeof value === "string" && (SUPPORTED_LAYOUTS as string[]).includes(value)
+    ? (value as LayoutId)
+    : DEFAULT_LAYOUT_V2.layout;
+}
+
 function writeLayoutV2(v: LayoutV2) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_LAYOUT_V2, JSON.stringify(v));
+    window.localStorage.setItem(STORAGE_LAYOUT_V2, JSON.stringify({ ...v, layout: normalizeLayoutId(v.layout) }));
   } catch {
     // ignore
   }
@@ -563,21 +535,48 @@ function writeLayoutV2(v: LayoutV2) {
 
 function useLayoutV2(): [LayoutId, string[], (patch: Partial<LayoutV2>) => void] {
   const [state, setState] = useState<LayoutV2>(() => readLayoutV2());
-  useEffect(() => writeLayoutV2(state), [state]);
-  const patch = (p: Partial<LayoutV2>) => setState((prev) => ({ ...prev, ...p }));
-  return [state.layout, state.miniSymbols, patch];
+  const layout = normalizeLayoutId(state.layout);
+  useEffect(() => {
+    if (layout !== state.layout) {
+      setState((prev) => ({ ...prev, layout: normalizeLayoutId(prev.layout) }));
+      return;
+    }
+    writeLayoutV2(state);
+  }, [layout, state]);
+  const patch = useCallback((p: Partial<LayoutV2>) => {
+    setState((prev) => {
+      const next = { ...prev, ...p };
+      return { ...next, layout: normalizeLayoutId(next.layout) };
+    });
+  }, []);
+  return [layout, state.miniSymbols, patch];
 }
 
 // ---------------------------------------------------------------------------
 // Compact command bar (replaces SurfaceHeader / WarRoomHeader sizing)
 // ---------------------------------------------------------------------------
 
-const LAYOUT_PRESETS: Array<{ id: LayoutId; label: string; hint: string }> = [
+const LAYOUT_PRESETS: Array<{ id: LayoutId; label: string; hint: string; disabledReason?: string }> = [
   { id: "1", label: "1", hint: "Single dominant chart" },
   { id: "1+4", label: "1 + 4", hint: "Main + 4 mini charts" },
-  { id: "orderflow", label: "orderflow", hint: "Main + flow imbalance + bookmap" },
-  { id: "macro", label: "macro", hint: "Main + macro strip + 4 mini" },
-  { id: "wall", label: "wall", hint: "Full density · everything visible" }
+  {
+    id: "orderflow",
+    label: "orderflow",
+    hint: "Use the stable right rail for order book, time & sales, depth, and heatmap",
+    disabledReason: "disabled · caused horizontal expansion"
+  },
+  {
+    id: "macro",
+    label: "macro",
+    hint: "Macro providers are adapter-ready",
+    disabledReason: "disabled · macro grid needs provider/sizing repair"
+  },
+  {
+    id: "wall",
+    label: "wall",
+    hint: "Dense wall mode is not safe in the workstation viewport",
+    disabledReason: "disabled · not layout-safe"
+  }
 ];
 
 function CommandBar({
@@ -586,6 +585,8 @@ function CommandBar({
   onCommand,
   onOpenSymbol,
   crypto,
+  newsState,
+  newsErr,
   adapters,
   layout,
   onLayout
@@ -595,16 +596,21 @@ function CommandBar({
   onCommand: (v: string) => void;
   onOpenSymbol: (s: string) => void;
   crypto: ReturnType<typeof useCryptoFeed>;
+  newsState: "loading" | "ok" | "error" | "adapter";
+  newsErr?: string;
   adapters: ReturnType<typeof adapterSummary>;
   layout: LayoutId;
   onLayout: (id: LayoutId) => void;
 }) {
-  const cgOk = crypto.state === "ok";
+  const hasBinance = binancePairFor(selected) != null;
+  const binanceTone: ProviderTone = hasBinance ? "ok" : "muted";
+  const cgTone: ProviderTone =
+    crypto.state === "ok" ? "ok" : crypto.state === "error" ? "bad" : "warn";
+  const newsTone: ProviderTone =
+    newsState === "ok" ? "ok" : newsState === "error" ? "bad" : newsState === "adapter" ? "muted" : "warn";
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-white/10 bg-white/[0.012] px-2 py-1">
-      <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
-        market lab · pro
-      </span>
+    <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2 overflow-hidden rounded-md border border-white/10 bg-black/60 px-2 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">market lab</span>
       <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/35">
         {new Date().toLocaleTimeString("en-GB", { hour12: false })}
       </span>
@@ -643,19 +649,22 @@ function CommandBar({
       <span className="font-mono text-[9.5px] uppercase tracking-wider text-white/55">
         layout
       </span>
-      <div role="tablist" aria-label="Layout preset" className="flex items-center gap-0.5 rounded border border-white/10 bg-white/[0.03] p-0.5">
+      <div role="tablist" aria-label="Layout preset" className="flex min-w-0 flex-wrap items-center gap-0.5 rounded border border-white/10 bg-white/[0.03] p-0.5">
         {LAYOUT_PRESETS.map((p) => {
-          const active = layout === p.id;
+          const disabled = Boolean(p.disabledReason);
+          const active = !disabled && layout === p.id;
           return (
             <button
               key={p.id}
               type="button"
               role="tab"
               aria-selected={active}
+              disabled={disabled}
               onClick={() => onLayout(p.id)}
-              title={`${p.hint} · WORKS`}
+              title={disabled ? `${p.label} · DISABLED · ${p.disabledReason}` : `${p.hint} · WORKS`}
+              aria-label={disabled ? `${p.label} layout · DISABLED · ${p.disabledReason}` : `${p.label} layout · WORKS`}
               className={clsx(
-                "relative rounded px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider transition",
+                "relative rounded px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-35",
                 active
                   ? "bg-accent/[0.18] text-accent shadow-[inset_0_-2px_0_0_rgba(124,155,255,0.7)]"
                   : "text-white/55 hover:bg-white/[0.07] hover:text-white/85"
@@ -666,25 +675,81 @@ function CommandBar({
           );
         })}
       </div>
-      <span className="ml-auto flex items-center gap-1.5">
+      <span className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5">
+        <ProviderChip
+          label="Binance"
+          value={hasBinance ? `${selected}USDT` : "no pair"}
+          tone={binanceTone}
+          title={hasBinance ? "Binance public OHLC/order-flow is used for this symbol" : `${selected} has no Binance pair · chart/order flow adapter-ready`}
+        />
+        <ProviderChip
+          label="CoinGecko"
+          value={crypto.state}
+          tone={cgTone}
+          title={crypto.error ? `CoinGecko error · ${crypto.error}` : `CoinGecko · ${crypto.state}`}
+        />
+        <ProviderChip
+          label="News"
+          value={newsState === "adapter" ? "adapter" : newsState}
+          tone={newsTone}
+          title={newsErr ? `News error · ${newsErr}` : `News · ${newsState}`}
+        />
         <span
-          className={clsx(
-            "rounded border px-1.5 py-px font-mono text-[9px] uppercase tracking-wider",
-            cgOk
-              ? "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200"
-              : "border-rose-400/30 bg-rose-500/[0.08] text-rose-200"
-          )}
-          title={`CoinGecko · ${crypto.state}`}
+          className="rounded border border-white/10 bg-white/[0.025] px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-white/50"
+          title="Adapter summary: errors / live / adapter-ready"
         >
-          cg · {crypto.state}
-        </span>
-        <span
-          className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-white/55"
-          title="Adapter summary (errors · ok · planned · pending)"
-        >
-          ad {adapters.error}/{adapters.connected}/{adapters.ready}
+          adapters {adapters.error}/{adapters.connected}/{adapters.ready}
         </span>
       </span>
+    </div>
+  );
+}
+
+type ProviderTone = "ok" | "warn" | "bad" | "muted";
+
+const PROVIDER_TONE: Record<ProviderTone, string> = {
+  ok: "border-emerald-400/30 bg-emerald-500/[0.08] text-emerald-200",
+  warn: "border-amber-400/30 bg-amber-500/[0.08] text-amber-200",
+  bad: "border-rose-400/30 bg-rose-500/[0.08] text-rose-200",
+  muted: "border-white/10 bg-white/[0.03] text-white/50"
+};
+
+function ProviderChip({
+  label,
+  value,
+  tone,
+  title
+}: {
+  label: string;
+  value: string;
+  tone: ProviderTone;
+  title: string;
+}) {
+  return (
+    <span
+      className={clsx(
+        "inline-flex items-center gap-1 rounded border px-1.5 py-px font-mono text-[9px] uppercase tracking-wider",
+        PROVIDER_TONE[tone]
+      )}
+      title={title}
+    >
+      <span className="text-white/45">{label}</span>
+      <span>{value}</span>
+    </span>
+  );
+}
+
+function ProviderErrorStrip({ errors }: { errors: string[] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 rounded border border-rose-400/25 bg-rose-500/[0.055] px-2 py-1">
+      <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-rose-200">
+        provider error
+      </span>
+      {errors.map((err) => (
+        <span key={err} className="rounded border border-white/10 bg-black/30 px-1.5 py-px font-mono text-[10px] text-white/80">
+          {err}
+        </span>
+      ))}
     </div>
   );
 }
@@ -703,10 +768,8 @@ function MiniGrid({
   return (
     <div
       className={clsx(
-        "grid min-h-0 gap-1.5",
-        // 2×2 tile grid · never a single long strip. `compact` mode (used
-        // by the "wall" preset) puts 4 in a row to fit more data on screen.
-        compact ? "grid-cols-4" : "grid-cols-2 grid-rows-2"
+        "grid min-h-0 max-w-full min-w-0 gap-1.5 overflow-hidden",
+        compact ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 sm:grid-rows-2"
       )}
     >
       {symbols.map((s, i) => (
@@ -896,7 +959,7 @@ function WarRoomWatchlist({
   onSelect: (s: string) => void;
 }) {
   return (
-    <Panel title="watchlist" icon={<LineChart className="h-3.5 w-3.5" />} bodyClassName="gap-0 p-0">
+    <Panel title="watchlist" icon={<LineChart className="h-3.5 w-3.5" />} bodyClassName="gap-0 p-0 overflow-hidden">
       <div className="grid grid-cols-[52px_1fr_52px] border-b border-white/6 px-2 py-1 font-mono text-[8px] uppercase tracking-wider text-white/30">
         <span>sym</span><span>last</span><span className="text-right">24h</span>
       </div>
@@ -910,6 +973,8 @@ function WarRoomWatchlist({
               key={sym}
               type="button"
               onClick={() => onSelect(sym)}
+              title={`Select ${sym} · WORKS`}
+              aria-label={`Select ${sym} · WORKS`}
               className={clsx(
                 "grid grid-cols-[52px_1fr_52px] items-center gap-2 px-2 py-1 text-left transition hover:bg-white/[0.035]",
                 selected === sym && "bg-accent/[0.08]"
@@ -1062,6 +1127,147 @@ function OrderFlowStack({ selected }: { selected: string }) {
         bodyClassName="p-2"
       >
         <DepthPanel symbol={selected} height={130} />
+      </Panel>
+    </div>
+  );
+}
+
+function MarketContextStrip({
+  selected,
+  quote,
+  selectedIsCrypto,
+  cryptoOnline,
+  chip,
+  onChip,
+  items,
+  state,
+  err,
+  missionBusy,
+  onCreateMission,
+  onSaveToBrain,
+  alert,
+  cost,
+  telegram,
+  adapters,
+  missions,
+  approvals
+}: {
+  selected: string;
+  quote: CryptoQuote | null;
+  selectedIsCrypto: boolean;
+  cryptoOnline: boolean;
+  chip: string;
+  onChip: (c: { label: string; cat: NewsCategory | null }) => void;
+  items: NewsItem[];
+  state: "loading" | "ok" | "error" | "adapter";
+  err?: string;
+  missionBusy: boolean;
+  onCreateMission: (n: NewsItem) => void;
+  onSaveToBrain: (n: NewsItem) => void;
+  alert: boolean;
+  cost: ReturnType<typeof computeCostBoard>;
+  telegram: ReturnType<typeof getTelegramBridgeStatus>;
+  adapters: ReturnType<typeof adapterSummary>;
+  missions: number;
+  approvals: number;
+}) {
+  const relatedNews = items.filter((n) => n.title.toUpperCase().includes(selected)).slice(0, 2);
+  return (
+    <div className="grid min-h-0 grid-cols-1 gap-1.5 2xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+      <Panel
+        title="news wire"
+        icon={<Newspaper className="h-3.5 w-3.5" />}
+        right={<Pill tone={state === "ok" ? "ok" : state === "error" ? "bad" : state === "adapter" ? "muted" : "warn"}>{state}</Pill>}
+        bodyClassName="min-h-0 gap-1.5"
+      >
+        <div className="flex flex-wrap gap-1">
+          {NEWS_CHIPS.slice(0, 6).map((c) => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() => onChip(c)}
+              title={c.cat == null ? "Adapter-ready category · no live source" : `Load ${c.cat} news · WORKS`}
+              aria-label={c.cat == null ? `${c.label} news · adapter-ready` : `Load ${c.cat} news · WORKS`}
+              className={clsx(
+                "rounded border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wider transition",
+                c.label === chip
+                  ? "border-accent/40 bg-accent/[0.08] text-accent"
+                  : "border-white/10 bg-white/[0.02] text-white/45 hover:bg-white/[0.05] hover:text-white/70"
+              )}
+            >
+              {c.label}
+              {c.cat == null ? " · adapter" : ""}
+            </button>
+          ))}
+        </div>
+        {state === "error" && (
+          <div role="alert" className="rounded border border-rose-400/30 bg-rose-500/[0.06] px-2 py-1 font-mono text-[10px] text-rose-200">
+            {err ?? "news fetch failed"}
+          </div>
+        )}
+        {state === "adapter" && (
+          <AdapterReady what="news category · adapter-ready" detail="This category has no live wire yet. No headlines are fabricated." />
+        )}
+        {state === "loading" && items.length === 0 && (
+          <p className="rounded border border-white/8 bg-white/[0.012] px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-white/40">
+            loading real news wire...
+          </p>
+        )}
+        {items.length > 0 && (
+          <ul className="grid gap-1 md:grid-cols-3">
+            {items.slice(0, 3).map((n) => (
+              <li key={n.id} className="flex min-w-0 flex-col gap-1 rounded border border-white/8 bg-black/30 px-2 py-1.5">
+                <a
+                  href={n.url ?? "#"}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="line-clamp-2 text-[11px] leading-snug text-white/80 hover:text-accent"
+                  title={n.title}
+                >
+                  {n.title}
+                </a>
+                <div className="flex items-center justify-between gap-2 font-mono text-[8px] uppercase tracking-wider text-white/35">
+                  <span className="truncate">{n.source} · {timeAgo(n.time)}</span>
+                  <span>{n.category}</span>
+                </div>
+                <div className="flex gap-1">
+                  <NewsAction
+                    Icon={Rocket}
+                    label={missionBusy ? "busy" : "mission"}
+                    disabled={missionBusy}
+                    disabledReason="mission already running"
+                    onClick={() => onCreateMission(n)}
+                  />
+                  <NewsAction Icon={Save} label="save" onClick={() => onSaveToBrain(n)} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel title="analyst context" icon={<Bot className="h-3.5 w-3.5" />} right={<Pill tone="muted">no signal</Pill>}>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+          <StatRow label="symbol" value={selected} />
+          <StatRow label="source" value={selectedIsCrypto ? "CoinGecko" : "no source"} tone={selectedIsCrypto ? "ok" : "muted"} />
+          <StatRow label="last" value={selectedIsCrypto && cryptoOnline ? formatPrice(quote?.price ?? null) : "—"} />
+          <StatRow label="24h" value={selectedIsCrypto && cryptoOnline ? formatChange(quote?.change24h ?? null) : "—"} />
+          <StatRow label="related news" value={relatedNews.length} />
+          <StatRow label="adapter errors" value={alert ? "yes" : "none"} tone={alert ? "bad" : "ok"} />
+          <StatRow label="telegram" value={telegram.live} />
+          <StatRow label="missions" value={missions} />
+          <StatRow label="approvals" value={approvals} tone={approvals > 0 ? "warn" : undefined} />
+          <StatRow label="cloud avoided" value={formatUsd(cost.estimatedCloudCostAvoidedUSD)} />
+        </div>
+        <p className="border-t border-white/6 pt-1.5 font-mono text-[9px] uppercase tracking-wider text-white/38">
+          context only · no recommendation · no buy/sell signal · {adapters.connected} live / {adapters.ready} adapter-ready
+        </p>
+        {!selectedIsCrypto && (
+          <AdapterReady
+            what={`${selected} market data · no source`}
+            detail="Equities, FX and metals need a keyed provider before charts, order flow or analytics can show values."
+          />
+        )}
       </Panel>
     </div>
   );
@@ -1800,12 +2006,14 @@ function NewsAction({
   label,
   onClick,
   disabled,
+  disabledReason,
   accent
 }: {
   Icon: typeof Rocket;
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  disabledReason?: string;
   accent?: boolean;
 }) {
   return (
@@ -1813,6 +2021,8 @@ function NewsAction({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={disabled ? `${label} · DISABLED · ${disabledReason ?? "unavailable"}` : `${label} · WORKS`}
+      aria-label={disabled ? `${label} · DISABLED · ${disabledReason ?? "unavailable"}` : `${label} · WORKS`}
       className={clsx(
         "inline-flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-40",
         accent
@@ -1973,9 +2183,9 @@ function Ticker({
   }
   const run = [...bits, ...bits];
   return (
-    <div className="flex items-center overflow-hidden rounded border border-white/8 bg-black/40">
+    <div className="flex max-w-full min-w-0 items-center overflow-hidden rounded border border-white/8 bg-black/40">
       <span className="shrink-0 border-r border-white/8 px-2 py-1.5 font-mono text-[8.5px] uppercase tracking-[0.2em] text-accent">tape</span>
-      <div className="mic-tape flex w-max items-center gap-6 whitespace-nowrap px-3 py-1.5 font-mono text-[10.5px] tabular-nums text-white/75">
+      <div className="mic-tape flex w-max max-w-none items-center gap-6 whitespace-nowrap px-3 py-1.5 font-mono text-[10.5px] tabular-nums text-white/75">
         {run.map((b, i) => (
           <span key={i} className="inline-flex items-center gap-2">
             <span className="h-1 w-1 rounded-full bg-accent/70" />

@@ -18,6 +18,8 @@
  *   - audit log entries after every invoke (`ok` / `blocked` / `error`)
  */
 
+import { invoke } from "@tauri-apps/api/tauri";
+import { isTauri } from "./runtimeBridge";
 import { appendAudit, type AuditAction } from "./serverAudit";
 import type { ServerProfile } from "@/store/servers";
 
@@ -71,27 +73,13 @@ export interface RestartOut {
 // Tauri presence + invoke wrapper
 // ---------------------------------------------------------------------------
 
-interface TauriWindow {
-  __TAURI_IPC__?: unknown;
-  __TAURI__?: {
-    invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
-  };
-}
-
 export function isBridgeAvailable(): boolean {
-  if (typeof window === "undefined") return false;
-  const w = window as unknown as TauriWindow;
-  return w.__TAURI_IPC__ != null || w.__TAURI__?.invoke != null;
+  return isTauri();
 }
 
 async function invokeBridge<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (typeof window === "undefined") throw new Error("no window");
-  const w = window as unknown as TauriWindow;
-  const invoke = w.__TAURI__?.invoke;
-  if (typeof invoke !== "function") {
-    throw new Error("Tauri IPC not present");
-  }
-  return invoke(cmd, args ?? {}) as Promise<T>;
+  if (!isBridgeAvailable()) throw new Error("agent not available · run in desktop app");
+  return invoke<T>(cmd, args ?? {});
 }
 
 const NOT_AVAILABLE: AgentResponse<unknown> = {

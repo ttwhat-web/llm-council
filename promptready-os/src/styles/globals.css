@@ -13,17 +13,28 @@ html,
 body,
 #root {
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
-  background:
-    radial-gradient(ellipse at 50% -20%, rgba(124, 155, 255, 0.06), transparent 60%),
-    radial-gradient(ellipse at 100% 100%, rgba(52, 211, 153, 0.04), transparent 50%),
-    var(--pr-surface-base);
+  background: linear-gradient(180deg, #05070d 0%, #03050a 52%, #010207 100%);
   color: #e6e8ee;
   font-feature-settings: "ss01", "ss02", "cv11";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+canvas,
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
+canvas {
+  display: block;
 }
 
 /* ---------- Background system · Intelligence Expansion 01 ---------------- *
@@ -45,6 +56,7 @@ body::before {
 #root {
   position: relative;
   z-index: 1;
+  min-width: 0;
 }
 
 /* static · plain (default) — overlay stays hidden */
