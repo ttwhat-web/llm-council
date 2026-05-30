@@ -80,24 +80,26 @@ export function TimeAndSalesPanel({ symbol, rows = 16 }: Props) {
 
       {pair && visible.length > 0 && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden font-mono text-[10.5px] tabular-nums">
-          <div className="grid grid-cols-[3fr_3fr_2fr] gap-1.5 border-b border-white/8 px-1.5 py-1 font-mono text-[9px] uppercase tracking-wider text-white/40">
-            <span>price</span>
-            <span>size</span>
+          <div className="grid grid-cols-[3fr_3fr_2fr] gap-1.5 border-b border-white/10 px-1.5 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-white/40">
+            <span className="text-right">price</span>
+            <span className="text-right">size</span>
             <span className="text-right">time</span>
           </div>
           <ul className="flex min-h-0 flex-1 flex-col overflow-auto scrollbar-thin">
-            {visible.map((t) => {
+            {visible.map((t, i) => {
               const aggressorIsBuyer = !t.buyerMaker;
               return (
                 <li
                   key={t.id}
                   className={clsx(
                     "grid grid-cols-[3fr_3fr_2fr] gap-1.5 px-1.5 py-px",
-                    aggressorIsBuyer ? "text-emerald-300/90" : "text-rose-300/90"
+                    aggressorIsBuyer ? "text-emerald-300/90" : "text-rose-300/90",
+                    // subtle zebra · readability without distraction
+                    i % 2 === 1 && "bg-white/[0.018]"
                   )}
                 >
-                  <span>{t.price.toLocaleString("en-US", { maximumFractionDigits: 4 })}</span>
-                  <span className="text-white/65">
+                  <span className="text-right">{t.price.toLocaleString("en-US", { maximumFractionDigits: 4 })}</span>
+                  <span className="text-right text-white/65">
                     {t.size.toLocaleString("en-US", { maximumFractionDigits: 4 })}
                   </span>
                   <span className="text-right text-white/45">

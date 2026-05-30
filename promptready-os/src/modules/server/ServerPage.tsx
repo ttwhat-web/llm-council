@@ -313,16 +313,20 @@ export default function ServerPage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-[1700px] flex-col gap-1.5 px-2 py-2">
       {/* compact single-row command bar · replaces the marketing header */}
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-white/10 bg-white/[0.012] px-2 py-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-white/10 bg-white/[0.012] px-2 py-1">
         <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
           server · command center
         </span>
-        <span className="text-white/15">·</span>
-        <span className="inline-flex items-center gap-1 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
+        <Divider />
+        <span className="inline-flex items-center gap-1 font-mono text-[9.5px] uppercase tracking-wider text-white/60">
           <Shield className="h-3 w-3 text-accent" />
-          ssh key only · no password · no arbitrary commands
+          ssh key only
+          <span className="text-white/25">·</span>
+          no password
+          <span className="text-white/25">·</span>
+          no arbitrary commands
         </span>
-        <span className="text-white/15">·</span>
+        <Divider />
         <span
           className="font-mono text-[9px] uppercase tracking-wider text-white/45"
           title={`allowlist: ${ALLOWED_COMMANDS.join(", ")}`}
@@ -615,13 +619,13 @@ function InlineError({ label, detail }: { label: string; detail: string }) {
   return (
     <div
       role="alert"
-      className="mt-1.5 flex items-start gap-1.5 rounded border border-rose-400/30 bg-rose-500/[0.06] px-2 py-1.5"
+      className="mt-1 flex items-center gap-1.5 rounded border border-rose-400/30 bg-rose-500/[0.06] px-1.5 py-1"
     >
-      <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-rose-300" />
-      <div className="flex min-w-0 flex-col">
-        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-rose-200">{label}</span>
-        <span className="break-all font-mono text-[10.5px] text-white/80">{detail}</span>
-      </div>
+      <AlertTriangle className="h-3 w-3 shrink-0 text-rose-300" />
+      <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.22em] text-rose-200">
+        {label}
+      </span>
+      <span className="min-w-0 truncate font-mono text-[10.5px] text-white/80">{detail}</span>
     </div>
   );
 }
@@ -645,12 +649,12 @@ function StatTile({
   tone: "ok" | "warn" | "bad" | "muted";
 }) {
   return (
-    <div className={clsx("flex flex-col gap-0.5 rounded border px-2 py-1.5", STAT_TONE[tone])}>
-      <span className="flex items-center gap-1 font-mono text-[8.5px] uppercase tracking-[0.22em]">
+    <div className={clsx("flex items-center justify-between gap-2 rounded border px-2 py-1.5", STAT_TONE[tone])}>
+      <span className="flex items-center gap-1 font-mono text-[8.5px] uppercase tracking-[0.22em] text-white/55">
         <Icon className="h-2.5 w-2.5" />
         {label}
       </span>
-      <span className="font-mono text-[15px] font-semibold tabular-nums">{value}</span>
+      <span className="font-mono text-[16px] font-semibold leading-none tabular-nums">{value}</span>
     </div>
   );
 }
@@ -779,7 +783,7 @@ function ServiceRow({
             disabled={hint?.state === "running"}
             title={`Restart ${svc.name} · WORKS · opens confirm modal · allowlisted`}
             aria-label={`Restart ${svc.name} · WORKS`}
-            className="inline-flex items-center gap-1 rounded border border-amber-400/30 bg-amber-500/[0.06] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-amber-200 transition hover:bg-amber-500/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded border border-white/12 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/75 transition hover:border-amber-400/40 hover:bg-amber-500/[0.08] hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {hint?.state === "running" ? "restarting…" : "restart"}
           </button>
@@ -801,17 +805,17 @@ function RestartHintRow({ hint }: { hint: RestartHint }) {
     <div
       role="status"
       className={clsx(
-        "flex items-start gap-1.5 rounded border px-1.5 py-0.5 font-mono text-[9.5px]",
+        "flex items-center gap-1.5 rounded border px-1.5 py-0.5 font-mono text-[9.5px]",
         cls
       )}
     >
-      <span className="uppercase tracking-wider">
+      <span className="shrink-0 uppercase tracking-wider">
         {hint.state === "ok" ? "ok" : "error"}
       </span>
-      <span className="uppercase tracking-wider text-white/45">
+      <span className="shrink-0 uppercase tracking-wider text-white/45 tabular-nums">
         {new Date(hint.at).toLocaleTimeString("en-GB", { hour12: false })}
       </span>
-      <span className="min-w-0 break-all text-white/80">{hint.detail}</span>
+      <span className="min-w-0 truncate text-white/80">{hint.detail}</span>
     </div>
   );
 }
@@ -965,26 +969,38 @@ function AuditLogPanel({
           subtext="every action you take on this page is recorded here"
         />
       ) : (
-        <ul className="flex min-h-0 flex-col gap-0.5 overflow-auto scrollbar-thin font-mono text-[10px]">
-          {entries.map((e, i) => (
-            <li
-              key={`${e.at}-${i}`}
-              className="grid grid-cols-[68px_82px_1fr_60px] items-center gap-2 rounded border border-white/8 bg-white/[0.012] px-1.5 py-0.5"
-            >
-              <span className="text-white/45">
-                {new Date(e.at).toLocaleTimeString("en-GB", { hour12: false })}
-              </span>
-              <span className="uppercase tracking-wider text-white/75">{e.action}</span>
-              <span className="truncate text-white/55">
-                {e.profileName ? `${e.profileName} · ` : ""}
-                {e.detail}
-              </span>
-              <span className={clsx("text-right uppercase tracking-wider", ACTION_TONE[e.result])}>
-                {e.result}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="flex min-h-0 flex-col overflow-hidden font-mono text-[10px]">
+          {/* column header · ties row alignment together */}
+          <div className="grid grid-cols-[64px_120px_1fr_60px] items-center gap-2 border-b border-white/10 px-1.5 py-1 font-mono text-[8.5px] uppercase tracking-[0.2em] text-white/35">
+            <span>time</span>
+            <span>action</span>
+            <span>detail</span>
+            <span className="text-right">result</span>
+          </div>
+          <ul className="flex min-h-0 flex-col overflow-auto scrollbar-thin">
+            {entries.map((e, i) => (
+              <li
+                key={`${e.at}-${i}`}
+                className={clsx(
+                  "grid grid-cols-[64px_120px_1fr_60px] items-center gap-2 border-b border-white/[0.04] px-1.5 py-0.5",
+                  i % 2 === 1 && "bg-white/[0.012]"
+                )}
+              >
+                <span className="text-white/45 tabular-nums">
+                  {new Date(e.at).toLocaleTimeString("en-GB", { hour12: false })}
+                </span>
+                <span className="truncate uppercase tracking-wider text-white/80">{e.action}</span>
+                <span className="truncate text-white/55">
+                  {e.profileName ? `${e.profileName} · ` : ""}
+                  {e.detail}
+                </span>
+                <span className={clsx("text-right uppercase tracking-wider", ACTION_TONE[e.result])}>
+                  {e.result}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </TerminalPanel>
   );
@@ -1286,6 +1302,10 @@ function AddProfileDialog({
       </form>
     </div>
   );
+}
+
+function Divider() {
+  return <span aria-hidden className="hidden h-3 w-px shrink-0 bg-white/10 sm:inline-block" />;
 }
 
 function pickDefaultLogTarget(

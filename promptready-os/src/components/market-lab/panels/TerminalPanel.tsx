@@ -50,32 +50,40 @@ export function TerminalPanel({
   return (
     <section
       className={clsx(
-        "flex min-h-0 flex-col overflow-hidden rounded-md border border-white/8 bg-black/40",
+        "flex min-h-0 flex-col overflow-hidden rounded-md border border-white/10 bg-black/40",
         className
       )}
     >
-      <header className="flex items-center justify-between gap-2 border-b border-white/8 px-2 py-1">
-        <div className="flex items-baseline gap-1.5">
-          <span className={clsx("inline-block h-1.5 w-1.5 rounded-full", TONE_DOT[tone])} />
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/85">
+      <header className="flex items-center justify-between gap-2 border-b border-white/10 px-2 py-1">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span
+            aria-hidden
+            className={clsx("inline-block h-1.5 w-1.5 shrink-0 rounded-full", TONE_DOT[tone])}
+          />
+          <span className="truncate font-mono text-[10px] font-medium uppercase tracking-[0.22em] text-white/90">
             {title}
           </span>
           {sub && (
-            <span className="font-mono text-[9px] uppercase tracking-wider text-white/40">
-              {sub}
+            <span className="truncate font-mono text-[9px] uppercase tracking-wider text-white/40">
+              · {sub}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5">
           {status && (
-            <span className={clsx("font-mono text-[9px] uppercase tracking-wider", TONE_TEXT[tone])}>
+            <span
+              className={clsx(
+                "font-mono text-[9px] uppercase tracking-wider tabular-nums",
+                TONE_TEXT[tone]
+              )}
+            >
               {status}
             </span>
           )}
           {right}
         </div>
       </header>
-      <div className={clsx("flex min-h-0 flex-1 flex-col p-2", bodyClassName)}>{children}</div>
+      <div className={clsx("flex min-h-0 flex-1 flex-col p-1.5", bodyClassName)}>{children}</div>
     </section>
   );
 }

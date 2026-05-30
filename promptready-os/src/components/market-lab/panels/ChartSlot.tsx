@@ -43,8 +43,8 @@ export function ChartSlot({
 
   return (
     <TerminalPanel
-      title={title ?? (compact ? "chart" : "main chart")}
-      sub={hasBinance ? "binance · live ohlc" : "no source"}
+      title={title ?? symbol}
+      sub={hasBinance ? "binance · live ohlc" : "no source · adapter-ready"}
       tone={hasBinance ? "ok" : "muted"}
       right={
         <div className="relative">

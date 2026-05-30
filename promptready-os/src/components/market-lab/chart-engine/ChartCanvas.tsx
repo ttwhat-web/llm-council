@@ -343,19 +343,30 @@ export function ChartCanvas({
 
 function TooltipBadge({ candle, interval }: { candle: Candle; interval: BinanceInterval }) {
   const up = candle.close >= candle.open;
+  const cell = (label: string, value: string, valueCls?: string) => (
+    <div className="flex flex-col leading-tight">
+      <span className="font-mono text-[8.5px] uppercase tracking-[0.2em] text-white/40">{label}</span>
+      <span className={clsx("font-mono text-[10.5px] tabular-nums", valueCls ?? "text-white/85")}>
+        {value}
+      </span>
+    </div>
+  );
   return (
-    <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-wrap items-center gap-1 rounded-md border border-white/10 bg-black/80 px-2 py-1 font-mono text-[10px] tabular-nums text-white/85 backdrop-blur">
-      <span className="text-white/50">{formatTime(candle.t, interval)}</span>
-      <span className="text-white/40">O</span>
-      <span>{formatPrice(candle.open)}</span>
-      <span className="text-white/40">H</span>
-      <span>{formatPrice(candle.high)}</span>
-      <span className="text-white/40">L</span>
-      <span>{formatPrice(candle.low)}</span>
-      <span className="text-white/40">C</span>
-      <span className={up ? "text-emerald-300" : "text-rose-300"}>{formatPrice(candle.close)}</span>
-      <span className="text-white/40">V</span>
-      <span>{candle.volume.toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>
+    <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-col gap-1 rounded-md border border-white/10 bg-black/80 px-2 py-1.5 backdrop-blur">
+      <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/55">
+        {formatTime(candle.t, interval)}
+      </span>
+      <div className="flex items-end gap-3">
+        {cell("o", formatPrice(candle.open))}
+        {cell("h", formatPrice(candle.high))}
+        {cell("l", formatPrice(candle.low))}
+        {cell(
+          "c",
+          formatPrice(candle.close),
+          up ? "text-emerald-300" : "text-rose-300"
+        )}
+        {cell("v", candle.volume.toLocaleString("en-US", { maximumFractionDigits: 2 }))}
+      </div>
     </div>
   );
 }

@@ -103,13 +103,14 @@ export function OrderBookPanel({ symbol, rows = 14 }: Props) {
             ))}
           </ul>
 
-          {/* spread row */}
+          {/* spread row · sits between asks and bids, centered key on left */}
           {spread && (
-            <div className="flex items-center justify-between rounded border border-white/10 bg-white/[0.04] px-1.5 py-1 text-white/65">
-              <span>spread</span>
+            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-white/70">
+              <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/40">spread</span>
+              <span className="h-px bg-white/10" aria-hidden />
               <span className="tabular-nums">
-                {spread.abs.toLocaleString("en-US", { maximumFractionDigits: 2 })} ·{" "}
-                {spread.bps.toFixed(1)} bps
+                {spread.abs.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                <span className="ml-1.5 text-white/45">{spread.bps.toFixed(1)} bps</span>
               </span>
             </div>
           )}
@@ -131,7 +132,7 @@ function Row({ side, price, size, max }: { side: "bid" | "ask"; price: number; s
   return (
     <li
       className={clsx(
-        "relative grid grid-cols-[1fr_auto] items-center gap-2 rounded-sm px-1.5 py-px",
+        "relative grid grid-cols-[1fr_1fr] items-center gap-2 rounded-sm px-1.5 py-px",
         side === "ask" ? "text-rose-300/90" : "text-emerald-300/90"
       )}
     >
@@ -143,8 +144,8 @@ function Row({ side, price, size, max }: { side: "bid" | "ask"; price: number; s
         )}
         style={{ width: `${pct}%` }}
       />
-      <span className="relative">{price.toLocaleString("en-US", { maximumFractionDigits: 4 })}</span>
-      <span className="relative text-white/65">{size.toLocaleString("en-US", { maximumFractionDigits: 4 })}</span>
+      <span className="relative text-right">{price.toLocaleString("en-US", { maximumFractionDigits: 4 })}</span>
+      <span className="relative text-right text-white/65">{size.toLocaleString("en-US", { maximumFractionDigits: 4 })}</span>
     </li>
   );
 }

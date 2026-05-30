@@ -644,22 +644,27 @@ function CommandBar({
         layout
       </span>
       <div role="tablist" aria-label="Layout preset" className="flex items-center gap-0.5 rounded border border-white/10 bg-white/[0.03] p-0.5">
-        {LAYOUT_PRESETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            role="tab"
-            aria-selected={layout === p.id}
-            onClick={() => onLayout(p.id)}
-            title={`${p.hint} · WORKS`}
-            className={clsx(
-              "rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider transition",
-              layout === p.id ? "bg-accent/[0.18] text-accent" : "text-white/55 hover:bg-white/[0.07]"
-            )}
-          >
-            {p.label}
-          </button>
-        ))}
+        {LAYOUT_PRESETS.map((p) => {
+          const active = layout === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onLayout(p.id)}
+              title={`${p.hint} · WORKS`}
+              className={clsx(
+                "relative rounded px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider transition",
+                active
+                  ? "bg-accent/[0.18] text-accent shadow-[inset_0_-2px_0_0_rgba(124,155,255,0.7)]"
+                  : "text-white/55 hover:bg-white/[0.07] hover:text-white/85"
+              )}
+            >
+              {p.label}
+            </button>
+          );
+        })}
       </div>
       <span className="ml-auto flex items-center gap-1.5">
         <span
@@ -711,9 +716,9 @@ function MiniGrid({
           onSymbol={(sym) => onSymbol(i, sym)}
           options={WATCHLIST_SYMBOLS}
           height={compact ? 170 : 200}
+          title={s}
           compact
           onCandles={onCandles(s)}
-          title={`mini · slot ${i + 1}`}
         />
       ))}
     </div>
