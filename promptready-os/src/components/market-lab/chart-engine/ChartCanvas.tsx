@@ -67,6 +67,8 @@ const PAD_TOP = 6;
 const PAD_LEFT = 0;
 const VOL_FRACTION = 0.22; // bottom 22% of the chart for volume
 const RSI_HEIGHT = 110;
+const MALFORMED_CANDLES_MESSAGE =
+  "chart data unavailable · provider returned incomplete candles";
 
 export function ChartCanvas({
   symbol,
@@ -87,6 +89,7 @@ export function ChartCanvas({
     candles: [],
     fetchedAt: null
   });
+  const [renderError, setRenderError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rsiCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -120,7 +123,18 @@ export function ChartCanvas({
       void fetchKlines(pair, interval, 500).then((r) => {
         if (cancelled) return;
         if (r.ok) {
-          const candles: Candle[] = r.candles as BinanceCandle[];
+          const normalized = normalizeCandles(r.candles as BinanceCandle[]);
+          if (normalized.malformed) {
+            setState({
+              loading: false,
+              error: MALFORMED_CANDLES_MESSAGE,
+              candles: [],
+              fetchedAt: r.at
+            });
+            onCandles?.([]);
+            return;
+          }
+          const candles = normalized.candles;
           setState({ loading: false, error: null, candles, fetchedAt: r.at });
           onCandles?.(candles);
         } else {
@@ -166,20 +180,29 @@ export function ChartCanvas({
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
-    if (state.candles.length === 0) return;
-    drawChart({
-      ctx,
-      width: cssW,
-      height: cssH,
-      candles: state.candles,
-      vp: viewport,
-      range,
-      overlays: overlays ?? [],
-      hlines: hlinesMain ?? [],
-      hoverIdx,
-      compact,
-      interval
-    });
+    if (state.candles.length === 0) {
+      drawNoData(ctx, cssW, cssH, state.error ?? "chart data unavailable · no candles returned");
+      return;
+    }
+    try {
+      drawChart({
+        ctx,
+        width: cssW,
+        height: cssH,
+        candles: state.candles,
+        vp: viewport,
+        range,
+        overlays: overlays ?? [],
+        hlines: hlinesMain ?? [],
+        hoverIdx,
+        compact,
+        interval
+      });
+      setRenderError(null);
+    } catch (error) {
+      setRenderError(error instanceof Error ? error.message : "chart rendering failed");
+      drawNoData(ctx, cssW, cssH, MALFORMED_CANDLES_MESSAGE);
+    }
   }, [state.candles, viewport, range, overlays, hlinesMain, hoverIdx, size, compact, interval]);
 
   // RSI lower pane redraw.
@@ -200,14 +223,18 @@ export function ChartCanvas({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
     if (state.candles.length === 0) return;
-    drawRsiPane({
-      ctx,
-      width: cssW,
-      height: cssH,
-      vp: viewport,
-      rsi,
-      hoverIdx
-    });
+    try {
+      drawRsiPane({
+        ctx,
+        width: cssW,
+        height: cssH,
+        vp: viewport,
+        rsi,
+        hoverIdx
+      });
+    } catch (error) {
+      setRenderError(error instanceof Error ? error.message : "RSI rendering failed");
+    }
   }, [state.candles, viewport, rsi, size, hoverIdx]);
 
   if (!pair) {
@@ -227,7 +254,17 @@ export function ChartCanvas({
   }
 
   const last = state.candles[state.candles.length - 1];
-  const hovered = hoverIdx != null ? state.candles[hoverIdx] : null;
+  const hovered =
+    hoverIdx != null && hoverIdx >= 0 && hoverIdx < state.candles.length
+      ? state.candles[hoverIdx]
+      : null;
+  const noDataMessage =
+    !state.loading && state.candles.length === 0
+      ? state.error ?? "chart data unavailable · no candles returned"
+      : null;
+  const visibleChartError = renderError
+    ? `${MALFORMED_CANDLES_MESSAGE} · ${renderError}`
+    : noDataMessage;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-1">
@@ -320,16 +357,20 @@ export function ChartCanvas({
         {hovered && !compact && (
           <TooltipBadge candle={hovered} interval={interval} />
         )}
-        {state.error && state.candles.length === 0 && (
+        {visibleChartError && (
           <div
-            role="alert"
+            role={state.error || renderError ? "alert" : "status"}
             className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/55 backdrop-blur-sm"
           >
             <div className="flex max-w-[80%] flex-col items-center gap-1 rounded border border-rose-400/40 bg-rose-500/[0.08] px-3 py-2 text-center">
               <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-rose-200">
-                binance fetch failed
+                {renderError || state.error === MALFORMED_CANDLES_MESSAGE
+                  ? MALFORMED_CANDLES_MESSAGE
+                  : state.error
+                    ? "binance fetch failed"
+                    : "no chart data"}
               </span>
-              <span className="break-all font-mono text-[11px] text-white/85">{state.error}</span>
+              <span className="break-all font-mono text-[11px] text-white/85">{visibleChartError}</span>
               <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
                 {symbol} · {interval} · check network / API rate limit
               </span>
@@ -371,6 +412,74 @@ function TooltipBadge({ candle, interval }: { candle: Candle; interval: BinanceI
   );
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isValidCandle(value: unknown): value is Candle {
+  if (!value || typeof value !== "object") return false;
+  const candle = value as Partial<Candle>;
+  return (
+    isFiniteNumber(candle.t) &&
+    isFiniteNumber(candle.open) &&
+    isFiniteNumber(candle.high) &&
+    isFiniteNumber(candle.low) &&
+    isFiniteNumber(candle.close) &&
+    isFiniteNumber(candle.volume)
+  );
+}
+
+function normalizeCandles(input: unknown[]): { candles: Candle[]; malformed: boolean } {
+  if (!Array.isArray(input)) return { candles: [], malformed: true };
+  const candles: Candle[] = [];
+  for (const item of input) {
+    if (!isValidCandle(item)) return { candles: [], malformed: true };
+    candles.push(item);
+  }
+  return { candles, malformed: false };
+}
+
+interface VisibleIndexes {
+  start: number;
+  end: number;
+  vp: import("./types").Viewport;
+  span: number;
+}
+
+function clampVisibleIndexes(
+  length: number,
+  vp: import("./types").Viewport
+): VisibleIndexes | null {
+  if (length <= 0) return null;
+  const maxIdx = length - 1;
+  const rawStart = Number.isFinite(vp.startIdx) ? Math.floor(vp.startIdx) : 0;
+  const rawExclusiveEnd = Number.isFinite(vp.endIdx) ? Math.ceil(vp.endIdx) : length;
+  const start = Math.max(0, Math.min(maxIdx, rawStart));
+  const exclusiveEnd = Math.max(start + 1, Math.min(length, rawExclusiveEnd));
+  const end = Math.max(start, Math.min(maxIdx, exclusiveEnd - 1));
+  const safeVp = {
+    startIdx: Math.max(0, Math.min(maxIdx, Number.isFinite(vp.startIdx) ? vp.startIdx : start)),
+    endIdx: Math.max(start + 1, Math.min(length, Number.isFinite(vp.endIdx) ? vp.endIdx : end + 1))
+  };
+  const span = Math.max(1, safeVp.endIdx - safeVp.startIdx);
+  return { start, end, vp: safeVp, span };
+}
+
+function drawNoData(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  message: string
+) {
+  ctx.fillStyle = "rgba(0,0,0,0.72)";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "rgba(255,255,255,0.58)";
+  ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(message, width / 2, height / 2);
+}
+
 // ---------------------------------------------------------------------------
 // Draw routines
 // ---------------------------------------------------------------------------
@@ -402,6 +511,12 @@ function drawChart({
   compact,
   interval
 }: DrawArgs) {
+  const visible = clampVisibleIndexes(candles.length, vp);
+  if (!visible) {
+    drawNoData(ctx, width, height, "chart data unavailable · no candles returned");
+    return;
+  }
+  const safeVp = visible.vp;
   const plotRight = width - PAD_RIGHT;
   const plotBottom = height - PAD_BOTTOM;
   const plotTop = PAD_TOP;
@@ -432,15 +547,15 @@ function drawChart({
   }
 
   // Vertical time gridlines · pick ~5 visible candle indices.
-  const span = vp.endIdx - vp.startIdx;
+  const span = visible.span;
   const stepIdx = Math.max(1, Math.floor(span / (compact ? 4 : 6)));
   ctx.strokeStyle = "rgba(255,255,255,0.05)";
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "center";
-  for (let i = Math.ceil(vp.startIdx / stepIdx) * stepIdx; i < vp.endIdx; i += stepIdx) {
+  for (let i = Math.ceil(visible.start / stepIdx) * stepIdx; i <= visible.end; i += stepIdx) {
     const candle = candles[i];
     if (!candle) continue;
-    const x = xForIndex(i, vp, plotRight);
+    const x = xForIndex(i, safeVp, plotRight);
     ctx.beginPath();
     ctx.moveTo(x, plotTop);
     ctx.lineTo(x, plotBottom);
@@ -450,23 +565,30 @@ function drawChart({
   }
 
   // Volume bars.
-  let volMax = 0;
-  for (let i = Math.max(0, vp.startIdx); i < Math.min(candles.length, vp.endIdx); i++) {
-    if (candles[i].volume > volMax) volMax = candles[i].volume;
+  const visibleCandles: Array<{ i: number; candle: Candle }> = [];
+  for (let i = visible.start; i <= visible.end; i++) {
+    const candle = candles[i];
+    if (!candle) continue;
+    visibleCandles.push({ i, candle });
   }
+  const volumeValues = visibleCandles
+    .map(({ candle }) => candle.volume)
+    .filter((value) => Number.isFinite(value) && value >= 0);
+  const volMax = volumeValues.length > 0 ? Math.max(...volumeValues) : 0;
   const candleSpan = (plotRight - PAD_LEFT) / span;
   const bodyW = Math.max(1, candleSpan * 0.72);
-  for (let i = Math.max(0, vp.startIdx); i < Math.min(candles.length, vp.endIdx); i++) {
-    const c = candles[i];
-    const x = xForIndex(i + 0.5, vp, plotRight) - bodyW / 2;
-    const h = volMax > 0 ? (c.volume / volMax) * (plotBottom - volumeTop - 2) : 0;
+  for (const { i, candle } of visibleCandles) {
+    const x = xForIndex(i + 0.5, safeVp, plotRight) - bodyW / 2;
+    const volume = Number.isFinite(candle.volume) && candle.volume >= 0 ? candle.volume : 0;
+    const h = volMax > 0 ? (volume / volMax) * (plotBottom - volumeTop - 2) : 0;
     ctx.fillStyle =
-      c.close >= c.open ? "rgba(52,211,153,0.35)" : "rgba(248,113,113,0.35)";
+      candle.close >= candle.open ? "rgba(52,211,153,0.35)" : "rgba(248,113,113,0.35)";
     ctx.fillRect(x, plotBottom - h, bodyW, h);
   }
 
   // hlines on main pane.
   for (const h of hlines) {
+    if (!Number.isFinite(h.value)) continue;
     if (h.value < range.min || h.value > range.max) continue;
     const y = yForPrice(h.value, range, priceHeight, plotTop, 0);
     ctx.strokeStyle = h.color;
@@ -488,32 +610,33 @@ function drawChart({
     ctx.strokeStyle = o.color;
     ctx.lineWidth = 2;
     if (o.kind === "line") {
-      drawSeries(ctx, o.values, vp, plotRight, range, priceHeight, plotTop);
+      drawSeries(ctx, o.values, safeVp, plotRight, range, priceHeight, plotTop);
     } else {
       // Upper / lower dashed, mid solid, optional fill between.
       ctx.fillStyle = `${o.color}1a`; // ~10% alpha when hex; rgb() lengths vary so this is best-effort
-      drawBandFill(ctx, o.upper, o.lower, vp, plotRight, range, priceHeight, plotTop);
+      drawBandFill(ctx, o.upper, o.lower, safeVp, plotRight, range, priceHeight, plotTop);
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
-      drawSeries(ctx, o.upper, vp, plotRight, range, priceHeight, plotTop);
-      drawSeries(ctx, o.lower, vp, plotRight, range, priceHeight, plotTop);
+      drawSeries(ctx, o.upper, safeVp, plotRight, range, priceHeight, plotTop);
+      drawSeries(ctx, o.lower, safeVp, plotRight, range, priceHeight, plotTop);
       ctx.setLineDash([]);
       ctx.lineWidth = 2;
-      drawSeries(ctx, o.mid, vp, plotRight, range, priceHeight, plotTop);
+      drawSeries(ctx, o.mid, safeVp, plotRight, range, priceHeight, plotTop);
     }
   }
 
   // Candles.
-  for (let i = Math.max(0, vp.startIdx); i < Math.min(candles.length, vp.endIdx); i++) {
-    const c = candles[i];
-    const cx = xForIndex(i + 0.5, vp, plotRight);
+  for (let i = visible.start; i <= visible.end; i++) {
+    const candle = candles[i];
+    if (!candle) continue;
+    const cx = xForIndex(i + 0.5, safeVp, plotRight);
     const x = cx - bodyW / 2;
-    const isUp = c.close >= c.open;
+    const isUp = candle.close >= candle.open;
     const color = isUp ? "rgb(52,211,153)" : "rgb(248,113,113)";
-    const yOpen = yForPrice(c.open, range, priceHeight, plotTop, 0);
-    const yClose = yForPrice(c.close, range, priceHeight, plotTop, 0);
-    const yHigh = yForPrice(c.high, range, priceHeight, plotTop, 0);
-    const yLow = yForPrice(c.low, range, priceHeight, plotTop, 0);
+    const yOpen = yForPrice(candle.open, range, priceHeight, plotTop, 0);
+    const yClose = yForPrice(candle.close, range, priceHeight, plotTop, 0);
+    const yHigh = yForPrice(candle.high, range, priceHeight, plotTop, 0);
+    const yLow = yForPrice(candle.low, range, priceHeight, plotTop, 0);
     const bodyTop = Math.min(yOpen, yClose);
     const bodyH = Math.max(1, Math.abs(yClose - yOpen));
     // wick
@@ -529,11 +652,11 @@ function drawChart({
   }
 
   // Crosshair on hover.
-  if (hoverIdx != null) {
-    const c = candles[hoverIdx];
-    if (c) {
-      const cx = xForIndex(hoverIdx + 0.5, vp, plotRight);
-      const cy = yForPrice(c.close, range, priceHeight, plotTop, 0);
+  if (hoverIdx != null && hoverIdx >= visible.start && hoverIdx <= visible.end) {
+    const candle = candles[hoverIdx];
+    if (candle) {
+      const cx = xForIndex(hoverIdx + 0.5, safeVp, plotRight);
+      const cy = yForPrice(candle.close, range, priceHeight, plotTop, 0);
       ctx.strokeStyle = "rgba(124,155,255,0.55)";
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
@@ -552,7 +675,7 @@ function drawChart({
       ctx.fillStyle = "rgb(2,4,10)";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(formatPrice(c.close), plotRight + 4, cy);
+      ctx.fillText(formatPrice(candle.close), plotRight + 4, cy);
     }
   }
 
@@ -573,15 +696,18 @@ function drawSeries(
   priceHeight: number,
   plotTop: number
 ) {
+  if (!Array.isArray(values)) return;
+  const visible = clampVisibleIndexes(values.length, vp);
+  if (!visible) return;
   ctx.beginPath();
   let started = false;
-  for (let i = Math.max(0, vp.startIdx); i < Math.min(values.length, vp.endIdx); i++) {
+  for (let i = visible.start; i <= visible.end; i++) {
     const v = values[i];
     if (!Number.isFinite(v)) {
       started = false;
       continue;
     }
-    const x = xForIndex(i + 0.5, vp, plotRight);
+    const x = xForIndex(i + 0.5, visible.vp, plotRight);
     const y = yForPrice(v, range, priceHeight, plotTop, 0);
     if (!started) {
       ctx.moveTo(x, y);
@@ -603,12 +729,15 @@ function drawBandFill(
   priceHeight: number,
   plotTop: number
 ) {
+  if (!Array.isArray(upper) || !Array.isArray(lower)) return;
+  const visible = clampVisibleIndexes(Math.max(upper.length, lower.length), vp);
+  if (!visible) return;
   ctx.beginPath();
   let started = false;
-  for (let i = Math.max(0, vp.startIdx); i < Math.min(upper.length, vp.endIdx); i++) {
+  for (let i = visible.start; i <= visible.end; i++) {
     const v = upper[i];
     if (!Number.isFinite(v)) continue;
-    const x = xForIndex(i + 0.5, vp, plotRight);
+    const x = xForIndex(i + 0.5, visible.vp, plotRight);
     const y = yForPrice(v, range, priceHeight, plotTop, 0);
     if (!started) {
       ctx.moveTo(x, y);
@@ -617,13 +746,17 @@ function drawBandFill(
       ctx.lineTo(x, y);
     }
   }
-  for (let i = Math.min(lower.length, vp.endIdx) - 1; i >= Math.max(0, vp.startIdx); i--) {
+  if (!started) return;
+  let lowerStarted = false;
+  for (let i = visible.end; i >= visible.start; i--) {
     const v = lower[i];
     if (!Number.isFinite(v)) continue;
-    const x = xForIndex(i + 0.5, vp, plotRight);
+    const x = xForIndex(i + 0.5, visible.vp, plotRight);
     const y = yForPrice(v, range, priceHeight, plotTop, 0);
     ctx.lineTo(x, y);
+    lowerStarted = true;
   }
+  if (!lowerStarted) return;
   ctx.closePath();
   ctx.fill();
 }
@@ -641,12 +774,22 @@ function drawRsiPane({ ctx, width, height, vp, rsi, hoverIdx }: RsiArgs) {
   const plotRight = width - PAD_RIGHT;
   const top = 2;
   const bottom = height - 2;
+  const rsiPlots = Array.isArray(rsi.plots) ? rsi.plots : [];
+  const rsiHlines = Array.isArray(rsi.hlines) ? rsi.hlines : [];
+  const rsiLength = Math.max(
+    0,
+    ...rsiPlots.map((plot) => (Array.isArray(plot.values) ? plot.values.length : 0))
+  );
+  const visible = clampVisibleIndexes(rsiLength, vp);
+  const safeVp = visible?.vp ?? { startIdx: 0, endIdx: 1 };
 
   // Compute range from plot series + hline values.
   let min = Infinity;
   let max = -Infinity;
-  for (const p of rsi.plots) {
-    for (let i = vp.startIdx; i < vp.endIdx; i++) {
+  for (const p of rsiPlots) {
+    if (!Array.isArray(p.values)) continue;
+    if (!visible) continue;
+    for (let i = visible.start; i <= visible.end; i++) {
       const v = p.values[i];
       if (Number.isFinite(v)) {
         if (v < min) min = v;
@@ -654,7 +797,8 @@ function drawRsiPane({ ctx, width, height, vp, rsi, hoverIdx }: RsiArgs) {
       }
     }
   }
-  for (const h of rsi.hlines) {
+  for (const h of rsiHlines) {
+    if (!Number.isFinite(h.value)) continue;
     if (h.value < min) min = h.value;
     if (h.value > max) max = h.value;
   }
@@ -673,7 +817,8 @@ function drawRsiPane({ ctx, width, height, vp, rsi, hoverIdx }: RsiArgs) {
   ctx.fillRect(0, 0, width, height);
 
   // hlines.
-  for (const h of rsi.hlines) {
+  for (const h of rsiHlines) {
+    if (!Number.isFinite(h.value)) continue;
     const y = yForPrice(h.value, range, heightPx, top, 0);
     ctx.strokeStyle = h.color;
     ctx.setLineDash([4, 4]);
@@ -691,10 +836,11 @@ function drawRsiPane({ ctx, width, height, vp, rsi, hoverIdx }: RsiArgs) {
   }
 
   // Plot lines.
-  for (const p of rsi.plots) {
+  for (const p of rsiPlots) {
+    if (!Array.isArray(p.values)) continue;
     ctx.strokeStyle = p.color;
     ctx.lineWidth = 2;
-    drawSeries(ctx, p.values, vp, plotRight, range, heightPx, top);
+    drawSeries(ctx, p.values, safeVp, plotRight, range, heightPx, top);
   }
 
   // Right-axis labels.
@@ -709,8 +855,8 @@ function drawRsiPane({ ctx, width, height, vp, rsi, hoverIdx }: RsiArgs) {
   }
 
   // Crosshair.
-  if (hoverIdx != null) {
-    const cx = xForIndex(hoverIdx + 0.5, vp, plotRight);
+  if (hoverIdx != null && visible && hoverIdx >= visible.start && hoverIdx <= visible.end) {
+    const cx = xForIndex(hoverIdx + 0.5, safeVp, plotRight);
     ctx.strokeStyle = "rgba(124,155,255,0.55)";
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);

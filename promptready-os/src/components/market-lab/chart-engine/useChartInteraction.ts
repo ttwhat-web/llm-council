@@ -88,6 +88,10 @@ export function useChartInteraction({
       const rect = e.currentTarget.getBoundingClientRect();
       const localX = e.clientX - rect.left;
       const drag = draggingRef.current;
+      if (candleCount === 0 || rect.width <= 0) {
+        setHoverIdx(null);
+        return;
+      }
       if (drag) {
         const dxPx = e.clientX - drag.startX;
         const span = drag.startVp.endIdx - drag.startVp.startIdx;
@@ -99,7 +103,7 @@ export function useChartInteraction({
         // hover index — round to nearest candle inside the viewport.
         const ix = indexForX(localX, vp, rect.width);
         const idx = Math.round(ix);
-        if (idx >= vp.startIdx && idx < vp.endIdx && idx < candleCount) setHoverIdx(idx);
+        if (idx >= 0 && idx >= vp.startIdx && idx < vp.endIdx && idx < candleCount) setHoverIdx(idx);
         else setHoverIdx(null);
       }
     },

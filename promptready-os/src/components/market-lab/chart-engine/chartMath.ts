@@ -6,10 +6,16 @@
 
 import type { Candle, Overlay, PriceRange, Viewport } from "./types";
 
+function finiteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 /** Build the default right-anchored viewport showing the last `visible` bars. */
 export function defaultViewport(total: number, visible = 120): Viewport {
-  const endIdx = total;
-  const startIdx = Math.max(0, total - visible);
+  const safeTotal = Math.max(0, Math.floor(Number.isFinite(total) ? total : 0));
+  const safeVisible = Math.max(1, Math.floor(Number.isFinite(visible) ? visible : 120));
+  const endIdx = safeTotal;
+  const startIdx = Math.max(0, safeTotal - safeVisible);
   return { startIdx, endIdx };
 }
 
@@ -24,15 +30,16 @@ export function priceRange(
   const a = Math.max(0, Math.floor(vp.startIdx));
   const b = Math.min(candles.length, Math.ceil(vp.endIdx));
   for (let i = a; i < b; i++) {
-    const c = candles[i];
-    if (!c) continue;
-    if (c.low < min) min = c.low;
-    if (c.high > max) max = c.high;
+    const candle = candles[i];
+    if (!candle) continue;
+    if (finiteNumber(candle.low) && candle.low < min) min = candle.low;
+    if (finiteNumber(candle.high) && candle.high > max) max = candle.high;
   }
   for (const o of overlays) {
     const fields =
       o.kind === "line" ? [o.values] : [o.upper, o.mid, o.lower];
     for (const arr of fields) {
+      if (!Array.isArray(arr)) continue;
       for (let i = a; i < b; i++) {
         const v = arr[i];
         if (Number.isFinite(v)) {
@@ -75,6 +82,10 @@ export function yForPrice(
   padBottom = 0
 ): number {
   const usable = Math.max(1, height - padTop - padBottom);
+  if (!Number.isFinite(price) || !Number.isFinite(range.min) || !Number.isFinite(range.max)) {
+    return padTop + usable / 2;
+  }
+  if (range.max === range.min) return padTop + usable / 2;
   return padTop + usable - ((price - range.min) / (range.max - range.min)) * usable;
 }
 
@@ -87,6 +98,10 @@ export function priceForY(
   padBottom = 0
 ): number {
   const usable = Math.max(1, height - padTop - padBottom);
+  if (!Number.isFinite(y) || !Number.isFinite(range.min) || !Number.isFinite(range.max)) {
+    return range.min;
+  }
+  if (range.max === range.min) return range.min;
   return (
     range.min + ((padTop + usable - y) / usable) * (range.max - range.min)
   );
@@ -100,19 +115,23 @@ export function clampViewport(
   total: number,
   minSpan = MIN_SPAN
 ): Viewport {
-  if (total <= 0) return { startIdx: 0, endIdx: 0 };
-  let span = vp.endIdx - vp.startIdx;
-  if (span < minSpan) span = Math.min(minSpan, total);
-  if (span > total) span = total;
-  let start = vp.startIdx;
+  const safeTotal = Math.max(0, Math.floor(Number.isFinite(total) ? total : 0));
+  if (safeTotal <= 0) return { startIdx: 0, endIdx: 0 };
+  const safeMinSpan = Math.max(1, Number.isFinite(minSpan) ? minSpan : MIN_SPAN);
+  const rawStart = Number.isFinite(vp.startIdx) ? vp.startIdx : 0;
+  const rawEnd = Number.isFinite(vp.endIdx) ? vp.endIdx : safeTotal;
+  let span = rawEnd - rawStart;
+  if (span < safeMinSpan) span = Math.min(safeMinSpan, safeTotal);
+  if (span > safeTotal) span = safeTotal;
+  let start = rawStart;
   let end = start + span;
   if (start < 0) {
     start = 0;
     end = span;
   }
-  if (end > total) {
-    end = total;
-    start = total - span;
+  if (end > safeTotal) {
+    end = safeTotal;
+    start = safeTotal - span;
   }
   return { startIdx: start, endIdx: end };
 }
