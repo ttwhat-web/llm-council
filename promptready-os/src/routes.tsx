@@ -14,6 +14,9 @@ import MarketplacePage from "@/modules/marketplace/MarketplacePage";
 import ServerPage from "@/modules/server/ServerPage";
 import SettingsPage from "@/modules/settings/SettingsPage";
 import AppsPage from "@/modules/apps/AppsPage";
+import WhyCenterPage from "@/modules/why-center/WhyCenterPage";
+import TradeReplayPage from "@/modules/trade-replay/TradeReplayPage";
+import WarRoomPage from "@/modules/war-room/WarRoomPage";
 
 /**
  * Route registry · Phase 11 rebuild.
@@ -43,6 +46,9 @@ const router = createBrowserRouter([
       { path: "marketplace", element: <MarketplacePage /> },
       { path: "server", element: <ServerPage /> },
       { path: "apps", element: <AppsPage /> },
+      { path: "why", element: <WhyCenterPage /> },
+      { path: "replay", element: <TradeReplayPage /> },
+      { path: "war-room", element: <WarRoomPage /> },
       { path: "settings", element: <SettingsPage /> }
     ]
   }

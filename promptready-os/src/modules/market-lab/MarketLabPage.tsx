@@ -66,6 +66,7 @@ import { TimeAndSalesPanel } from "@/components/market-lab/TimeAndSalesPanel";
 import { DepthPanel } from "@/components/market-lab/DepthPanel";
 import { ScriptLabEditor } from "@/components/market-lab/ScriptLabEditor";
 import { ChartSlot } from "@/components/market-lab/panels/ChartSlot";
+import { AdvancedTradingChart } from "@/components/market-lab/AdvancedTradingChart";
 import { TerminalPanel } from "@/components/market-lab/panels/TerminalPanel";
 import { FlowImbalancePanel } from "@/components/market-lab/FlowImbalancePanel";
 import { LiquidityHeatmapPanel } from "@/components/market-lab/LiquidityHeatmapPanel";
@@ -389,18 +390,16 @@ export default function MarketLabPage() {
         />
 
         <main className="flex min-h-0 min-w-0 flex-col gap-1.5 overflow-hidden">
-          {/* dominant main chart — always present */}
-          <ChartSlot
-            symbol={selected}
-            onSymbol={openSymbol}
-            options={WATCHLIST_SYMBOLS}
-            height={mainHeight}
-            overlays={mainOverlays}
-            hlinesMain={mainHlines}
-            rsi={rsiPane}
-            onCandles={onCandlesLoaded(selected)}
-            title="main chart · custom engine"
-          />
+          {/* TradingView is the only chart engine on the dominant main slot.
+           *  The previous custom canvas render path has been removed. */}
+          <AdvancedTradingChart symbol={selected} height={mainHeight} />
+          {(mainOverlays.length > 0 || mainHlines.length > 0 || rsiPane) && (
+            <div className="rounded border border-white/10 bg-white/[0.012] px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-white/55">
+              script overlays computed · {mainOverlays.length} plot · {mainHlines.length} hline
+              {rsiPane ? " · rsi pane" : ""}
+              <span className="text-white/35"> · TradingView renders the price natively</span>
+            </div>
+          )}
 
           {/* preset-driven bottom of center column */}
           {layout === "1+4" && (
