@@ -34,7 +34,16 @@ export const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
   { id: "settings", label: "Settings" }
 ];
 
-export type DefaultHome = "atlas" | "market-lab" | "server" | "apps" | "settings";
+export type DefaultHome =
+  | "home"
+  | "markets"
+  | "console"
+  | "library"
+  | "atlas"
+  | "market-lab"
+  | "server"
+  | "apps"
+  | "settings";
 export type StartupMode = "operator" | "market" | "voice" | "focus";
 export type Density = "compact" | "comfortable";
 
@@ -136,5 +145,9 @@ export const DEFAULT_HOME_PATHS: Record<DefaultHome, string> = {
   "market-lab": "/market-lab",
   server: "/server",
   apps: "/launchpad",
+  markets: "/markets",
+  console: "/console",
+  library: "/library",
+  home: "/",
   settings: "/settings"
 };

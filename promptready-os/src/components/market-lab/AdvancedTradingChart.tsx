@@ -61,7 +61,7 @@ function loadScript(): Promise<void> {
   });
 }
 
-export function AdvancedTradingChart({ symbol, height = 520 }: Props) {
+export function AdvancedTradingChart({ symbol, height }: Props) {
   const pair = binancePairFor(symbol);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const containerId = useId().replace(/[^a-z0-9]/gi, "");
@@ -186,7 +186,7 @@ export function AdvancedTradingChart({ symbol, height = 520 }: Props) {
       {status === "no-pair" && (
         <div
           className="flex flex-1 flex-col items-center justify-center gap-2 p-3 text-center"
-          style={{ minHeight: height }}
+          style={{ minHeight: height ?? 360 }}
         >
           <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/75">
             {symbol} · needs setup
@@ -211,7 +211,7 @@ export function AdvancedTradingChart({ symbol, height = 520 }: Props) {
           data-tradingview-container={pair ?? "none"}
           aria-label={`TradingView chart · ${pair ?? symbol}`}
           className="min-h-0 min-w-0 max-w-full flex-1 overflow-hidden"
-          style={{ height, width: "100%" }}
+          style={height != null ? { height, width: "100%" } : { width: "100%" }}
         />
       )}
 

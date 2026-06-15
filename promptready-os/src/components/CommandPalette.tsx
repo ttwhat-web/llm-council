@@ -19,27 +19,23 @@ interface PaletteAction {
 }
 
 const ACTIONS: PaletteAction[] = [
-  { id: "atlas", label: "Open Atlas", hint: "home", to: "/" },
-  { id: "terminal", label: "Open Intelligence Terminal", hint: "terminal", to: "/terminal" },
-  { id: "terminal-pro", label: "Open Terminal Pro · Live Wall", hint: "terminal · w", to: "/terminal" },
-  { id: "market-lab", label: "Open Market Lab", hint: "MIC", to: "/market-lab" },
-  { id: "market-intel", label: "Open Market Intel", hint: "why a move happened", to: "/market-intel" },
-  { id: "move-replay", label: "Open Move Replay", hint: "recent timeline", to: "/move-replay" },
-  { id: "market-briefing", label: "Open Market Briefing", hint: "risks · opportunities", to: "/market-briefing" },
-  { id: "launchpad", label: "Open Launchpad", hint: "external web apps", to: "/launchpad" },
-  { id: "voice", label: "Open Voice · Atlas", hint: "jarvis", to: "/voice" },
-  { id: "atlas-analyze", label: "Atlas analyze", hint: "voice console", to: "/voice" },
-  { id: "clean-paste", label: "Clean paste", hint: "smart paste", to: "/voice" },
-  { id: "new-mission", label: "New mission", hint: "mission control", to: "/mission-control" },
-  { id: "new-note", label: "New note", hint: "memory", to: "/memory" },
-  { id: "telegram", label: "Telegram", hint: "settings · remote", to: "/settings" },
-  { id: "market-replay", label: "Market replay", hint: "library", to: "/library" },
-  { id: "polymarket", label: "Polymarket research", hint: "market lab", to: "/market-lab" },
-  { id: "tasks", label: "Recent tasks", hint: "voice queue", to: "/voice" },
+  // Primary surfaces
+  { id: "home", label: "Open Home", hint: "today", to: "/" },
+  { id: "markets", label: "Open Markets", hint: "chart workspace", to: "/markets" },
+  { id: "console", label: "Open Console", hint: "dispatch missions", to: "/console" },
+  { id: "library", label: "Open Library", hint: "notes · saved", to: "/library" },
+  { id: "launchpad", label: "Open Launchpad", hint: "external apps", to: "/launchpad" },
+  { id: "settings", label: "Open Settings", hint: "providers · workspace", to: "/settings" },
+  // Power-user routes
+  { id: "atlas", label: "Open Atlas", hint: "blueprint canvas", to: "/atlas" },
+  { id: "brain", label: "Open Brain", hint: "identity · memory", to: "/brain" },
+  { id: "memory", label: "Open Memory", hint: "notes", to: "/memory" },
+  { id: "workflows", label: "Open Workflows", hint: "automations", to: "/workflows" },
   { id: "marketplace", label: "Open Marketplace", hint: "packs", to: "/marketplace" },
-  { id: "workflows", label: "Open Workflows", hint: "workflows", to: "/workflows" },
-  { id: "brain", label: "Open Brain", hint: "brain", to: "/brain" },
-  { id: "settings", label: "Open Settings", hint: "settings", to: "/settings" }
+  { id: "voice", label: "Open Voice console", hint: "transcripts", to: "/voice" },
+  { id: "terminal", label: "Open Intelligence Terminal", hint: "feeds", to: "/terminal" },
+  { id: "agents", label: "Open Agents", hint: "agent registry", to: "/agents" },
+  { id: "server", label: "Open Server", hint: "ssh bridge", to: "/server" }
 ];
 
 const RECENT_KEY = "promptready-os.cmdk.recent";

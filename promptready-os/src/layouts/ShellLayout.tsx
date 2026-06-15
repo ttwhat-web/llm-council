@@ -1,201 +1,235 @@
 "use client";
 
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import {
-  Activity,
   AppWindow,
-  Brain,
-  Cpu,
+  BookOpen,
+  CircleDot,
   LineChart,
-  Map as MapIcon,
-  Server as ServerIcon,
-  Settings as SettingsIcon
+  Mic,
+  Search,
+  Settings as SettingsIcon,
+  Terminal
 } from "lucide-react";
-import { KbdHint } from "@/components/primitives/KbdHint";
+import { useEffect, useRef, useState } from "react";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { MediaDock } from "@/components/MediaDock";
 import { CommandPalette } from "@/components/CommandPalette";
 import { useUiModeStore } from "@/store/uiMode";
-import { useWorkspace, DEFAULT_HOME_PATHS, type NavId } from "@/store/workspace";
-import { useEffect, useRef } from "react";
-
-// Map nav route → workspace nav id, used to filter the rail.
-const NAV_ID_BY_PATH: Record<string, NavId> = {
-  "/": "atlas",
-  "/market-lab": "market-lab",
-  "/server": "server",
-  "/launchpad": "apps",
-  "/atlas": "atlas",
-  "/settings": "settings"
-};
 
 /**
- * Shell layout · Operator.Center frame.
+ * Shell layout · Operator Center.
  *
- * Primary rail is intentionally small: Market Lab, Server, Launchpad,
- * Atlas, Settings. Legacy surfaces remain routable through direct
- * URLs and the command palette, but they no longer clutter the rail.
+ * One rail of five things, one quiet header. Global search resolves a
+ * ticker to /markets, anything else opens an external browser search.
+ * Voice is reachable via the mic button — when no ElevenLabs provider
+ * is configured we surface that state honestly rather than fake it.
  */
 
 interface NavItem {
   to: string;
   label: string;
-  Icon: typeof Activity;
+  Icon: typeof LineChart;
 }
 
 const PRIMARY_NAV: NavItem[] = [
-  { to: "/market-lab", label: "Market Lab", Icon: LineChart },
-  { to: "/server", label: "Server", Icon: ServerIcon },
+  { to: "/markets", label: "Markets", Icon: LineChart },
+  { to: "/console", label: "Console", Icon: Terminal },
+  { to: "/library", label: "Library", Icon: BookOpen },
   { to: "/launchpad", label: "Launchpad", Icon: AppWindow },
-  { to: "/atlas", label: "Atlas", Icon: MapIcon },
   { to: "/settings", label: "Settings", Icon: SettingsIcon }
 ];
 
+const TICKER_RE = /^[A-Z]{1,6}([./][A-Z]{1,6})?$/;
+
 export function ShellLayout() {
   const secondScreen = useUiModeStore((s) => s.secondScreen);
-  const workspace = useWorkspace();
   const location = useLocation();
   const navigate = useNavigate();
-  const homeRedirectedRef = useRef(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
-  // One-time default-home redirect when the app first lands on "/".
+  // Migrate any deep-link landing on /atlas (the previous home) so a
+  // returning user sees the new Home instead of the legacy cinema
+  // canvas. Honors explicit /atlas requests via the command palette.
+  const migratedHomeRef = useRef(false);
   useEffect(() => {
-    if (homeRedirectedRef.current) return;
-    homeRedirectedRef.current = true;
-    if (workspace.defaultHome !== "atlas" && location.pathname === "/") {
-      navigate(DEFAULT_HOME_PATHS[workspace.defaultHome], { replace: true });
-    }
+    if (migratedHomeRef.current) return;
+    migratedHomeRef.current = true;
+    if (location.pathname === "/atlas") navigate("/", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div className="flex h-screen w-screen max-w-full overflow-hidden">
-      {/* ---- left rail (hidden in Second Screen mode) ---- */}
+    <div className="flex h-screen w-screen max-w-full overflow-hidden bg-[#08090d] text-white">
       {!secondScreen && (
-      <aside className="flex w-[68px] shrink-0 flex-col items-center justify-between border-r border-white/8 bg-black/25 py-3">
-        <div className="flex flex-col items-center gap-4">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-accent/25 bg-white/[0.025]"
-            title="Operator.Center · Core · Atlas"
-          >
-            <span className="font-mono text-[11px] tracking-wider text-accent">[ ]</span>
-          </div>
-
-          <nav className="flex flex-col items-stretch gap-1.5" aria-label="Primary navigation">
-            {PRIMARY_NAV
-              .filter(({ to }) => {
-                const id = NAV_ID_BY_PATH[to];
-                return !id || !workspace.hiddenNav.includes(id);
-              })
-              .map(({ to, label, Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end
-                    title={label}
-                    className={({ isActive }) =>
-                      clsx(
-                        "group relative flex h-10 w-10 items-center justify-center rounded-md border transition",
-                        isActive
-                          ? "border-accent/30 bg-accent/[0.11] text-accent"
-                          : "border-transparent text-white/50 hover:border-white/10 hover:bg-white/[0.055] hover:text-white/85"
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <Icon className="h-4 w-4" />
-                        {isActive && (
-                          <span
-                            aria-hidden
-                            className="absolute -left-0.5 h-5 w-0.5 rounded-r bg-accent"
-                          />
-                        )}
-                      </>
-                    )}
-                  </NavLink>
+        <aside className="flex w-[60px] shrink-0 flex-col items-center justify-between border-r border-white/[0.04] py-4">
+          <div className="flex flex-col items-center gap-5">
+            <Link
+              to="/"
+              title="Home"
+              className="flex h-9 w-9 items-center justify-center rounded-md bg-white/[0.05] text-white/85 transition hover:bg-white/[0.08] hover:text-white"
+            >
+              <CircleDot className="h-4 w-4" />
+            </Link>
+            <nav className="flex flex-col items-stretch gap-1" aria-label="Primary">
+              {PRIMARY_NAV.map(({ to, label, Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  title={label}
+                  className={({ isActive }) =>
+                    clsx(
+                      "group relative flex h-9 w-9 items-center justify-center rounded-md transition",
+                      isActive
+                        ? "bg-white/[0.06] text-white"
+                        : "text-white/45 hover:bg-white/[0.04] hover:text-white/85"
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                </NavLink>
               ))}
-          </nav>
-        </div>
-
-        <KbdHint keys={["cmd", "k"]} />
-      </aside>
+            </nav>
+          </div>
+        </aside>
       )}
 
-      {/* ---- main column ---- */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {!secondScreen && (
-        <header className="drag-region flex min-w-0 items-center justify-between gap-3 overflow-hidden border-b border-white/6 px-5 py-2">
-          <div className="flex min-w-0 items-center gap-2 truncate font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
-            <span className="text-accent">[ ]</span>
-            <span>Operator.Center</span>
-            <span className="text-white/25">·</span>
-            <span>Workstation</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <StatusRail />
-            <ThemeSwitcher />
-          </div>
-        </header>
+          <header className="drag-region flex min-w-0 items-center gap-3 px-5 py-2.5">
+            <div className="flex min-w-0 items-center gap-2 text-[12.5px] font-medium text-white/60">
+              <span className="text-white/80">Operator Center</span>
+            </div>
+            <div className="no-drag mx-auto flex max-w-[520px] flex-1">
+              <GlobalSearch />
+            </div>
+            <div className="no-drag flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setVoiceOpen(true)}
+                title="Voice"
+                aria-label="Voice"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-white/55 transition hover:bg-white/[0.05] hover:text-white"
+              >
+                <Mic className="h-4 w-4" />
+              </button>
+              <ThemeSwitcher />
+            </div>
+          </header>
         )}
 
-        <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+        <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
           <Outlet />
         </div>
       </main>
 
-      {/* Floating App Dock · official web apps open externally */}
-      <MediaDock />
-
-      {/* Global command palette · Cmd/Ctrl+K */}
       <CommandPalette />
+      <VoiceSheet open={voiceOpen} onClose={() => setVoiceOpen(false)} />
     </div>
   );
 }
 
-// ============================================================================
-// Status rail
-// ============================================================================
+// ---------------------------------------------------------------------------
+// Global search
+// ---------------------------------------------------------------------------
 
-/**
- * Static status chips. Every value here is a label, not a live metric —
- * the desktop runtime fills these from real Tauri commands when wired.
- * Until then we never animate them.
- */
-function StatusRail() {
+function GlobalSearch() {
+  const [value, setValue] = useState("");
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = value.trim();
+    if (!q) return;
+    const asTicker = q.toUpperCase();
+    if (TICKER_RE.test(asTicker)) {
+      navigate(`/markets?symbol=${encodeURIComponent(asTicker)}`);
+    } else {
+      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+    setValue("");
+    inputRef.current?.blur();
+  };
+
   return (
-    <div className="no-drag hidden items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.18em] xl:flex">
-      <StatusChip Icon={Cpu} label="engine" value="rules · ready" tone="ok" />
-      <StatusChip Icon={Activity} label="route" value="local-first" tone="ok" />
-      <StatusChip Icon={Brain} label="brain" value="local only" tone="muted" />
-      <span className="text-white/30">·</span>
-      <span className="text-white/35">v0.1 · BYOK</span>
-    </div>
+    <form
+      onSubmit={onSubmit}
+      className="group flex w-full items-center gap-2 rounded-md bg-white/[0.04] px-3 py-1.5 transition focus-within:bg-white/[0.06]"
+    >
+      <Search className="h-3.5 w-3.5 shrink-0 text-white/40 group-focus-within:text-white/65" />
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Search ticker, company, or anything…"
+        aria-label="Global search"
+        className="min-w-0 flex-1 bg-transparent text-[13px] text-white placeholder:text-white/35 focus:outline-none"
+      />
+      <span className="hidden shrink-0 text-[10px] font-medium text-white/30 sm:inline">
+        /
+      </span>
+    </form>
   );
 }
 
-function StatusChip({
-  Icon,
-  label,
-  value,
-  tone
-}: {
-  Icon: typeof Activity;
-  label: string;
-  value: string;
-  tone: "ok" | "warn" | "muted";
-}) {
-  const cls = {
-    ok: "border-emerald-400/30 bg-emerald-500/[0.06] text-emerald-200",
-    warn: "border-amber-400/35 bg-amber-500/[0.06] text-amber-200",
-    muted: "border-white/10 bg-white/[0.03] text-white/55"
-  }[tone];
+// ---------------------------------------------------------------------------
+// Voice sheet (honest placeholder until ElevenLabs is wired)
+// ---------------------------------------------------------------------------
+
+function VoiceSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
   return (
-    <span className={clsx("inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5", cls)}>
-      <Icon className="h-2.5 w-2.5" />
-      <span className="text-white/50">{label}</span>
-      <span className="text-white">{value}</span>
-    </span>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-end p-6"
+      role="dialog"
+      aria-label="Voice"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/40" />
+      <section
+        className="relative flex w-full max-w-sm flex-col gap-3 rounded-2xl bg-[#101218] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2">
+          <Mic className="h-4 w-4 text-white/75" />
+          <h2 className="text-[14px] font-semibold text-white">Voice</h2>
+          <span className="ml-auto rounded-full bg-amber-500/[0.12] px-2 py-0.5 text-[10.5px] font-medium text-amber-200">
+            Needs setup
+          </span>
+        </div>
+        <p className="text-[13px] leading-relaxed text-white/55">
+          Voice will use ElevenLabs for low-latency conversation. Add an ElevenLabs API key in Settings → Providers to enable push-to-talk.
+        </p>
+        <Link
+          to="/settings"
+          onClick={onClose}
+          className="inline-flex w-fit items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium text-black transition hover:bg-white/90"
+        >
+          Open Settings
+        </Link>
+      </section>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import { createBrowserRouter, isRouteErrorResponse, Navigate, RouterProvider, useRouteError } from "react-router-dom";
 import { ShellLayout } from "@/layouts/ShellLayout";
+import HomePage from "@/modules/home/HomePage";
 import MissionControlPage from "@/modules/mission-control/MissionControlPage";
 import AgentsPage from "@/modules/agents/AgentsPage";
 import MemoryPage from "@/modules/memory/MemoryPage";
@@ -14,17 +15,14 @@ import MarketplacePage from "@/modules/marketplace/MarketplacePage";
 import ServerPage from "@/modules/server/ServerPage";
 import SettingsPage from "@/modules/settings/SettingsPage";
 import LaunchpadPage from "@/modules/launchpad/LaunchpadPage";
-import MarketIntelPage from "@/modules/market-intel/MarketIntelPage";
-import MoveReplayPage from "@/modules/move-replay/MoveReplayPage";
-import MarketBriefingPage from "@/modules/market-briefing/MarketBriefingPage";
 
 /**
  * Route registry.
  *
- * Visible labels and paths use the current names: Launchpad, Market
- * Intel, Move Replay, Market Briefing. Legacy paths (/apps, /why,
- * /replay, /war-room) are kept as redirects so old bookmarks and
- * deep links still resolve.
+ * Five visible surfaces: Home, Markets, Console, Library, Launchpad,
+ * Settings. Everything else is reachable through the command palette
+ * (Cmd+K) and via legacy redirects so old deep-links continue to
+ * resolve.
  */
 
 const router = createBrowserRouter([
@@ -32,30 +30,34 @@ const router = createBrowserRouter([
     path: "/",
     element: <ShellLayout />,
     children: [
-      { index: true, element: <AtlasPage /> },
-      { path: "mission-control", element: <MissionControlPage /> },
+      { index: true, element: <HomePage /> },
+      { path: "markets", element: <MarketLabPage />, errorElement: <MarketsRouteError /> },
+      { path: "console", element: <MissionControlPage /> },
+      { path: "library", element: <LibraryPage /> },
+      { path: "launchpad", element: <LaunchpadPage /> },
+      { path: "settings", element: <SettingsPage /> },
+
+      // Cmd+K-only / legacy surfaces · still routable
       { path: "agents", element: <AgentsPage /> },
       { path: "memory", element: <MemoryPage /> },
-      { path: "library", element: <LibraryPage /> },
       { path: "terminal", element: <IntelligenceTerminalPage /> },
-      { path: "market-lab", element: <MarketLabPage />, errorElement: <MarketLabRouteError /> },
-      { path: "market-intel", element: <MarketIntelPage /> },
-      { path: "move-replay", element: <MoveReplayPage /> },
-      { path: "market-briefing", element: <MarketBriefingPage /> },
       { path: "voice", element: <VoiceConsolePage /> },
       { path: "workflows", element: <WorkflowsPage /> },
       { path: "brain", element: <BrainPage /> },
       { path: "atlas", element: <AtlasPage /> },
       { path: "marketplace", element: <MarketplacePage /> },
       { path: "server", element: <ServerPage /> },
-      { path: "launchpad", element: <LaunchpadPage /> },
-      { path: "settings", element: <SettingsPage /> },
 
-      // legacy redirects · keep old links working
+      // Legacy redirects
+      { path: "mission-control", element: <Navigate to="/console" replace /> },
+      { path: "market-lab", element: <Navigate to="/markets" replace /> },
+      { path: "market-intel", element: <Navigate to="/markets?tab=intel" replace /> },
+      { path: "move-replay", element: <Navigate to="/markets?tab=replay" replace /> },
+      { path: "market-briefing", element: <Navigate to="/markets?tab=briefing" replace /> },
       { path: "apps", element: <Navigate to="/launchpad" replace /> },
-      { path: "why", element: <Navigate to="/market-intel" replace /> },
-      { path: "replay", element: <Navigate to="/move-replay" replace /> },
-      { path: "war-room", element: <Navigate to="/market-briefing" replace /> }
+      { path: "why", element: <Navigate to="/markets?tab=intel" replace /> },
+      { path: "replay", element: <Navigate to="/markets?tab=replay" replace /> },
+      { path: "war-room", element: <Navigate to="/markets?tab=briefing" replace /> }
     ]
   }
 ]);
@@ -64,30 +66,27 @@ export function AppRouter() {
   return <RouterProvider router={router} />;
 }
 
-function MarketLabRouteError() {
+function MarketsRouteError() {
   const error = useRouteError();
   const detail = isRouteErrorResponse(error)
     ? `${error.status} ${error.statusText}`
     : error instanceof Error
       ? error.message
-      : "unknown chart rendering error";
+      : "unknown rendering error";
 
   return (
-    <div className="flex min-h-[calc(100vh-43px)] w-full items-center justify-center bg-[#03050a] p-4 text-white">
+    <div className="flex min-h-[calc(100vh-43px)] w-full items-center justify-center p-8">
       <section
         role="alert"
-        className="flex w-full max-w-xl flex-col gap-3 rounded-lg border border-rose-400/30 bg-rose-500/[0.06] p-4"
+        className="flex w-full max-w-md flex-col gap-3 rounded-2xl bg-white/[0.03] p-6"
       >
-        <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-rose-200">
-          market lab recovered
-        </span>
-        <h1 className="text-[18px] font-semibold">Chart surface unavailable</h1>
-        <p className="text-[12px] leading-snug text-white/70">
-          Market Lab caught a rendering error before it could take down the app.
+        <h1 className="text-[18px] font-semibold text-white">Markets is recovering</h1>
+        <p className="text-[13px] leading-relaxed text-white/60">
+          Something tripped while drawing the workspace. The rest of Operator Center kept running.
         </p>
-        <div className="rounded-md border border-white/10 bg-black/35 px-2 py-1.5 font-mono text-[10px] text-white/65">
+        <pre className="overflow-auto rounded-lg bg-black/30 px-3 py-2 text-[11.5px] text-white/65">
           {detail}
-        </div>
+        </pre>
       </section>
     </div>
   );
