@@ -3,9 +3,9 @@
 /**
  * Market Intelligence Center · Operator.Center "Market Lab".
  *
- * A Bloomberg-style trading-floor / quant-desk surface rendered entirely
- * in the native Operator.Center design language (dark glass, accent =
- * var(--pr-color-accent)). NO Bloomberg branding, NO amber-on-black.
+ * An institutional-style trading-floor / quant-desk surface rendered
+ * entirely in the native Operator.Center design language (dark glass,
+ * accent = var(--pr-color-accent)).
  *
  * HARD HONESTY: the ONLY real feeds here are crypto (CoinGecko via the
  * shared useCryptoFeed) and news (HN / NewsAPI via useNewsFeed /
@@ -869,7 +869,7 @@ function WarRoomHeader({
     <section className="border border-white/10 bg-[#05070b]">
       <div className="flex flex-wrap items-center gap-2 border-b border-white/8 px-2 py-1">
         <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-accent">
-          <LineChart className="h-3.5 w-3.5" /> Market Lab War Room
+          <LineChart className="h-3.5 w-3.5" /> Market Lab · floor
         </span>
         <form
           className="flex min-w-[260px] flex-1 items-center gap-1 border border-white/10 bg-white/[0.025] px-2 py-1"
@@ -898,7 +898,7 @@ function WarRoomHeader({
         <Pill tone={cryptoOnline ? "ok" : crypto.state === "error" ? "bad" : "muted"}>
           CoinGecko {cryptoOnline ? "connected" : crypto.state}
         </Pill>
-        <Pill tone="accent">{adapters.ready} adapter-ready</Pill>
+        <Pill tone="accent">{adapters.ready} needs setup</Pill>
         <Pill tone="muted">{adapters.offline} offline</Pill>
         <button
           type="button"
@@ -1085,7 +1085,7 @@ function BreadthPanel({
 
 function MacroFxPanel() {
   return (
-    <Panel title="macro / FX strip chart" icon={<Globe2 className="h-3.5 w-3.5" />} right={<Pill tone="muted">adapter-ready</Pill>}>
+    <Panel title="macro / FX strip chart" icon={<Globe2 className="h-3.5 w-3.5" />} right={<Pill tone="muted">needs setup</Pill>}>
       <div className="grid grid-cols-2 gap-1">
         {MACRO_STRIP.map((s) => (
           <div key={s} className="flex items-center justify-between border border-white/8 bg-white/[0.01] px-1.5 py-1" style={HATCH}>
@@ -1356,7 +1356,7 @@ function AiAnalystPanel({
 }) {
   const relatedNews = newsItems.filter((n) => n.title.toUpperCase().includes(selected)).slice(0, 3);
   return (
-    <Panel title="AI Analyst" icon={<Bot className="h-3.5 w-3.5" />} right={<Pill tone="muted">analysis adapter-ready</Pill>}>
+    <Panel title="AI Analyst" icon={<Bot className="h-3.5 w-3.5" />} right={<Pill tone="muted">analysis needs setup</Pill>}>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1">
         <StatRow label="symbol" value={selected} />
         <StatRow label="source" value={selectedIsCrypto ? "CoinGecko" : "no source"} tone={selectedIsCrypto ? "ok" : "muted"} />
@@ -1525,7 +1525,7 @@ function AdapterWatchlist({ title, symbols }: { title: string; symbols: string[]
     <Panel
       title={title}
       icon={<Boxes className="h-3.5 w-3.5" />}
-      right={<Pill tone="muted">adapter-ready</Pill>}
+      right={<Pill tone="muted">needs setup</Pill>}
       className="opacity-80"
       bodyClassName="gap-0 p-0"
     >
@@ -2043,7 +2043,7 @@ function PolymarketWall() {
   const [tab, setTab] = useState("Politics");
   const tabs = ["Politics", "Crypto", "AI", "Economy", "Top movers"];
   return (
-    <Panel title="prediction wall" icon={<Waypoints className="h-3.5 w-3.5" />} right={<Pill tone="muted">adapter-ready</Pill>} className="opacity-80">
+    <Panel title="prediction wall" icon={<Waypoints className="h-3.5 w-3.5" />} right={<Pill tone="muted">needs setup</Pill>} className="opacity-80">
       <div className="flex flex-wrap items-center gap-1 opacity-60" style={HATCH}>
         {tabs.map((t) => (
           <button
@@ -2302,7 +2302,7 @@ function TvWall({
           <span className="font-mono text-[10px] text-white/45">receipts on device</span>
         </TvPanel>
         <TvPanel title="world markets">
-          <span className="font-mono text-lg text-white/55">adapter-ready</span>
+          <span className="font-mono text-lg text-white/55">needs setup</span>
           <span className="font-mono text-[10px] text-white/40">equities · fx · commodities</span>
         </TvPanel>
         <TvPanel title="world clock" wide>
@@ -2322,7 +2322,7 @@ function TvWall({
         </TvPanel>
       </div>
       <p className="text-center font-mono text-[10px] uppercase tracking-[0.25em] text-white/35">
-        operational signal · not financial advice · crypto + news real · all else adapter-ready · no fabricated numbers
+        operational signal · not financial advice · crypto + news real · all else needs setup · no fabricated numbers
       </p>
     </div>
   );

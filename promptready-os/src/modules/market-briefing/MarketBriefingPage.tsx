@@ -10,7 +10,7 @@ interface Item { title: string; why: string; source: string; impact: 1 | 2 | 3; 
 const IMPACT_LABEL: Record<Item["impact"], string> = { 1: "low", 2: "med", 3: "high" };
 const CONF_LABEL: Record<Item["confidence"], string> = { 1: "low", 2: "med", 3: "high" };
 
-export default function WarRoomPage() {
+export default function MarketBriefingPage() {
   const crypto = useCryptoFeed();
 
   const { risks, opportunities } = useMemo(() => {
@@ -45,11 +45,11 @@ export default function WarRoomPage() {
         <div className="flex min-w-0 flex-col gap-1">
           <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
             <ShieldAlert className="h-3.5 w-3.5" />
-            market war room
+            markets · briefing
           </span>
-          <h1 className="text-[22px] font-semibold leading-tight text-white">Market War Room</h1>
+          <h1 className="text-[22px] font-semibold leading-tight text-white">Market Briefing</h1>
           <p className="max-w-2xl text-[12px] leading-snug text-white/55">
-            Risks · opportunities · upcoming events. Every entry is sourced and ranked by impact and confidence. Macro calendar items appear once an economic-calendar adapter is connected.
+            Today&apos;s risks, opportunities, and what&apos;s ahead. Each item is sourced and ranked by impact and confidence. Macro calendar items appear once an economic-calendar connector is added.
           </p>
         </div>
       </header>

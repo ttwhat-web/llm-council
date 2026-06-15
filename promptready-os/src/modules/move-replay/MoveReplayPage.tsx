@@ -44,7 +44,7 @@ function buildEvents(candles: Candle[]): TimelineEvent[] {
   return events.slice(-30);
 }
 
-export default function TradeReplayPage() {
+export default function MoveReplayPage() {
   const [symbol, setSymbol] = useState<(typeof SYMBOLS)[number]>("BTC");
   const [windowId, setWindowId] = useState<(typeof WINDOWS)[number]["id"]>("24h");
   const replayWindow = WINDOWS.find((w) => w.id === windowId)!;
@@ -71,11 +71,11 @@ export default function TradeReplayPage() {
         <div className="flex min-w-0 flex-col gap-1">
           <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
             <Rewind className="h-3.5 w-3.5" />
-            trade replay
+            markets · move replay
           </span>
-          <h1 className="text-[22px] font-semibold leading-tight text-white">Trade Replay</h1>
+          <h1 className="text-[22px] font-semibold leading-tight text-white">Move Replay</h1>
           <p className="max-w-2xl text-[12px] leading-snug text-white/55">
-            Replay an asset&apos;s recent move as a single narrative timeline. Swings and volume spikes come from Binance candles; news pins and funding flips need provider archives to wire in.
+            Walk through an asset&apos;s recent move as a single timeline. Swings and volume spikes come from Binance candles. News pins and funding flips appear once their provider archives are connected.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

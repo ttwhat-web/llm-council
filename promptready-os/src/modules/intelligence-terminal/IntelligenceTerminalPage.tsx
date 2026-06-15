@@ -73,7 +73,7 @@ import { useCryptoFeed, useNewsFeed, refreshCryptoNow } from "@/services/marketF
 /**
  * Intelligence Terminal · Intelligence Expansion 01.
  *
- * Bloomberg-density operator terminal organised into four GROUPS:
+ * Institutional-density operator terminal organised into four GROUPS:
  *
  *   MARKETS   · Stocks · Crypto · FX · Watchlists
  *   RESEARCH  · News Feed · Earnings · AI News · Repo Research

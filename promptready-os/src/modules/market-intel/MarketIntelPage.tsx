@@ -21,7 +21,7 @@ function pctChange(candles: Candle[], lookback: number): number | null {
   return ((last.close - ref.close) / ref.close) * 100;
 }
 
-export default function WhyCenterPage() {
+export default function MarketIntelPage() {
   const [symbol, setSymbol] = useState<SymbolKey>("BTC");
   const [klines, setKlines] = useState<Candle[]>([]);
   const [klinesErr, setKlinesErr] = useState<string | null>(null);
@@ -69,11 +69,11 @@ export default function WhyCenterPage() {
         <div className="flex min-w-0 flex-col gap-1">
           <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
             <Brain className="h-3.5 w-3.5" />
-            why center · explain the move
+            markets · intel
           </span>
-          <h1 className="text-[22px] font-semibold leading-tight text-white">Why Center</h1>
+          <h1 className="text-[22px] font-semibold leading-tight text-white">Market Intel</h1>
           <p className="max-w-2xl text-[12px] leading-snug text-white/55">
-            Pick an asset and Juan assembles the timeline: what moved, what likely drove it, and what to watch next. Every claim is sourced; if a source isn&apos;t connected the section says so honestly.
+            Pick an asset and Juan assembles the picture: what moved, what likely drove it, and what to watch next. Every claim is sourced. If a source isn&apos;t connected, the section says so plainly.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1">

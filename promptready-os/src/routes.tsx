@@ -1,4 +1,4 @@
-import { createBrowserRouter, isRouteErrorResponse, RouterProvider, useRouteError } from "react-router-dom";
+import { createBrowserRouter, isRouteErrorResponse, Navigate, RouterProvider, useRouteError } from "react-router-dom";
 import { ShellLayout } from "@/layouts/ShellLayout";
 import MissionControlPage from "@/modules/mission-control/MissionControlPage";
 import AgentsPage from "@/modules/agents/AgentsPage";
@@ -13,18 +13,18 @@ import AtlasPage from "@/modules/atlas/AtlasPage";
 import MarketplacePage from "@/modules/marketplace/MarketplacePage";
 import ServerPage from "@/modules/server/ServerPage";
 import SettingsPage from "@/modules/settings/SettingsPage";
-import AppsPage from "@/modules/apps/AppsPage";
-import WhyCenterPage from "@/modules/why-center/WhyCenterPage";
-import TradeReplayPage from "@/modules/trade-replay/TradeReplayPage";
-import WarRoomPage from "@/modules/war-room/WarRoomPage";
+import LaunchpadPage from "@/modules/launchpad/LaunchpadPage";
+import MarketIntelPage from "@/modules/market-intel/MarketIntelPage";
+import MoveReplayPage from "@/modules/move-replay/MoveReplayPage";
+import MarketBriefingPage from "@/modules/market-briefing/MarketBriefingPage";
 
 /**
- * Route registry · Phase 11 rebuild.
+ * Route registry.
  *
- * Eight top-level surfaces matching the left rail. The index route is
- * Mission Control — the centerpiece HUD. The other seven render their
- * own modules. No more `Placeholder` cards; every surface ships a real
- * (honest) screen.
+ * Visible labels and paths use the current names: Launchpad, Market
+ * Intel, Move Replay, Market Briefing. Legacy paths (/apps, /why,
+ * /replay, /war-room) are kept as redirects so old bookmarks and
+ * deep links still resolve.
  */
 
 const router = createBrowserRouter([
@@ -39,17 +39,23 @@ const router = createBrowserRouter([
       { path: "library", element: <LibraryPage /> },
       { path: "terminal", element: <IntelligenceTerminalPage /> },
       { path: "market-lab", element: <MarketLabPage />, errorElement: <MarketLabRouteError /> },
+      { path: "market-intel", element: <MarketIntelPage /> },
+      { path: "move-replay", element: <MoveReplayPage /> },
+      { path: "market-briefing", element: <MarketBriefingPage /> },
       { path: "voice", element: <VoiceConsolePage /> },
       { path: "workflows", element: <WorkflowsPage /> },
       { path: "brain", element: <BrainPage /> },
       { path: "atlas", element: <AtlasPage /> },
       { path: "marketplace", element: <MarketplacePage /> },
       { path: "server", element: <ServerPage /> },
-      { path: "apps", element: <AppsPage /> },
-      { path: "why", element: <WhyCenterPage /> },
-      { path: "replay", element: <TradeReplayPage /> },
-      { path: "war-room", element: <WarRoomPage /> },
-      { path: "settings", element: <SettingsPage /> }
+      { path: "launchpad", element: <LaunchpadPage /> },
+      { path: "settings", element: <SettingsPage /> },
+
+      // legacy redirects · keep old links working
+      { path: "apps", element: <Navigate to="/launchpad" replace /> },
+      { path: "why", element: <Navigate to="/market-intel" replace /> },
+      { path: "replay", element: <Navigate to="/move-replay" replace /> },
+      { path: "war-room", element: <Navigate to="/market-briefing" replace /> }
     ]
   }
 ]);

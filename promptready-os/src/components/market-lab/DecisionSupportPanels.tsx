@@ -1,11 +1,9 @@
 "use client";
 
 /**
- * Honest-by-default helpers shared by the Why Center / Trade Replay
- * / War Room surfaces.  Only NeedsSetupBanner is exported today —
- * additional decision-support panels (Watch Rules, Trade Journal,
- * Inbox, AI Risk Check) live in `marketBriefStore.ts` and will be
- * wired in once their evaluators ship.
+ * Honest-by-default helpers shared by the Market Intel / Move Replay
+ * / Market Briefing surfaces. Only NeedsSetupBanner is exported
+ * today.
  */
 
 import { AlertTriangle } from "lucide-react";

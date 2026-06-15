@@ -29,7 +29,7 @@ export type NavId =
 export const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
   { id: "market-lab", label: "Market Lab" },
   { id: "server", label: "Server" },
-  { id: "apps", label: "Apps" },
+  { id: "apps", label: "Launchpad" },
   { id: "atlas", label: "Atlas" },
   { id: "settings", label: "Settings" }
 ];
@@ -135,6 +135,6 @@ export const DEFAULT_HOME_PATHS: Record<DefaultHome, string> = {
   atlas: "/",
   "market-lab": "/market-lab",
   server: "/server",
-  apps: "/apps",
+  apps: "/launchpad",
   settings: "/settings"
 };

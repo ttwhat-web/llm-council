@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
 import { BrainGraph } from "@/components/BrainGraph";
+import { MarketsLauncher } from "@/components/MarketsLauncher";
 import { RepoContextCard, type RepoContextValue } from "@/components/RepoContextCard";
 import { CodeOperatorActions } from "@/components/CodeOperatorActions";
 import { useBrainStore } from "@/store/brain";
@@ -88,6 +89,8 @@ export default function MissionControlPage() {
           </div>
         }
       />
+
+      <MarketsLauncher />
 
       {/* ====================== Top row ====================== */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)_minmax(0,340px)]">

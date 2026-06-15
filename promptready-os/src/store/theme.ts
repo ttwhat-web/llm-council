@@ -23,7 +23,7 @@ export type ThemeId =
   | "violet"
   | "emerald"
   | "terminal"
-  | "bloomberg"
+  | "amber-terminal"
   | "founder"
   | "night-ops"
   | "travel"
@@ -154,8 +154,8 @@ export const THEMES: ThemePalette[] = [
     swatch: "linear-gradient(135deg,#04070a 0%,#46f5a0 100%)"
   },
   {
-    id: "bloomberg",
-    label: "Bloomberg",
+    id: "amber-terminal",
+    label: "Amber Terminal",
     bg: "#0a0500",
     panel: "rgba(255,160,40,0.04)",
     accent: "#ffa928",

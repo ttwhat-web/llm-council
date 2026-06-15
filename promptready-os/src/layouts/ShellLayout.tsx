@@ -25,7 +25,7 @@ const NAV_ID_BY_PATH: Record<string, NavId> = {
   "/": "atlas",
   "/market-lab": "market-lab",
   "/server": "server",
-  "/apps": "apps",
+  "/launchpad": "apps",
   "/atlas": "atlas",
   "/settings": "settings"
 };
@@ -33,9 +33,9 @@ const NAV_ID_BY_PATH: Record<string, NavId> = {
 /**
  * Shell layout · Operator.Center frame.
  *
- * Primary rail is intentionally small: Market Lab, Server, Apps, Atlas,
- * Settings. Legacy surfaces remain routable through direct URLs and the
- * command palette, but they no longer clutter the main workstation.
+ * Primary rail is intentionally small: Market Lab, Server, Launchpad,
+ * Atlas, Settings. Legacy surfaces remain routable through direct
+ * URLs and the command palette, but they no longer clutter the rail.
  */
 
 interface NavItem {
@@ -47,7 +47,7 @@ interface NavItem {
 const PRIMARY_NAV: NavItem[] = [
   { to: "/market-lab", label: "Market Lab", Icon: LineChart },
   { to: "/server", label: "Server", Icon: ServerIcon },
-  { to: "/apps", label: "Apps", Icon: AppWindow },
+  { to: "/launchpad", label: "Launchpad", Icon: AppWindow },
   { to: "/atlas", label: "Atlas", Icon: MapIcon },
   { to: "/settings", label: "Settings", Icon: SettingsIcon }
 ];

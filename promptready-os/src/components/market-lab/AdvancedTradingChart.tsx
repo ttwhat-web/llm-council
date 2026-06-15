@@ -221,7 +221,7 @@ export function AdvancedTradingChart({ symbol, height = 520 }: Props) {
           className="flex shrink-0 flex-col gap-1 border-t border-rose-400/30 bg-rose-500/[0.06] px-2 py-1.5"
         >
           <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-rose-200">
-            <XCircle className="h-3 w-3" /> TradingView Failed · no fallback chart engine
+            <XCircle className="h-3 w-3" /> TradingView Unavailable · no fallback chart engine
           </span>
           <span className="break-all font-mono text-[10.5px] text-white/85">{error ?? "unknown error"}</span>
           <div className="flex items-center gap-1.5 pt-0.5">
@@ -279,7 +279,7 @@ function StatusBadge({ status }: { status: Status }) {
         data-tradingview-status="failed"
         className="inline-flex items-center gap-1 rounded border border-rose-400/40 bg-rose-500/[0.1] px-1.5 py-px font-mono text-[10.5px] uppercase tracking-wider text-rose-200"
       >
-        <XCircle className="h-3 w-3" /> TradingView Failed
+        <XCircle className="h-3 w-3" /> TradingView Unavailable
       </span>
     );
   }
@@ -288,7 +288,7 @@ function StatusBadge({ status }: { status: Status }) {
       data-tradingview-status="no-pair"
       className="inline-flex items-center gap-1 rounded border border-amber-400/40 bg-amber-500/[0.08] px-1.5 py-px font-mono text-[10.5px] uppercase tracking-wider text-amber-200"
     >
-      TradingView · no Binance pair
+      TradingView Unavailable · no Binance pair
     </span>
   );
 }

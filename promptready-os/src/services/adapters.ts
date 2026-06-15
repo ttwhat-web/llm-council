@@ -178,7 +178,7 @@ export function statusMeta(
     case "connected":
       return { label: "connected", tone: "ok" };
     case "adapter-ready":
-      return { label: "adapter ready", tone: "accent" };
+      return { label: "needs setup", tone: "accent" };
     case "error":
       return { label: "error", tone: "bad" };
     default:

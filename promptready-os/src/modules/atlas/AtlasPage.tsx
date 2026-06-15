@@ -27,6 +27,7 @@ import { AtlasHud } from "./AtlasHud";
 import { OperationsView, LiveView } from "./AtlasViews";
 import { RuntimeHeatmap } from "@/components/RuntimeHeatmap";
 import { AtlasHero } from "@/components/AtlasHero";
+import { MarketsLauncher } from "@/components/MarketsLauncher";
 import { CommandRoomEmptyState } from "@/components/CommandRoomEmptyState";
 import { DispatchPanel } from "./panels/DispatchPanel";
 import { RepoWorkspace } from "./panels/RepoWorkspace";
@@ -275,6 +276,7 @@ export default function AtlasPage() {
       <AtlasHud />
 
       <AtlasHero />
+      <MarketsLauncher />
       <CommandRoomEmptyState />
 
       {homeMode === "operations" && <OperationsView onOpenSection={(id) => setSelected(id as SectionId)} />}
