@@ -1,783 +1,472 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import clsx from "clsx";
 import {
-  Activity,
   ArrowRight,
-  CheckCircle2,
-  Circle,
-  Cpu,
-  Download,
+  ChevronDown,
+  ChevronRight,
+  CornerDownLeft,
   FileText,
-  Github,
   Loader,
-  Rocket,
-  ShieldCheck,
-  Sparkles,
   X
 } from "lucide-react";
-import { SurfaceHeader } from "@/components/primitives/SurfaceHeader";
-import { BrainGraph } from "@/components/BrainGraph";
-import { MarketsLauncher } from "@/components/MarketsLauncher";
-import { RepoContextCard, type RepoContextValue } from "@/components/RepoContextCard";
-import { CodeOperatorActions } from "@/components/CodeOperatorActions";
-import { useBrainStore } from "@/store/brain";
 import {
   useMissionStore,
   STAGES,
   STAGE_META,
   type MissionStage,
-  type RuntimeStatus,
   type MissionReceipt
 } from "@/store/mission";
-import type { Deliverable } from "@/services/missionRunner";
+import { useBrainStore } from "@/store/brain";
 
 /**
- * Mission Control · Phase 13.
+ * Console · the dispatch surface.
  *
- * Cockpit, not a form. The Brain Graph (compact) lives in the right
- * column as the visual anchor — "I am building my own AI brain". Below
- * it sits the brain state. The center column owns the Execution Graph
- * timeline; the bottom row holds Flight Recorder (log) · Deliverables
- * (real artifact cards) · Operations Archive jumps.
+ * Single calm column. One input you type into, one button to dispatch,
+ * one quiet trace below it while a mission runs, and a short list of
+ * recent missions you can re-open. No three-column cockpit, no brain
+ * graph wallpaper, no archive jump rails — those live elsewhere.
  */
 
-const MODE_OPTIONS = ["auto", "claude", "chatgpt", "cursor", "gemini", "dev", "terminal", "business", "general"] as const;
-const QUALITY_OPTIONS = ["fast", "smart", "expert", "code", "local"] as const;
+const MODES = ["auto", "claude", "chatgpt", "gemini", "cursor", "local"] as const;
+const QUALITIES = ["fast", "smart", "expert"] as const;
 
-const BLUEPRINTS = [
-  { id: "fix-prompt", label: "Fix messy prompt", seed: "Take this messy prompt and turn it into an execution-ready brief:\n\n" },
-  { id: "architect", label: "Architect a product", seed: "I want to build " },
-  { id: "stack-trace", label: "Debug stack trace", seed: "Help me debug this stack trace and propose a fix:\n\n" },
-  { id: "terminal-fix", label: "Terminal-safe command", seed: "I want a shell command to " }
+type Mode = (typeof MODES)[number];
+type Quality = (typeof QUALITIES)[number];
+
+const SUGGESTIONS = [
+  "Draft an investor update for this quarter.",
+  "Summarise this stack trace and propose a fix.",
+  "Plan a 3-day product spike for X.",
+  "Rewrite this messy prompt into a sharp brief."
 ];
 
 export default function MissionControlPage() {
   const [brief, setBrief] = useState("");
-  const [mode, setMode] = useState<(typeof MODE_OPTIONS)[number]>("auto");
-  const [quality, setQuality] = useState<(typeof QUALITY_OPTIONS)[number]>("fast");
-  const [repo, setRepo] = useState<RepoContextValue | null>(null);
+  const [mode, setMode] = useState<Mode>("auto");
+  const [quality, setQuality] = useState<Quality>("fast");
+  const [openMission, setOpenMission] = useState<MissionReceipt | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const current = useMissionStore((s) => s.current);
-  const runtime = useMissionStore((s) => s.runtime);
   const history = useMissionStore((s) => s.history);
   const dispatch = useMissionStore((s) => s.dispatch);
   const cancel = useMissionStore((s) => s.cancel);
-
-  const brainSourceCount = useBrainStore((s) => s.memorySources.length);
   const identity = useBrainStore((s) => s.identity);
 
-  const onDispatch = () => {
-    if (!brief.trim()) return;
-    void dispatch(brief, mode, quality, repo ? repoToString(repo) : null);
+  const firstName = identity?.name?.split(/\s+/)[0] ?? "Operator";
+  const inFlight =
+    !!current && current.stage !== "deliverable-ready" && current.stage !== "idle";
+
+  // autosize textarea
+  useEffect(() => {
+    const t = textareaRef.current;
+    if (!t) return;
+    t.style.height = "auto";
+    t.style.height = `${Math.min(t.scrollHeight, 320)}px`;
+  }, [brief]);
+
+  const onDispatch = useCallback(() => {
+    const trimmed = brief.trim();
+    if (!trimmed || inFlight) return;
+    void dispatch(trimmed, mode, quality, null);
+    setBrief("");
+  }, [brief, dispatch, inFlight, mode, quality]);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      onDispatch();
+    }
   };
 
-  const activeStage: MissionStage = current?.stage ?? "idle";
-  const inFlight = !!current && current.stage !== "deliverable-ready" && current.stage !== "idle";
+  const recent = useMemo(() => history.slice(0, 6), [history]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-5 px-5 py-5 md:px-7 md:py-7">
-      <SurfaceHeader
-        eyebrow="mission control · operator console"
-        title={identity ? `${identity.name}'s cockpit` : "Mission cockpit"}
-        sub="Dispatch missions, watch the execution graph, ship named deliverables. Every receipt lands in the Operations Archive."
-        right={
-          <div className="flex items-center gap-2">
-            <RuntimeChip runtime={runtime} />
-            {current && <MissionIdChip id={current.id} />}
-          </div>
-        }
-      />
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-10 px-6 py-12 md:py-16">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-white">
+          What should we ship, {firstName}?
+        </h1>
+        <p className="text-[14px] leading-relaxed text-white/55">
+          Type a brief. Operator Center routes it, picks a model, and returns named deliverables.
+        </p>
+      </header>
 
-      <MarketsLauncher />
-
-      {/* ====================== Top row ====================== */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)_minmax(0,340px)]">
-        {/* Brief column */}
-        <div className="flex flex-col gap-4">
-          <BriefPanel
-            brief={brief}
-            setBrief={setBrief}
-            mode={mode}
-            setMode={setMode}
-            quality={quality}
-            setQuality={setQuality}
-            onDispatch={onDispatch}
-            onCancel={cancel}
-            inFlight={inFlight}
-            runtime={runtime}
-            attachedRepo={repo}
-            brainSourceCount={brainSourceCount}
+      <section className="flex flex-col gap-3">
+        <div className="rounded-2xl bg-white/[0.03] p-3 transition focus-within:bg-white/[0.045]">
+          <textarea
+            ref={textareaRef}
+            value={brief}
+            onChange={(e) => setBrief(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Tell Operator Center what you need…"
+            rows={3}
+            aria-label="Mission brief"
+            className="min-h-[88px] w-full resize-none bg-transparent text-[15px] leading-relaxed text-white placeholder:text-white/35 focus:outline-none"
           />
-          <RepoContextCard value={repo} onChange={setRepo} />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <ChipSelect label="Mode" value={mode} options={MODES} onChange={(v) => setMode(v as Mode)} />
+            <ChipSelect
+              label="Quality"
+              value={quality}
+              options={QUALITIES}
+              onChange={(v) => setQuality(v as Quality)}
+            />
+            <span className="ml-auto flex items-center gap-2">
+              {inFlight && (
+                <button
+                  type="button"
+                  onClick={cancel}
+                  className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] text-white/55 transition hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" /> Cancel
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onDispatch}
+                disabled={!brief.trim() || inFlight}
+                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[13px] font-medium text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/45"
+              >
+                {inFlight ? (
+                  <>
+                    <Loader className="h-3.5 w-3.5 animate-spin" /> Working…
+                  </>
+                ) : (
+                  <>
+                    Dispatch
+                    <span className="hidden items-center gap-0.5 text-[11px] font-normal text-black/50 sm:inline-flex">
+                      <CornerDownLeft className="h-3 w-3" /> ⌘
+                    </span>
+                  </>
+                )}
+              </button>
+            </span>
+          </div>
         </div>
 
-        {/* Execution graph */}
-        <ExecutionGraph activeStage={activeStage} runtime={runtime} mission={current} />
-
-        {/* Brain column */}
-        <div className="flex flex-col gap-4">
-          <BrainGraphPanel />
-          <BrainStateCard />
-        </div>
-      </div>
-
-      {/* ====================== Bottom row ====================== */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)_minmax(0,340px)]">
-        <FlightRecorder mission={current} />
-        <DeliverablesPanel mission={current} />
-        <ArchiveJump history={history} />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// Brief panel
-// ============================================================================
-
-function BriefPanel({
-  brief,
-  setBrief,
-  mode,
-  setMode,
-  quality,
-  setQuality,
-  onDispatch,
-  onCancel,
-  inFlight,
-  runtime,
-  attachedRepo,
-  brainSourceCount
-}: {
-  brief: string;
-  setBrief: (v: string) => void;
-  mode: (typeof MODE_OPTIONS)[number];
-  setMode: (v: (typeof MODE_OPTIONS)[number]) => void;
-  quality: (typeof QUALITY_OPTIONS)[number];
-  setQuality: (v: (typeof QUALITY_OPTIONS)[number]) => void;
-  onDispatch: () => void;
-  onCancel: () => void;
-  inFlight: boolean;
-  runtime: RuntimeStatus;
-  attachedRepo: RepoContextValue | null;
-  brainSourceCount: number;
-}) {
-  return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-      <SectionLabel eyebrow="01 · brief" title="Mission Brief" />
-
-      <div className="flex flex-wrap items-center gap-1">
-        <Chip Icon={Activity} label={`brain · ${brainSourceCount} source${brainSourceCount === 1 ? "" : "s"} attached`} tone="default" />
-        {attachedRepo && (
-          <Chip Icon={Github} label={`repo · ${shortRepo(attachedRepo.url)}`} tone="accent" />
-        )}
-      </div>
-
-      <textarea
-        value={brief}
-        onChange={(e) => setBrief(e.target.value)}
-        placeholder="Paste a messy prompt, an error log, or describe what you need…"
-        rows={9}
-        spellCheck={false}
-        className="no-drag w-full resize-y rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2.5 text-[13px] text-white/90 placeholder:text-white/30 focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/25"
-      />
-
-      <div className="grid grid-cols-2 gap-2">
-        <SelectField label="Mode" value={mode} onChange={(v) => setMode(v as (typeof MODE_OPTIONS)[number])}>
-          {MODE_OPTIONS.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </SelectField>
-        <SelectField label="Quality" value={quality} onChange={(v) => setQuality(v as (typeof QUALITY_OPTIONS)[number])}>
-          {QUALITY_OPTIONS.map((q) => (
-            <option key={q} value={q}>{q}</option>
-          ))}
-        </SelectField>
-      </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        {BLUEPRINTS.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            onClick={() => setBrief(brief ? brief + "\n\n" + b.seed : b.seed)}
-            className="no-drag inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] text-white/80 transition hover:bg-white/[0.06]"
-          >
-            <Sparkles className="h-3 w-3 text-accent/80" />
-            {b.label}
-          </button>
-        ))}
-      </div>
-
-      {inFlight ? (
-        <button
-          type="button"
-          onClick={onCancel}
-          className="no-drag inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500/15 px-3 py-2 text-sm font-semibold text-rose-100 ring-1 ring-rose-400/40 transition hover:bg-rose-500/25"
-        >
-          <X className="h-4 w-4" /> Cancel mission
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={onDispatch}
-          disabled={!brief.trim()}
-          className="no-drag inline-flex items-center justify-center gap-2 rounded-xl bg-accent/90 px-3 py-2 text-sm font-semibold text-white shadow-glow transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Rocket className="h-4 w-4" /> Dispatch Mission
-        </button>
-      )}
-      <p className="text-[10.5px] text-white/40">
-        {runtime === "ready"
-          ? "Engine ready. Stages stream into the execution graph."
-          : "Running on the deterministic local engine. Cloud + Ollama wire in via Settings."}
-      </p>
-    </section>
-  );
-}
-
-// ============================================================================
-// Execution graph
-// ============================================================================
-
-function ExecutionGraph({
-  activeStage,
-  runtime,
-  mission
-}: {
-  activeStage: MissionStage;
-  runtime: RuntimeStatus;
-  mission: MissionReceipt | null;
-}) {
-  const activeIdx = STAGES.indexOf(activeStage);
-  return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.018] p-4 shadow-glass">
-      <SectionLabel
-        eyebrow="02 · execution graph"
-        title="Pipeline"
-        sub={
-          mission
-            ? "Each card lights as the runner advances. Real computation per stage — no fake auto-advance."
-            : "Eight typed stages. Dispatch a brief to light them up."
-        }
-      />
-
-      <ol className="grid grid-cols-1 gap-2 md:grid-cols-2">
-        {STAGES.filter((s) => s !== "idle").map((stage, i) => {
-          const meta = STAGE_META[stage];
-          const realIdx = i + 1;
-          const state: "done" | "current" | "pending" =
-            activeIdx > realIdx
-              ? "done"
-              : activeIdx === realIdx
-                ? "current"
-                : "pending";
-          return <TimelineCard key={stage} code={meta.code} label={meta.label} blurb={meta.blurb} state={state} />;
-        })}
-      </ol>
-
-      {runtime !== "ready" && (
-        <div className="mt-1 flex items-center gap-2 rounded-md border border-amber-400/25 bg-amber-500/[0.05] px-3 py-2 font-mono text-[10.5px] uppercase tracking-wider text-amber-200/85">
-          <Loader className="h-3 w-3" />
-          {runtime === "waiting-for-engine"
-            ? "engine: deterministic local · awaiting first dispatch"
-            : runtime === "local-mode"
-              ? "engine: deterministic local · cloud/ollama not configured"
-              : "engine: offline · no path resolved"}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function TimelineCard({
-  code,
-  label,
-  blurb,
-  state
-}: {
-  code: string;
-  label: string;
-  blurb: string;
-  state: "done" | "current" | "pending";
-}) {
-  return (
-    <li
-      className={clsx(
-        "relative flex flex-col gap-1 rounded-xl border px-3 py-2.5",
-        state === "current"
-          ? "border-accent/40 bg-accent/[0.06] shadow-glow"
-          : state === "done"
-            ? "border-emerald-400/25 bg-emerald-500/[0.04]"
-            : "border-white/8 bg-white/[0.012]"
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em]">
-          <span
-            className={clsx(
-              state === "current"
-                ? "text-accent"
-                : state === "done"
-                  ? "text-emerald-300"
-                  : "text-white/35"
-            )}
-          >
-            {code}
-          </span>
-          <span className="text-white/80">{label}</span>
-        </span>
-        {state === "done" ? (
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />
-        ) : state === "current" ? (
-          <Loader className="h-3.5 w-3.5 animate-pulse text-accent" />
-        ) : (
-          <Circle className="h-3.5 w-3.5 text-white/25" />
-        )}
-      </div>
-      <p className="text-[10.5px] text-white/50">{blurb}</p>
-    </li>
-  );
-}
-
-// ============================================================================
-// Brain graph + state (right column)
-// ============================================================================
-
-function BrainGraphPanel() {
-  return (
-    <section className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.018] p-4 shadow-glass">
-      <SectionLabel eyebrow="03 · brain graph" title="Live graph" sub="Click a node for detail." />
-      <BrainGraph compact />
-      <a
-        href="/brain"
-        className="self-end font-mono text-[10px] uppercase tracking-wider text-white/55 hover:text-white"
-      >
-        full graph →
-      </a>
-    </section>
-  );
-}
-
-function BrainStateCard() {
-  const identity = useBrainStore((s) => s.identity);
-  const sources = useBrainStore((s) => s.memorySources);
-  const engines = useBrainStore((s) => s.engines);
-  const missionCount = useBrainStore((s) => s.missionCount);
-  const demo = useBrainStore((s) => s.demo);
-
-  return (
-    <section className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-      <SectionLabel
-        eyebrow="04 · brain state"
-        title={identity ? identity.name : "No brain"}
-        sub={identity ? `${identity.mode}${demo ? " · demo data" : ""}` : "Bootstrap a brain to populate this card."}
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <Stat label="missions" value={String(missionCount)} />
-        <Stat label="sources" value={String(sources.length)} />
-        <Stat label="engines" value={String(engines.length)} />
-        <Stat label="demo" value={demo ? "yes" : "no"} />
-      </div>
-    </section>
-  );
-}
-
-// ============================================================================
-// Flight recorder (bottom-left)
-// ============================================================================
-
-function FlightRecorder({ mission }: { mission: MissionReceipt | null }) {
-  return (
-    <section className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.018] p-4">
-      <SectionLabel
-        eyebrow="05 · flight recorder"
-        title="Live event log"
-        sub="Every stage event is logged with its timestamp. Replayable from any receipt."
-      />
-      <div className="rounded-xl border border-white/8 bg-black/30 p-3">
-        {!mission ? (
-          <ul className="flex flex-col gap-1 font-mono text-[10.5px] text-white/55">
-            <LogLine kind="info" tag="boot" message="Operator Core shell ready" />
-            <LogLine kind="info" tag="brain" message="Brain identity loaded from local store" />
-            <LogLine kind="info" tag="route" message="Local-first · deterministic engine standby" />
-            <LogLine kind="info" tag="safety" message="Screen armed" />
-          </ul>
-        ) : (
-          <ul className="flex max-h-[260px] flex-col gap-1 overflow-auto font-mono text-[10.5px]">
-            {mission.events.map((e, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="text-white/30">{ts(e.at)}</span>
-                <LogLineInner kind={e.kind} tag={e.tag} message={e.message} />
+        {brief.trim().length === 0 && !current && (
+          <ul className="flex flex-wrap gap-2 pt-1">
+            {SUGGESTIONS.map((s) => (
+              <li key={s}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBrief(s);
+                    textareaRef.current?.focus();
+                  }}
+                  className="rounded-full bg-white/[0.025] px-3 py-1.5 text-[12.5px] text-white/65 transition hover:bg-white/[0.05] hover:text-white"
+                >
+                  {s}
+                </button>
               </li>
             ))}
           </ul>
         )}
-      </div>
-    </section>
-  );
-}
+      </section>
 
-function ts(at: number) {
-  const d = new Date(at);
-  const m = String(d.getMinutes()).padStart(2, "0");
-  const s = String(d.getSeconds()).padStart(2, "0");
-  const ms = String(d.getMilliseconds()).padStart(3, "0");
-  return `${m}:${s}.${ms}`;
-}
-
-// ============================================================================
-// Deliverables
-// ============================================================================
-
-function DeliverablesPanel({ mission }: { mission: MissionReceipt | null }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const deliverables = mission?.deliverables ?? [];
-
-  return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-      <SectionLabel
-        eyebrow="06 · deliverables"
-        title="Mission Output"
-        sub="Real artifacts generated by the deterministic engine. Each card downloads or copies cleanly."
-      />
-
-      {deliverables.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.012] p-4 text-center">
-          <FileText className="mx-auto h-5 w-5 text-white/35" />
-          <p className="mt-1 text-[12px] text-white/75">No deliverables yet.</p>
-          <p className="mt-1 text-[10.5px] text-white/45">
-            Dispatch a mission to fill this column.
-          </p>
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {deliverables.map((d) => (
-            <DeliverableCard
-              key={d.id}
-              d={d}
-              open={open === d.id}
-              onToggle={() => setOpen(open === d.id ? null : d.id)}
-            />
-          ))}
-        </ul>
+      {current && (
+        <ActiveMission
+          mission={current}
+          onOpenReceipt={() => setOpenMission(current)}
+        />
       )}
 
-      <MissionReceiptCard mission={mission} />
+      {recent.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-[13px] font-medium text-white/45">Recent</h2>
+          <ul className="flex flex-col">
+            {recent.map((m, i) => (
+              <li key={m.id}>
+                <button
+                  type="button"
+                  onClick={() => setOpenMission(m)}
+                  className={clsx(
+                    "flex w-full items-center justify-between gap-3 py-3 text-left transition hover:bg-white/[0.02]",
+                    i > 0 && "border-t border-white/[0.04]"
+                  )}
+                >
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="line-clamp-1 text-[14px] text-white/90">{m.brief || "(empty brief)"}</span>
+                    <span className="text-[11.5px] text-white/40">
+                      {m.deliverables.length} deliverable{m.deliverables.length === 1 ? "" : "s"} ·
+                      {" "}
+                      {formatRelative(m.endedAt ?? m.startedAt)}
+                      {m.score != null && <> · score {m.score}/100</>}
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-white/30" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {openMission && (
+        <ReceiptSheet receipt={openMission} onClose={() => setOpenMission(null)} />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Active mission · quiet inline trace
+// ---------------------------------------------------------------------------
+
+function ActiveMission({
+  mission,
+  onOpenReceipt
+}: {
+  mission: MissionReceipt;
+  onOpenReceipt: () => void;
+}) {
+  const done = mission.stage === "deliverable-ready";
+  const stageIndex = STAGES.indexOf(mission.stage);
+
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl bg-white/[0.018] p-4">
+      <div className="flex items-center gap-2">
+        <span
+          className={clsx(
+            "h-1.5 w-1.5 rounded-full",
+            done ? "bg-emerald-300" : "animate-pulse bg-accent"
+          )}
+        />
+        <span className="text-[13px] font-medium text-white/85">
+          {done ? "Mission complete" : STAGE_META[mission.stage].label}
+        </span>
+        <span className="ml-auto text-[11.5px] text-white/35">{mission.id}</span>
+      </div>
+      <p className="line-clamp-2 text-[13px] text-white/55">{mission.brief}</p>
+
+      <ol className="flex flex-col">
+        {STAGES.filter((s) => s !== "idle").map((s, i) => {
+          const reached = STAGES.indexOf(s) <= stageIndex || done;
+          const active = mission.stage === s && !done;
+          return (
+            <li
+              key={s}
+              className={clsx(
+                "flex items-center gap-3 py-1.5 text-[12.5px]",
+                reached ? "text-white/80" : "text-white/30"
+              )}
+            >
+              <span
+                className={clsx(
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px]",
+                  active
+                    ? "bg-accent text-black"
+                    : reached
+                      ? "bg-emerald-400/15 text-emerald-300"
+                      : "bg-white/[0.05] text-white/35"
+                )}
+              >
+                {reached && !active ? "✓" : i + 1}
+              </span>
+              <span>{STAGE_META[s].label}</span>
+            </li>
+          );
+        })}
+      </ol>
+
+      {done && (
+        <div className="flex items-center gap-3 pt-1">
+          <span className="text-[12.5px] text-white/65">
+            {mission.deliverables.length} deliverable{mission.deliverables.length === 1 ? "" : "s"} ready
+          </span>
+          <button
+            type="button"
+            onClick={onOpenReceipt}
+            className="ml-auto inline-flex items-center gap-1 text-[12.5px] text-white/85 transition hover:text-white"
+          >
+            Open receipt <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
     </section>
   );
 }
 
-function DeliverableCard({
-  d,
-  open,
-  onToggle
-}: {
-  d: Deliverable;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  const onCopy = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      void navigator.clipboard.writeText(d.content);
-    }
-  };
-  const onDownload = () => {
-    if (typeof window === "undefined") return;
-    const ext = d.format === "shell" ? "sh" : d.format === "json" ? "json" : d.format === "markdown" ? "md" : "txt";
-    const blob = new Blob([d.content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${d.label.toLowerCase().replace(/\s+/g, "-")}.${ext}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+// ---------------------------------------------------------------------------
+// Receipt sheet (slide-over)
+// ---------------------------------------------------------------------------
+
+function ReceiptSheet({ receipt, onClose }: { receipt: MissionReceipt; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   return (
-    <li className="rounded-xl border border-white/8 bg-white/[0.012]">
+    <div
+      role="dialog"
+      aria-label={`Mission ${receipt.id}`}
+      className="fixed inset-0 z-50 flex justify-end"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/45" />
+      <aside
+        onClick={(e) => e.stopPropagation()}
+        className="relative ml-auto flex h-full w-full max-w-[640px] flex-col gap-5 overflow-y-auto bg-[#0c0e13] px-6 py-6 shadow-2xl"
+      >
+        <header className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="text-[11px] text-white/40">{receipt.id}</span>
+            <h2 className="line-clamp-2 text-[18px] font-semibold leading-snug text-white">
+              {receipt.brief || "(empty brief)"}
+            </h2>
+            <span className="text-[12px] text-white/45">
+              {receipt.mode} · {receipt.quality}
+              {receipt.score != null && <> · score {receipt.score}/100</>}
+              {receipt.elapsedMs != null && <> · {(receipt.elapsedMs / 1000).toFixed(1)}s</>}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-md p-1 text-white/55 transition hover:bg-white/[0.05] hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+
+        <section className="flex flex-col gap-2">
+          <h3 className="text-[12px] font-medium uppercase tracking-wider text-white/35">
+            Deliverables
+          </h3>
+          {receipt.deliverables.length === 0 ? (
+            <p className="text-[13px] text-white/45">No deliverables.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {receipt.deliverables.map((d) => (
+                <DeliverableRow key={d.id} label={d.label} blurb={d.blurb} content={d.content} />
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="flex flex-col gap-2">
+          <h3 className="text-[12px] font-medium uppercase tracking-wider text-white/35">
+            Trace
+          </h3>
+          <ul className="flex flex-col gap-1">
+            {receipt.events.slice(-12).map((e, i) => (
+              <li key={i} className="flex items-baseline gap-2 text-[12px]">
+                <span className="text-white/35">{new Date(e.at).toLocaleTimeString("en-GB", { hour12: false })}</span>
+                <span
+                  className={clsx(
+                    "shrink-0",
+                    e.kind === "ok"
+                      ? "text-emerald-300/80"
+                      : e.kind === "warn"
+                        ? "text-amber-300/80"
+                        : e.kind === "err"
+                          ? "text-rose-300/80"
+                          : "text-white/45"
+                  )}
+                >
+                  {e.tag}
+                </span>
+                <span className="min-w-0 flex-1 text-white/70">{e.message}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <footer className="mt-auto flex flex-wrap items-center gap-3 pt-4">
+          <Link
+            to="/library"
+            onClick={onClose}
+            className="inline-flex items-center gap-1 text-[12.5px] text-white/55 transition hover:text-white"
+          >
+            <FileText className="h-3.5 w-3.5" /> Open in Library
+          </Link>
+        </footer>
+      </aside>
+    </div>
+  );
+}
+
+function DeliverableRow({ label, blurb, content }: { label: string; blurb: string; content: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="rounded-xl bg-white/[0.025] p-3">
       <button
         type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 text-left"
       >
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[12.5px] font-semibold text-white">{d.label}</span>
-          <span className="text-[10.5px] text-white/50">{d.blurb}</span>
-        </div>
-        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/55">
-          {d.format}
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[13.5px] font-medium text-white">{label}</span>
+          <span className="line-clamp-1 text-[12px] text-white/50">{blurb}</span>
         </span>
+        <ChevronDown
+          className={clsx(
+            "h-4 w-4 shrink-0 text-white/40 transition",
+            open && "rotate-180"
+          )}
+        />
       </button>
       {open && (
-        <div className="border-t border-white/6 p-3">
-          <pre className="max-h-[180px] overflow-auto rounded-md border border-white/8 bg-black/40 p-2 font-mono text-[10.5px] leading-snug text-white/80">
-            {d.content}
-          </pre>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <CodeOperatorActions label={d.label} content={d.content} />
-            <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onCopy}
-              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[10.5px] font-medium text-white/80 hover:bg-white/[0.06]"
-            >
-              Copy
-            </button>
-            <button
-              type="button"
-              onClick={onDownload}
-              className="inline-flex items-center gap-1 rounded-md bg-accent/85 px-2 py-1 text-[10.5px] font-semibold text-white shadow-glow hover:bg-accent"
-            >
-              <Download className="h-3 w-3" /> Download
-            </button>
-            </div>
-          </div>
-        </div>
+        <pre className="mt-3 max-h-[260px] overflow-auto rounded-lg bg-black/40 p-3 text-[12px] leading-relaxed text-white/85">
+          {content}
+        </pre>
       )}
     </li>
   );
 }
 
-function MissionReceiptCard({ mission }: { mission: MissionReceipt | null }) {
-  return (
-    <article className="rounded-xl border border-accent/25 bg-accent/[0.04] p-3 shadow-glow">
-      <header className="mb-1.5 flex items-center justify-between">
-        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-accent">
-          mission receipt
-        </span>
-        {mission && <MissionIdChip id={mission.id} />}
-      </header>
-      <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-        {[
-          ["mode", mission?.mode ?? "—"],
-          ["quality", mission?.quality ?? "—"],
-          ["stage", mission?.stage ?? "idle"],
-          ["score", mission?.score ? `${mission.score}/100` : "—"],
-          ["elapsed", mission?.elapsedMs ? `${mission.elapsedMs}ms` : "—"],
-          ["memory", mission ? `${mission.memoryMatches ?? 0} match` : "—"]
-        ].map(([k, v]) => (
-          <li key={k} className="flex items-center justify-between text-[10.5px]">
-            <span className="font-mono uppercase tracking-wider text-white/40">{k}</span>
-            <span className="font-mono text-white/85">{v}</span>
-          </li>
-        ))}
-      </ul>
-    </article>
-  );
-}
+// ---------------------------------------------------------------------------
+// Chip select
+// ---------------------------------------------------------------------------
 
-// ============================================================================
-// Archive jump (bottom-right)
-// ============================================================================
-
-function ArchiveJump({ history }: { history: MissionReceipt[] }) {
-  return (
-    <section className="flex flex-col gap-2 rounded-2xl border border-white/8 bg-white/[0.018] p-4">
-      <SectionLabel
-        eyebrow="07 · operations archive"
-        title="Recent missions"
-        sub="The Library page holds every receipt. Quick jumps here."
-      />
-      {history.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.008] p-4 text-center">
-          <p className="text-[12px] text-white/75">Archive empty.</p>
-          <p className="mt-1 text-[10.5px] text-white/45">
-            Completed missions land here automatically.
-          </p>
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-1.5">
-          {history.slice(0, 6).map((m) => (
-            <li
-              key={m.id}
-              className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.012] px-2 py-1 text-[11.5px]"
-            >
-              <span className="truncate text-white/80">{m.brief.slice(0, 56)}</span>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-white/45">
-                {m.stage === "deliverable-ready" ? "ready" : m.stage}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <a
-        href="/library"
-        className="self-start font-mono text-[10px] uppercase tracking-wider text-white/55 hover:text-white"
-      >
-        open archive →
-      </a>
-    </section>
-  );
-}
-
-// ============================================================================
-// Atoms
-// ============================================================================
-
-function SectionLabel({
-  eyebrow,
-  title,
-  sub
-}: {
-  eyebrow: string;
-  title: string;
-  sub?: string;
-}) {
-  return (
-    <header className="flex flex-col gap-0.5 border-b border-white/5 pb-2">
-      <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/40">
-        {eyebrow}
-      </span>
-      <span className="text-[13px] font-semibold text-white">{title}</span>
-      {sub && <p className="text-[10.5px] text-white/50">{sub}</p>}
-    </header>
-  );
-}
-
-function SelectField({
+function ChipSelect({
   label,
   value,
-  onChange,
-  children
+  options,
+  onChange
 }: {
   label: string;
   value: string;
+  options: readonly string[];
   onChange: (v: string) => void;
-  children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1 font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">
-      {label}
+    <label className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 text-[12px] text-white/65 transition hover:bg-white/[0.06]">
+      <span className="text-white/40">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="no-drag rounded-md border border-white/8 bg-white/[0.025] px-2 py-1.5 font-sans text-[12px] normal-case text-white focus:border-accent/40 focus:outline-none"
+        className="bg-transparent text-white focus:outline-none"
+        aria-label={label}
       >
-        {children}
+        {options.map((o) => (
+          <option key={o} value={o} className="bg-[#0c0e13]">
+            {o}
+          </option>
+        ))}
       </select>
     </label>
   );
 }
 
-function LogLine({
-  kind,
-  tag,
-  message
-}: {
-  kind: "ok" | "info" | "warn" | "err";
-  tag: string;
-  message: string;
-}) {
-  return (
-    <li className="flex items-center gap-2">
-      <LogLineInner kind={kind} tag={tag} message={message} />
-    </li>
-  );
+// ---------------------------------------------------------------------------
+// Misc
+// ---------------------------------------------------------------------------
+
+function formatRelative(ts: number): string {
+  const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function LogLineInner({
-  kind,
-  tag,
-  message
-}: {
-  kind: "ok" | "info" | "warn" | "err";
-  tag: string;
-  message: string;
-}) {
-  const tone = {
-    ok: "text-emerald-300/80",
-    info: "text-white/45",
-    warn: "text-amber-300/80",
-    err: "text-rose-300/80"
-  }[kind];
-  return (
-    <>
-      <span className={clsx("font-mono uppercase tracking-wider", tone)}>{kind}</span>
-      <span className="rounded border border-white/10 bg-white/[0.03] px-1 py-px text-[9px] uppercase tracking-wider text-white/45">
-        {tag}
-      </span>
-      <span className="text-white/65">{message}</span>
-    </>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5 rounded-md border border-white/8 bg-white/[0.012] px-2 py-1.5">
-      <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">{label}</span>
-      <span className="text-[14px] font-semibold text-white">{value}</span>
-    </div>
-  );
-}
-
-function Chip({
-  Icon,
-  label,
-  tone
-}: {
-  Icon: typeof Activity;
-  label: string;
-  tone: "default" | "accent";
-}) {
-  return (
-    <span
-      className={clsx(
-        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider",
-        tone === "accent"
-          ? "border-accent/30 bg-accent/[0.08] text-accent"
-          : "border-white/10 bg-white/[0.03] text-white/65"
-      )}
-    >
-      <Icon className="h-3 w-3" /> {label}
-    </span>
-  );
-}
-
-function RuntimeChip({ runtime }: { runtime: RuntimeStatus }) {
-  const meta = {
-    ready: { tone: "ok" as const, label: "engine ready", Icon: ShieldCheck },
-    "waiting-for-engine": { tone: "warn" as const, label: "deterministic standby", Icon: Loader },
-    "local-mode": { tone: "ok" as const, label: "local · deterministic", Icon: Cpu },
-    offline: { tone: "muted" as const, label: "offline", Icon: Activity }
-  }[runtime];
-  const cls = {
-    ok: "border-emerald-400/30 bg-emerald-500/[0.06] text-emerald-200",
-    warn: "border-amber-400/35 bg-amber-500/[0.06] text-amber-200",
-    muted: "border-white/10 bg-white/[0.03] text-white/55"
-  }[meta.tone];
-  const { Icon } = meta;
-  return (
-    <span
-      className={clsx(
-        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-wider",
-        cls
-      )}
-    >
-      <Icon className="h-3 w-3" /> {meta.label}
-    </span>
-  );
-}
-
-function MissionIdChip({ id }: { id: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/[0.08] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent">
-      <ArrowRight className="h-3 w-3" />
-      {id}
-    </span>
-  );
-}
-
-function repoToString(r: RepoContextValue) {
-  const branch = r.branch ? `#${r.branch}` : "";
-  const note = r.note ? ` — ${r.note}` : "";
-  return `${r.url}${branch}${note}`;
-}
-
-function shortRepo(url: string) {
-  return url.replace(/^https?:\/\//, "").replace(/\.git$/, "").slice(0, 36);
-}
