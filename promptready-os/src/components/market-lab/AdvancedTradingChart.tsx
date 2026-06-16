@@ -152,7 +152,7 @@ export function AdvancedTradingChart({ symbol, height }: Props) {
     : "https://www.tradingview.com";
 
   return (
-    <section className="flex min-h-0 min-w-0 max-w-full flex-col overflow-hidden rounded-md border border-white/10 bg-black/60">
+    <section className="flex h-full min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden rounded-md border border-white/10 bg-black/60">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/10 px-2 py-1.5">
         <div className="flex min-w-0 items-center gap-2">
           <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/90">

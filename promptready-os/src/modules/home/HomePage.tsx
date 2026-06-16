@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Sparkles, Terminal, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRight, Brain, LineChart, Rewind, ShieldAlert, Sparkles, Terminal, TrendingDown, TrendingUp } from "lucide-react";
 import { useBrainStore } from "@/store/brain";
 import { useCryptoFeed, useNewsFeed } from "@/services/marketFeed";
 
@@ -90,7 +90,7 @@ export default function HomePage() {
   const feedsOnline = crypto.state === "ok" || news.state === "ok";
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[820px] flex-col justify-center gap-12 px-8 py-16">
+    <div className="mx-auto flex h-full w-full max-w-[920px] flex-col gap-12 px-8 py-14">
       <header className="flex flex-col gap-3">
         <h1 className="text-[34px] font-semibold leading-tight tracking-tight text-white">
           {greeting}, {firstName}.
@@ -103,6 +103,36 @@ export default function HomePage() {
             : `${signals.length} thing${signals.length === 1 ? "" : "s"} worth a look right now.`}
         </p>
       </header>
+
+      <section aria-label="Markets" className="flex flex-col gap-4">
+        <h2 className="text-[13px] font-medium uppercase tracking-wider text-white/45">Markets</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <MarketCard
+            to="/markets"
+            title="Markets"
+            blurb="Full chart workspace · TradingView hero"
+            Icon={LineChart}
+          />
+          <MarketCard
+            to="/market-intel"
+            title="Market Intel"
+            blurb="Why a move happened, sourced"
+            Icon={Brain}
+          />
+          <MarketCard
+            to="/move-replay"
+            title="Move Replay"
+            blurb="24h / 7d / 30d as a timeline"
+            Icon={Rewind}
+          />
+          <MarketCard
+            to="/market-briefing"
+            title="Market Briefing"
+            blurb="Risks · opportunities · today"
+            Icon={ShieldAlert}
+          />
+        </div>
+      </section>
 
       {signals.length > 0 && (
         <ul className="flex flex-col">
@@ -160,6 +190,36 @@ function ToneIcon({ tone }: { tone: Signal["tone"] }) {
   if (tone === "ok") return <TrendingUp className="mt-1 h-4 w-4 shrink-0 text-emerald-300/80" />;
   if (tone === "warn") return <TrendingDown className="mt-1 h-4 w-4 shrink-0 text-rose-300/80" />;
   return null;
+}
+
+function MarketCard({
+  to,
+  title,
+  blurb,
+  Icon
+}: {
+  to: string;
+  title: string;
+  blurb: string;
+  Icon: typeof Brain;
+}) {
+  return (
+    <Link
+      to={to}
+      className="group flex min-w-0 flex-col gap-3 rounded-2xl bg-white/[0.025] p-4 transition hover:bg-white/[0.05]"
+    >
+      <span className="flex items-center justify-between">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.06] text-white/85 group-hover:text-accent">
+          <Icon className="h-4 w-4" />
+        </span>
+        <ArrowRight className="h-3.5 w-3.5 text-white/30 transition group-hover:translate-x-0.5 group-hover:text-accent" />
+      </span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[14.5px] font-medium text-white">{title}</span>
+        <span className="text-[12px] leading-snug text-white/55">{blurb}</span>
+      </span>
+    </Link>
+  );
 }
 
 function timeAgo(ts: number, nowMs: number): string {

@@ -2,13 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import {
-  Bookmark,
-  ChevronDown,
-  ChevronUp,
-  ClipboardList,
-  PenLine
-} from "lucide-react";
 import { AdvancedTradingChart } from "@/components/market-lab/AdvancedTradingChart";
 import { useCryptoFeed, useNewsFeed } from "@/services/marketFeed";
 import { binancePairFor, fetchKlines, type Candle } from "@/services/providers/binance";
@@ -28,7 +21,6 @@ import { binancePairFor, fetchKlines, type Candle } from "@/services/providers/b
 const WATCHLIST: string[] = ["BTC", "ETH", "SOL", "BNB", "XRP", "AAPL", "TSLA", "NVDA"];
 
 type RightTab = "intel" | "replay" | "briefing" | "alerts";
-type DrawerTab = "journal" | "notes" | "setups";
 
 const RIGHT_TABS: Array<{ id: RightTab; label: string }> = [
   { id: "intel", label: "Intel" },
@@ -37,16 +29,12 @@ const RIGHT_TABS: Array<{ id: RightTab; label: string }> = [
   { id: "alerts", label: "Alerts" }
 ];
 
-const DRAWER_TABS: Array<{ id: DrawerTab; label: string; Icon: typeof PenLine }> = [
-  { id: "journal", label: "Journal", Icon: ClipboardList },
-  { id: "notes", label: "Notes", Icon: PenLine },
-  { id: "setups", label: "Saved setups", Icon: Bookmark }
-];
-
 const SYMBOL_PARAM_KEY = "symbol";
+const TAB_PARAM_KEY = "tab";
 const SYMBOL_STORAGE_KEY = "operator.markets.symbol";
-const DRAWER_TAB_KEY = "operator.markets.drawerTab";
 const RIGHT_TAB_KEY = "operator.markets.rightTab";
+
+const VALID_TABS: RightTab[] = ["intel", "replay", "briefing", "alerts"];
 
 function readStorage(key: string, fallback: string): string {
   if (typeof window === "undefined") return fallback;
@@ -73,14 +61,16 @@ export default function MarketLabPage() {
     return (fromUrl ?? readStorage(SYMBOL_STORAGE_KEY, "BTC")).toUpperCase();
   }, []);
 
+  const initialTab = useMemo<RightTab>(() => {
+    if (typeof window === "undefined") return "intel";
+    const fromUrl = new URL(window.location.href).searchParams.get(TAB_PARAM_KEY);
+    if (fromUrl && (VALID_TABS as string[]).includes(fromUrl)) return fromUrl as RightTab;
+    const stored = readStorage(RIGHT_TAB_KEY, "intel");
+    return (VALID_TABS as string[]).includes(stored) ? (stored as RightTab) : "intel";
+  }, []);
+
   const [symbol, setSymbol] = useState<string>(initialSymbol);
-  const [rightTab, setRightTab] = useState<RightTab>(
-    (readStorage(RIGHT_TAB_KEY, "intel") as RightTab) || "intel"
-  );
-  const [drawerTab, setDrawerTab] = useState<DrawerTab>(
-    (readStorage(DRAWER_TAB_KEY, "journal") as DrawerTab) || "journal"
-  );
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [rightTab, setRightTab] = useState<RightTab>(initialTab);
 
   useEffect(() => {
     writeStorage(SYMBOL_STORAGE_KEY, symbol);
@@ -91,19 +81,22 @@ export default function MarketLabPage() {
     }
   }, [symbol]);
   useEffect(() => writeStorage(RIGHT_TAB_KEY, rightTab), [rightTab]);
-  useEffect(() => writeStorage(DRAWER_TAB_KEY, drawerTab), [drawerTab]);
 
+  // Layout · hero chart.
+  //   * grid: 1fr main column + fixed 280px rail (max).
+  //   * full height = whatever the shell hands us via h-full.
+  //   * no symbol bar above the chart, no bottom drawer — those used
+  //     to steal ~80px of vertical space. The chart now owns
+  //     calc(100vh - header - small padding).
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <section className="grid min-h-0 flex-1 grid-cols-1 gap-8 px-6 pt-4 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <main className="flex min-h-0 min-w-0 flex-col gap-3">
-          <SymbolBar symbol={symbol} onChange={setSymbol} />
-          <div className="min-h-0 flex-1">
-            <AdvancedTradingChart symbol={symbol} />
-          </div>
+      <section className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-4 pt-2 pb-2 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <main className="flex min-h-0 min-w-0 flex-col">
+          <AdvancedTradingChart symbol={symbol} />
         </main>
 
-        <aside className="flex min-h-0 min-w-0 flex-col gap-5 pb-2">
+        <aside className="flex min-h-0 min-w-0 flex-col gap-4 pb-1">
+          <SymbolStrip symbol={symbol} />
           <Watchlist symbol={symbol} onSelect={setSymbol} />
           <RightTabBar active={rightTab} onChange={setRightTab} />
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
@@ -114,65 +107,40 @@ export default function MarketLabPage() {
           </div>
         </aside>
       </section>
-
-      <Drawer
-        open={drawerOpen}
-        onToggle={() => setDrawerOpen((v) => !v)}
-        tab={drawerTab}
-        onTab={setDrawerTab}
-      />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Top symbol bar (compact, premium)
+// Symbol strip (lives in the right rail; the chart owns the hero area)
 // ---------------------------------------------------------------------------
 
-function SymbolBar({ symbol, onChange }: { symbol: string; onChange: (s: string) => void }) {
+function SymbolStrip({ symbol }: { symbol: string }) {
   const crypto = useCryptoFeed();
   const quote = crypto.quotes.find((q) => q.symbol === symbol);
   const change = quote?.change24h ?? null;
   const up = change != null && change >= 0;
-
   return (
-    <header className="flex min-w-0 items-end justify-between gap-4">
-      <div className="flex min-w-0 items-end gap-3">
-        <h1 className="text-[26px] font-semibold leading-none text-white">{symbol}</h1>
+    <header className="flex min-w-0 flex-col gap-1 pt-1">
+      <span className="flex items-baseline gap-2">
+        <h1 className="text-[18px] font-semibold leading-none text-white">{symbol}</h1>
         {quote?.price != null && (
-          <span className="text-[15px] tabular-nums text-white/70">
+          <span className="text-[13px] tabular-nums text-white/65">
             ${quote.price.toLocaleString()}
           </span>
         )}
-        {change != null && (
-          <span
-            className={clsx(
-              "text-[13px] font-medium tabular-nums",
-              up ? "text-emerald-300" : "text-rose-300"
-            )}
-          >
-            {up ? "+" : ""}
-            {change.toFixed(2)}% · 24h
-          </span>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        {WATCHLIST.slice(0, 6).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => onChange(s)}
-            className={clsx(
-              "rounded-md px-2 py-1 text-[12px] font-medium transition",
-              s === symbol
-                ? "bg-white/[0.08] text-white"
-                : "text-white/45 hover:bg-white/[0.04] hover:text-white/80"
-            )}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      </span>
+      {change != null && (
+        <span
+          className={clsx(
+            "text-[12px] font-medium tabular-nums",
+            up ? "text-emerald-300" : "text-rose-300"
+          )}
+        >
+          {up ? "+" : ""}
+          {change.toFixed(2)}% · 24h
+        </span>
+      )}
     </header>
   );
 }
@@ -454,109 +422,6 @@ function AlertsTab() {
       <Block title="Watch rules">
         <EmptyHint text="No rules yet. The evaluator that fires them is coming." />
       </Block>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Drawer
-// ---------------------------------------------------------------------------
-
-function Drawer({
-  open,
-  onToggle,
-  tab,
-  onTab
-}: {
-  open: boolean;
-  onToggle: () => void;
-  tab: DrawerTab;
-  onTab: (t: DrawerTab) => void;
-}) {
-  return (
-    <div
-      className={clsx(
-        "shrink-0 border-t border-white/[0.06] transition-[max-height] duration-300 ease-out",
-        open ? "max-h-[280px]" : "max-h-[40px]"
-      )}
-    >
-      <div className="flex items-center gap-2 px-6 py-2">
-        <div className="flex items-center gap-1">
-          {DRAWER_TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                onTab(t.id);
-                if (!open) onToggle();
-              }}
-              className={clsx(
-                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12.5px] transition",
-                tab === t.id && open
-                  ? "bg-white/[0.06] text-white"
-                  : "text-white/45 hover:bg-white/[0.04] hover:text-white/80"
-              )}
-            >
-              <t.Icon className="h-3.5 w-3.5" />
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={open ? "Close drawer" : "Open drawer"}
-          className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md text-white/45 transition hover:bg-white/[0.04] hover:text-white"
-        >
-          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-        </button>
-      </div>
-      {open && (
-        <div className="px-6 pb-4">
-          <DrawerContent tab={tab} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DrawerContent({ tab }: { tab: DrawerTab }) {
-  if (tab === "journal") {
-    return (
-      <DrawerEmpty
-        icon={ClipboardList}
-        title="Journal"
-        body="Write a thesis you can review honestly later. Saved on this device only."
-      />
-    );
-  }
-  if (tab === "notes") {
-    return (
-      <DrawerEmpty
-        icon={PenLine}
-        title="Notes"
-        body="Quick notes you want next to the chart. Saved on this device only."
-      />
-    );
-  }
-  return (
-    <DrawerEmpty
-      icon={Bookmark}
-      title="Saved setups"
-      body="Bookmark a chart layout, watchlist, or thesis combo. Saved on this device only."
-    />
-  );
-}
-
-function DrawerEmpty({ icon: Icon, title, body }: { icon: typeof PenLine; title: string; body: string }) {
-  return (
-    <div className="flex flex-col items-start gap-2 rounded-lg bg-white/[0.018] px-4 py-5">
-      <span className="flex items-center gap-2 text-white/80">
-        <Icon className="h-4 w-4" />
-        <span className="text-[14px] font-medium">{title}</span>
-      </span>
-      <p className="max-w-md text-[13px] leading-relaxed text-white/55">{body}</p>
-      <span className="text-[11.5px] text-white/35">Coming soon</span>
     </div>
   );
 }

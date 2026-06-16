@@ -20,10 +20,10 @@ interface Card {
 
 const CARDS: Card[] = [
   {
-    to: "/market-lab",
-    title: "Market Lab",
+    to: "/markets",
+    title: "Markets",
     Icon: LineChart,
-    blurb: "Charts and order flow. TradingView in the main slot."
+    blurb: "Live chart workspace. TradingView in the hero slot."
   },
   {
     to: "/market-intel",
