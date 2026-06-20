@@ -3,8 +3,6 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import {
-  AppWindow,
-  BookOpen,
   CircleDot,
   LineChart,
   Mic,
@@ -20,10 +18,12 @@ import { useUiModeStore } from "@/store/uiMode";
 /**
  * Shell layout · Operator Center.
  *
- * One rail of five things, one quiet header. Global search resolves a
- * ticker to /markets, anything else opens an external browser search.
- * Voice is reachable via the mic button — when no ElevenLabs provider
- * is configured we surface that state honestly rather than fake it.
+ * One quiet rail. The logo at the top is Home (/). Three icons under
+ * it cover the only surfaces a customer opens by intent: Console,
+ * Markets, Settings. Everything else lives in Cmd+K. Global search
+ * resolves a ticker to /markets and anything else to an external
+ * browser search. Voice is the header mic — honest placeholder until
+ * ElevenLabs is connected in Settings.
  */
 
 interface NavItem {
@@ -33,10 +33,8 @@ interface NavItem {
 }
 
 const PRIMARY_NAV: NavItem[] = [
-  { to: "/markets", label: "Markets", Icon: LineChart },
   { to: "/console", label: "Console", Icon: Terminal },
-  { to: "/library", label: "Library", Icon: BookOpen },
-  { to: "/launchpad", label: "Launchpad", Icon: AppWindow },
+  { to: "/markets", label: "Markets", Icon: LineChart },
   { to: "/settings", label: "Settings", Icon: SettingsIcon }
 ];
 
