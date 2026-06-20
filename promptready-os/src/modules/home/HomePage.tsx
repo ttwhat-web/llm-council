@@ -10,6 +10,9 @@ import {
   STAGE_META,
   type MissionStage
 } from "@/store/mission";
+import { useSourcesStore } from "@/store/sources";
+import type { BriefingItem as RealBriefingItem } from "@/services/briefing/types";
+import type { PanelData as RealPanelData } from "@/services/briefing/engine";
 
 /**
  * Home · Operator Center morning briefing.
@@ -32,9 +35,9 @@ import {
  * sample data. Never used outside that flag.
  */
 
-type FocusKey = "customers" | "revenue" | "tasks" | "lines";
+type FocusKey = "customers" | "revenue" | "tasks" | "calendar";
 
-const FOCUS_KEYS: FocusKey[] = ["customers", "revenue", "tasks", "lines"];
+const FOCUS_KEYS: FocusKey[] = ["customers", "revenue", "tasks", "calendar"];
 
 function isFocusKey(v: string | null): v is FocusKey {
   return !!v && (FOCUS_KEYS as string[]).includes(v);
@@ -121,12 +124,12 @@ const DEMO_BRIEFING: BriefingItem[] = [
     verb: "Teklifleri aç"
   },
   {
-    id: "lines",
-    focus: "lines",
-    fact: "Almanya hattında son 14 günde rezervasyon %18 düştü. Diğer üç hat yatay ya da artıyor.",
-    why: "İki büyük Alman acentesi (Klein Reisen, Müller GmbH) hafta 2'de göndermeyi kesti. Lufthansa fiyatı yükseldi ama diğer hatlar etkilenmedi — fiyat değil, kanal.",
-    recommendation: "Klein Reisen'e bugün yaz. Müller GmbH için bir gün bekle.",
-    verb: "Hattı aç"
+    id: "calendar",
+    focus: "calendar",
+    fact: "Yarın 10:30'da iki toplantı çakışıyor: 'Bridge demo' ve 'Müller call'.",
+    why: "Her ikisi de takvimde aktif. Birisi reddedilmedikçe bir tarafı bekletmiş olursun ve yer açtığınla aramız soğur.",
+    recommendation: "Bridge'i 11:00'a kaydır; Müller'i 10:30'da bırak — Müller'le konu daha kritik.",
+    verb: "Takvimi aç"
   }
 ];
 
@@ -205,27 +208,27 @@ const DEMO_PANELS: Record<FocusKey, PanelData> = {
       "Itinerary ve refund — öğleden sonra."
     ]
   },
-  lines: {
-    label: "Lines",
-    count: "last 14d",
-    headline: "Almanya düşüyor; sebep iki acente, fiyat değil.",
+  calendar: {
+    label: "Calendar",
+    count: "next 7d",
+    headline: "Yarın bir çakışma var; bugün başka önemli bir şey yok.",
     rows: [
-      { id: "de", primary: "Germany", secondary: "28 → 23 rezervasyon", trailing: "▼ 18 %" },
-      { id: "ru", primary: "Russia", secondary: "sessiz hat", trailing: "▼  4 %" },
-      { id: "ist-ayt", primary: "Local · IST → AYT", secondary: "düzenli artış", trailing: "▲  4 %" },
-      { id: "uk", primary: "United Kingdom", secondary: "stabil", trailing: "= 0 %" }
+      { id: "bridge", primary: "Bridge demo", secondary: "yarın · 10:30", trailing: "⚠" },
+      { id: "muller", primary: "Müller call", secondary: "yarın · 10:30", trailing: "⚠" },
+      { id: "schmidt", primary: "Schmidt itinerary review", secondary: "perşembe · 14:00" },
+      { id: "klein", primary: "Klein Reisen check-in", secondary: "cuma · 11:00" }
     ],
     pattern:
-      "Son 14 günde Almanya rezervasyonu %18 düştü. Diğer üç hat yatay ya da artıyor. Pazar değil, kanal sorunu.",
+      "Önümüzdeki yedi günde dört dış toplantı var. İki tanesi yarın aynı saatte; geri kalan ikisi normal hafta dolusu.",
     why: [
-      "Klein Reisen ve Müller GmbH — iki büyük Alman acentesi hafta 2'de göndermeyi kesti.",
-      "Lufthansa IST fiyatları %6 yükseldi ama diğer hatlar etkilenmedi — fiyat değil.",
-      "Rakip fiyatlarında halka açık veride değişiklik yok."
+      "Bridge demo ve Müller call yarın 10:30'da çakışıyor. Birisi reddedilmedikçe bir tarafa söz vermiş oluyorsun.",
+      "Müller call için son hazırlık notu üç hafta önce; Bridge için bu sabah Stripe linkini de göndermek anlamlı.",
+      "Schmidt ve Klein toplantıları yeterli hazırlık zamanı bırakıyor."
     ],
     move: [
-      "Klein Reisen'e bugün yaz — uzun süredir konuşmadın.",
-      "Müller GmbH için bir gün bekle — Hans Müller'le konuşurken hatırlatacaksın.",
-      "Lufthansa fiyatını ayrıca takibe al ama acil değil."
+      "Bridge demo'yu 11:00'a kaydır — Stripe linki gönderince zaten o saatte konuşacaksın.",
+      "Müller call için bugün öğleden sonra 10 dakikalık hazırlık notu yaz.",
+      "Schmidt ve Klein için bir şey değiştirme."
     ]
   }
 };
@@ -236,7 +239,7 @@ const FOCUS_SOURCE: Record<FocusKey, string> = {
   customers: "Gmail or a customer source",
   revenue: "Stripe or a payment provider",
   tasks: "Calendar or a task source",
-  lines: "Stripe / Shopify or a CSV import"
+  calendar: "Google Calendar (read-only)"
 };
 
 const FOCUS_DAY1_BLURB: Record<FocusKey, string> = {
@@ -246,8 +249,8 @@ const FOCUS_DAY1_BLURB: Record<FocusKey, string> = {
     "Once Operator can see your offers and payments, open offers will land here with the amount, the customer, and the next step.",
   tasks:
     "Once a calendar or task source is connected, today's work will land here, sorted by what unblocks the most.",
-  lines:
-    "Once Operator can see your sales lines (markets, channels, regions, products), shifts will land here with the reason where we can find one."
+  calendar:
+    "Once Calendar is connected, your week — conflicts, prep windows, important upcoming meetings — will land here."
 };
 
 // ---------------------------------------------------------------------------
@@ -290,10 +293,51 @@ export default function HomePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [focus, closeFocus]);
 
+  // Real briefing comes from the Sources store (computed by the
+  // deterministic engine over the synced Google snapshot). The demo
+  // mode keeps the hand-written content for reference / screenshots.
+  const googleState = useSourcesStore((s) => s.google.state);
+  const lastSyncMs = useSourcesStore((s) => s.google.lastSyncMs);
+  const realBriefingItems = useSourcesStore((s) => s.briefing);
+  const realPanelsRaw = useSourcesStore((s) => s.panels);
+  const sourcesConnected = googleState === "connected" || googleState === "syncing" || googleState === "error";
+
   const firstName = getUserFirstName(isDemo);
   const greeting = greetingFor(now);
-  const briefing: BriefingItem[] = isDemo ? DEMO_BRIEFING : [];
-  const panels = isDemo ? DEMO_PANELS : null;
+
+  // Map real engine briefing → local briefing shape.
+  const realBriefing: BriefingItem[] = realBriefingItems.map((b: RealBriefingItem) => ({
+    id: b.id,
+    focus: b.focus as FocusKey,
+    fact: b.fact,
+    why: b.why,
+    recommendation: b.recommendation,
+    verb: b.verb
+  }));
+
+  // Map real engine panels → local panel shape. The COO mini-report
+  // fields (pattern / why / move) are absent for real data; the focus
+  // column knows to fall back to a quiet "Receipts" view + a note
+  // about the optional AI provider.
+  const realPanels: Record<FocusKey, PanelData> | null = realPanelsRaw
+    ? {
+        customers: liftPanel(realPanelsRaw.customers),
+        revenue: liftPanel(realPanelsRaw.revenue),
+        tasks: liftPanel(realPanelsRaw.tasks),
+        calendar: liftPanel(realPanelsRaw.calendar)
+      }
+    : null;
+
+  const briefing: BriefingItem[] = isDemo
+    ? DEMO_BRIEFING
+    : sourcesConnected
+      ? realBriefing
+      : [];
+  const panels: Record<FocusKey, PanelData> | null = isDemo
+    ? DEMO_PANELS
+    : sourcesConnected
+      ? realPanels
+      : null;
 
   return (
     <div className="flex h-full min-h-0">
@@ -318,8 +362,18 @@ export default function HomePage() {
             <p className="max-w-2xl text-[15px] leading-relaxed text-white/65">
               {isDemo
                 ? "Bu sabah üç şeye dikkat etmen gerek. Aşağıdaki paneller dayanak veriyi gösteriyor."
-                : "Henüz bir kaynağa bağlı değilim, o yüzden bu sabah sana güvenebileceğin bir özet veremem. Bir kaynak bağlayalım — yarın gerçek bir özetle başlarız."}
+                : sourcesConnected
+                  ? briefing.length === 0
+                    ? "Sessiz bir sabah. Bugün için seni meşgul edecek bir şey görmüyorum."
+                    : `Bu sabah ${briefing.length === 1 ? "bir konu" : `${briefing.length} konu`} dikkatini hak ediyor. Paneller aşağıda dayanak veriyi gösteriyor.`
+                  : "Henüz bir kaynağa bağlı değilim, o yüzden bu sabah sana güvenebileceğin bir özet veremem. Bir kaynak bağlayalım — yarın gerçek bir özetle başlarız."}
             </p>
+            {sourcesConnected && (
+              <p className="text-[12.5px] text-white/40">
+                Watching · Gmail (last 14d) · Calendar (next 14d) · Contacts
+                {lastSyncMs ? ` · synced ${formatAgo(lastSyncMs)}` : ""}
+              </p>
+            )}
           </header>
 
           {/* 40 % · Briefing — FACT / WHY / RECOMMENDATION */}
@@ -353,7 +407,7 @@ export default function HomePage() {
       </main>
 
       {focus && (
-        <FocusColumn focus={focus} onClose={closeFocus} isDemo={isDemo} />
+        <FocusColumn focus={focus} data={panels?.[focus] ?? null} onClose={closeFocus} />
       )}
     </div>
   );
@@ -489,6 +543,32 @@ function PanelView({
   );
 }
 
+/**
+ * Convert an engine PanelData into the local PanelData shape used by
+ * Home. Real data has no COO narrative (pattern / why / move) — the
+ * focus column renders just the receipts plus a quiet AI-provider
+ * note when those fields are absent.
+ */
+function liftPanel(p: RealPanelData): PanelData {
+  return {
+    label: p.label,
+    count: p.count,
+    headline: p.headline,
+    rows: p.rows,
+    pattern: "",
+    why: [],
+    move: []
+  };
+}
+
+function formatAgo(ts: number): string {
+  const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
 function defaultLabel(focus: FocusKey): string {
   switch (focus) {
     case "customers":
@@ -497,8 +577,8 @@ function defaultLabel(focus: FocusKey): string {
       return "Revenue";
     case "tasks":
       return "Tasks";
-    case "lines":
-      return "Lines";
+    case "calendar":
+      return "Calendar";
   }
 }
 
@@ -508,15 +588,18 @@ function defaultLabel(focus: FocusKey): string {
 
 function FocusColumn({
   focus,
-  onClose,
-  isDemo
+  data,
+  onClose
 }: {
   focus: FocusKey;
+  data: PanelData | null;
   onClose: () => void;
-  isDemo: boolean;
 }) {
-  const data = isDemo ? DEMO_PANELS[focus] : null;
   const label = data?.label ?? defaultLabel(focus);
+  // The COO mini-report (pattern / why / move) is only available when
+  // an AI provider is wired. Demo data ships it hand-written. Real
+  // data from the deterministic engine doesn't — and we say so.
+  const hasReport = !!data && !!data.pattern && data.why.length > 0 && data.move.length > 0;
 
   return (
     <aside
@@ -542,31 +625,44 @@ function FocusColumn({
 
       {data ? (
         <div className="flex flex-col gap-8 px-7 pt-6">
-          <ReportBlock label="The pattern">
-            <p className="text-[14.5px] leading-relaxed text-white/85">{data.pattern}</p>
-          </ReportBlock>
+          {hasReport ? (
+            <>
+              <ReportBlock label="The pattern">
+                <p className="text-[14.5px] leading-relaxed text-white/85">{data.pattern}</p>
+              </ReportBlock>
 
-          <ReportBlock label="Why it matters">
-            <ul className="flex flex-col gap-1.5 text-[14px] leading-relaxed text-white/75">
-              {data.why.map((line, i) => (
-                <li key={i} className="grid grid-cols-[16px_minmax(0,1fr)] gap-1">
-                  <span aria-hidden className="text-white/35">·</span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          </ReportBlock>
+              <ReportBlock label="Why it matters">
+                <ul className="flex flex-col gap-1.5 text-[14px] leading-relaxed text-white/75">
+                  {data.why.map((line, i) => (
+                    <li key={i} className="grid grid-cols-[16px_minmax(0,1fr)] gap-1">
+                      <span aria-hidden className="text-white/35">·</span>
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </ReportBlock>
 
-          <ReportBlock label="The move">
-            <ol className="flex flex-col gap-1.5 text-[14.5px] leading-relaxed text-white">
-              {data.move.map((line, i) => (
-                <li key={i} className="grid grid-cols-[20px_minmax(0,1fr)] gap-1">
-                  <span aria-hidden className="font-medium text-white/55">{i + 1}.</span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ol>
-          </ReportBlock>
+              <ReportBlock label="The move">
+                <ol className="flex flex-col gap-1.5 text-[14.5px] leading-relaxed text-white">
+                  {data.move.map((line, i) => (
+                    <li key={i} className="grid grid-cols-[20px_minmax(0,1fr)] gap-1">
+                      <span aria-hidden className="font-medium text-white/55">{i + 1}.</span>
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ol>
+              </ReportBlock>
+            </>
+          ) : (
+            <ReportBlock label="Operator's read">
+              <p className="text-[14.5px] leading-relaxed text-white/85">{data.headline}</p>
+              <p className="text-[12.5px] leading-relaxed text-white/45">
+                The deeper read (pattern · why · move) needs an AI provider.
+                Add an OpenAI / Anthropic / Ollama key in Settings → Providers
+                to unlock the COO narrative on top of the deterministic engine.
+              </p>
+            </ReportBlock>
+          )}
 
           {/* Receipts — quiet, at the bottom. */}
           <section className="flex flex-col gap-2 pt-2">

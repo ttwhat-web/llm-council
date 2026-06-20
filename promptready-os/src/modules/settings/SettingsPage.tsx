@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
+import { GoogleSourceCard } from "@/components/settings/GoogleSourceCard";
 import {
   AlertTriangle,
   Apple,
@@ -153,6 +154,8 @@ export default function SettingsPage() {
         title="Settings"
         sub="Auto-setup, appearance, BYOK keys, safety, telemetry, mobile companion. Keys you paste stay in memory for this session only — keychain lands with the desktop runtime."
       />
+
+      <GoogleSourceCard />
 
       <PerfectSetupGuide />
 
