@@ -6,24 +6,21 @@ import {
   CircleDot,
   LineChart,
   Mic,
-  Search,
   Settings as SettingsIcon,
   Terminal
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { CommandPalette } from "@/components/CommandPalette";
 import { useUiModeStore } from "@/store/uiMode";
 
 /**
  * Shell layout · Operator Center.
  *
- * One quiet rail. The logo at the top is Home (/). Three icons under
- * it cover the only surfaces a customer opens by intent: Console,
- * Markets, Settings. Everything else lives in Cmd+K. Global search
- * resolves a ticker to /markets and anything else to an external
- * browser search. Voice is the header mic — honest placeholder until
- * ElevenLabs is connected in Settings.
+ * Quiet by design. The header carries one element only — the voice
+ * mic — and reduces to a drag region otherwise. The rail is the
+ * Home logo plus three icons (Console · Markets · Settings); every
+ * other surface lives in Cmd+K. Voice is an honest placeholder
+ * until ElevenLabs is connected in Settings.
  */
 
 interface NavItem {
@@ -37,8 +34,6 @@ const PRIMARY_NAV: NavItem[] = [
   { to: "/markets", label: "Markets", Icon: LineChart },
   { to: "/settings", label: "Settings", Icon: SettingsIcon }
 ];
-
-const TICKER_RE = /^[A-Z]{1,6}([./][A-Z]{1,6})?$/;
 
 export function ShellLayout() {
   const secondScreen = useUiModeStore((s) => s.secondScreen);
@@ -94,25 +89,16 @@ export function ShellLayout() {
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {!secondScreen && (
-          <header className="drag-region flex min-w-0 items-center gap-3 px-5 py-2.5">
-            <div className="flex min-w-0 items-center gap-2 text-[12.5px] font-medium text-white/60">
-              <span className="text-white/80">Operator Center</span>
-            </div>
-            <div className="no-drag mx-auto flex max-w-[520px] flex-1">
-              <GlobalSearch />
-            </div>
-            <div className="no-drag flex shrink-0 items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setVoiceOpen(true)}
-                title="Voice"
-                aria-label="Voice"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-white/55 transition hover:bg-white/[0.05] hover:text-white"
-              >
-                <Mic className="h-4 w-4" />
-              </button>
-              <ThemeSwitcher />
-            </div>
+          <header className="drag-region flex min-w-0 items-center justify-end gap-2 px-5 py-2">
+            <button
+              type="button"
+              onClick={() => setVoiceOpen(true)}
+              title="Voice"
+              aria-label="Voice"
+              className="no-drag inline-flex h-8 w-8 items-center justify-center rounded-md text-white/40 transition hover:bg-white/[0.04] hover:text-white/80"
+            >
+              <Mic className="h-4 w-4" />
+            </button>
           </header>
         )}
 
@@ -124,62 +110,6 @@ export function ShellLayout() {
       <CommandPalette />
       <VoiceSheet open={voiceOpen} onClose={() => setVoiceOpen(false)} />
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Global search
-// ---------------------------------------------------------------------------
-
-function GlobalSearch() {
-  const [value, setValue] = useState("");
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
-        e.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = value.trim();
-    if (!q) return;
-    const asTicker = q.toUpperCase();
-    if (TICKER_RE.test(asTicker)) {
-      navigate(`/markets?symbol=${encodeURIComponent(asTicker)}`);
-    } else {
-      const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-    setValue("");
-    inputRef.current?.blur();
-  };
-
-  return (
-    <form
-      onSubmit={onSubmit}
-      className="group flex w-full items-center gap-2 rounded-md bg-white/[0.04] px-3 py-1.5 transition focus-within:bg-white/[0.06]"
-    >
-      <Search className="h-3.5 w-3.5 shrink-0 text-white/40 group-focus-within:text-white/65" />
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Search ticker, company, or anything…"
-        aria-label="Global search"
-        className="min-w-0 flex-1 bg-transparent text-[13px] text-white placeholder:text-white/35 focus:outline-none"
-      />
-      <span className="hidden shrink-0 text-[10px] font-medium text-white/30 sm:inline">
-        /
-      </span>
-    </form>
   );
 }
 
