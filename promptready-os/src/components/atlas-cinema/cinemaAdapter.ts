@@ -162,9 +162,9 @@ export function useCinemaScene(): CinemaScene {
   const runtimeTone: OrbitTone = runtime === "ready" ? "live" : runtime === "local-mode" ? "live" : "planned";
 
   // Markets tone · honest: we don't trigger an extra fetch here. If
-  // no cached crypto data is available we show "adapter-ready".
+  // no cached crypto data is available we surface a "needs setup" cell.
   const marketsTone: OrbitTone = "planned";
-  const marketsLabel = "adapter-ready";
+  const marketsLabel = "needs setup";
 
   const orbits: CinemaOrbitData[] = ORBIT_ORDER.map((o) => {
     switch (o.id) {

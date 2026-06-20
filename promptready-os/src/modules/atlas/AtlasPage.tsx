@@ -905,7 +905,7 @@ function buildSections(a: BuildArgs): SectionData[] {
       `${a.totalDeliverables} deliverable${a.totalDeliverables === 1 ? "" : "s"} produced`
     ],
     planned: ["Ollama routing", "Cloud routing (BYOK)", "Streamed token execution"],
-    nextAction: "Open Mission Control · dispatch a brief.",
+    nextAction: "Open Console · dispatch a brief.",
     missionLink: "/"
   });
 
@@ -969,7 +969,7 @@ function buildSections(a: BuildArgs): SectionData[] {
       "PR / issue write-back",
       "Branch + diff context"
     ],
-    nextAction: "Attach a repo from Mission Control's Repo Context card.",
+    nextAction: "Attach a repo from the Console's Repo Context card.",
     missionLink: "/"
   });
 

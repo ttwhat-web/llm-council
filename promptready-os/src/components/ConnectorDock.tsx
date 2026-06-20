@@ -92,7 +92,7 @@ const STATUS_PILL: Record<ConnectorStatus, string> = {
 const STATUS_LABEL: Record<ConnectorStatus, string> = {
   external: "external",
   blocked: "blocked · external",
-  planned: "planned"
+  planned: "Coming soon"
 };
 
 function loadBool(key: string, fallback: boolean): boolean {

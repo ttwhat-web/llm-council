@@ -145,8 +145,8 @@ export function LiveWall({
             <span className={clsx("font-semibold tracking-tight", broadcast ? "text-2xl" : "text-lg")}>
               Live Wall
             </span>
-            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/40">
-              Operator.Center · data wall
+            <span className="text-[11px] text-white/45">
+              Operator Center · data wall
             </span>
           </div>
         </div>

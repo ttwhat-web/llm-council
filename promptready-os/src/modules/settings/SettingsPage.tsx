@@ -485,8 +485,8 @@ function MobileCompanionCard() {
       </div>
 
       <p className="mt-3 text-[10.5px] text-white/45">
-        Mobile never runs the full Mission Control, never executes
-        unapproved actions, and never pretends Ollama exists on phone.
+        Mobile never runs the full Console, never executes unapproved
+        actions, and never pretends Ollama exists on phone.
       </p>
     </section>
   );

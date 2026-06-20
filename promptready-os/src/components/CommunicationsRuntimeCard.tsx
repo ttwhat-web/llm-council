@@ -37,9 +37,9 @@ interface SourceState {
 /** Telegram live status → honest pill. simulator renders as adapter-ready. */
 const TELEGRAM_STATE: Record<TelegramLiveStatus, SourceState> = {
   "live-connected": { label: "connected", tone: "ok", connected: true },
-  "live-ready": { label: "adapter ready", tone: "accent", connected: false },
+  "live-ready": { label: "needs setup", tone: "accent", connected: false },
   error: { label: "error", tone: "bad", connected: false },
-  simulator: { label: "adapter ready", tone: "accent", connected: false }
+  simulator: { label: "needs setup", tone: "accent", connected: false }
 };
 
 function emailSourceState(): SourceState {
@@ -299,7 +299,7 @@ export function CommunicationsRuntimeCard() {
                   TONE_PILL.muted
                 )}
               >
-                planned · adapter ready
+                Coming soon · needs setup
               </span>
             </li>
           ))}

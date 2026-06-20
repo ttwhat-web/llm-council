@@ -64,16 +64,12 @@ export default function MarketIntelPage() {
   );
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1280px] min-w-0 flex-col gap-3 overflow-y-auto overflow-x-hidden px-4 py-4">
-      <header className="flex max-w-full min-w-0 flex-wrap items-end justify-between gap-3 border-b border-white/8 pb-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
-            <Brain className="h-3.5 w-3.5" />
-            markets · intel
-          </span>
-          <h1 className="text-[22px] font-semibold leading-tight text-white">Market Intel</h1>
-          <p className="max-w-2xl text-[12px] leading-snug text-white/55">
-            Pick an asset and Juan assembles the picture: what moved, what likely drove it, and what to watch next. Every claim is sourced. If a source isn&apos;t connected, the section says so plainly.
+    <div className="mx-auto flex h-full w-full max-w-[1280px] min-w-0 flex-col gap-4 overflow-y-auto overflow-x-hidden px-6 py-6">
+      <header className="flex max-w-full min-w-0 flex-wrap items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="text-[24px] font-semibold leading-tight text-white">Market Intel</h1>
+          <p className="max-w-2xl text-[13px] leading-relaxed text-white/55">
+            Pick an asset and Operator Center assembles the picture: what moved, what likely drove it, and what to watch next. Every claim is sourced. If a source isn&apos;t connected, the section says so plainly.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1">
@@ -102,7 +98,7 @@ export default function MarketIntelPage() {
             <Bucket label="7d" value={moves.d7} />
           </div>
         ) : (
-          <NeedsSetupBanner message={`${symbol} · needs a market data provider (TwelveData, FMP, etc.) before Juan can compute price moves.`} />
+          <NeedsSetupBanner message={`${symbol} · needs a market data provider (TwelveData, FMP, etc.) before we can compute price moves.`} />
         )}
         {pair && klinesErr && <NeedsSetupBanner message={`Binance fetch failed · ${klinesErr}`} />}
       </Section>
@@ -125,7 +121,7 @@ export default function MarketIntelPage() {
       </Section>
 
       <Section title="3 · Order Flow Drivers" icon={LineChart} source="adapter required">
-        <NeedsSetupBanner message="Funding · Open Interest · Liquidations · Volume spikes need a derivatives adapter (Binance futures, Coinglass, etc.). Until then Juan won't guess." />
+        <NeedsSetupBanner message="Funding · Open Interest · Liquidations · Volume spikes need a derivatives source (Binance futures, Coinglass, etc.). Until then we won't guess." />
         <div className="mt-1 grid grid-cols-2 gap-1.5 md:grid-cols-4">
           {["funding", "open interest", "liquidations", "volume spike"].map((k) => <NeedsSetupCell key={k} label={k} />)}
         </div>
@@ -149,7 +145,7 @@ export default function MarketIntelPage() {
       </Section>
 
       <Section title="6 · AI Explanation" icon={Brain} source="provider required">
-        <NeedsSetupBanner message="Juan won't summarize a story he can't source. Connect an AI provider (OpenAI / Anthropic / local Ollama) in Settings · Providers to unlock a one-paragraph 'why this moved' here." />
+        <NeedsSetupBanner message="We won't summarize a story we can't source. Connect an AI provider (OpenAI / Anthropic / local Ollama) in Settings · Providers to unlock a one-paragraph 'why this moved' here." />
         <a href="/settings" className="inline-flex w-fit items-center gap-1 rounded border border-accent/40 bg-accent/[0.1] px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-accent transition hover:bg-accent/[0.15]">
           <ExternalLink className="h-3 w-3" /> open settings · providers
         </a>

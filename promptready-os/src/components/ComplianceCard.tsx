@@ -174,7 +174,7 @@ function SecurityFeature({
                 : "rounded border border-white/10 bg-white/[0.03] px-1 py-px font-mono text-[9px] uppercase tracking-wider text-white/55"
             }
           >
-            {state}
+            {state === "ready" ? "ready" : "Coming soon"}
           </span>
         </span>
         <span className="text-[10.5px] text-white/55">{hint}</span>

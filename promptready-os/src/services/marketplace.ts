@@ -62,7 +62,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "brain",
     name: "Startup CTO",
     blurb: "Day-30 plan + architecture review + hire-or-build canvas.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.1.0",
     contents: {
       workflowNodes: [
@@ -92,7 +92,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "template",
     name: "Claude Coding",
     blurb: "Messy ask → Claude-ready prompt + repo audit + deploy notes.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.2.0",
     contents: {
       missionTemplates: [
@@ -124,7 +124,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "brain",
     name: "Travel OS",
     blurb: "Lead board + travel workflows + CRM notes + ops dashboard.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.2.0",
     contents: {
       pinnedTerminal: {
@@ -178,7 +178,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "brain",
     name: "Crypto Research",
     blurb: "Balanced bull/bear research note + scenarios + triggers.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.1.0",
     contents: {
       pinnedTerminal: {
@@ -200,7 +200,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "brain",
     name: "Perfume Lab",
     blurb: "Batch workflow + inventory + split calculator + community notes.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.2.0",
     contents: {
       pinnedTerminal: {
@@ -239,7 +239,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "brain",
     name: "Carpet Export",
     blurb: "Shipment workflow + invoice templates + customer notes + logistics.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.2.0",
     contents: {
       pinnedTerminal: {
@@ -290,7 +290,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "brain",
     name: "AI Founder",
     blurb: "Repo intelligence + roadmap + go-to-market pack.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.1.0",
     contents: {
       workflowNodes: [
@@ -311,7 +311,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "template",
     name: "Prompt Engineer",
     blurb: "Freeform prompt → operator-grade brief.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.1.0",
     contents: {
       missionTemplates: [
@@ -330,7 +330,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "brain",
     name: "Agency Pack",
     blurb: "Client intake → proposal → delivery workflow + status notes.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.1.0",
     contents: {
       pinnedTerminal: {
@@ -378,7 +378,7 @@ export const STARTER_PACKS: Pack[] = [
     kind: "brain",
     name: "Export Ops Pack",
     blurb: "Order → invoice → shipment → docs runtime for export businesses.",
-    author: "Operator.Center",
+    author: "Operator Center",
     version: "0.1.0",
     contents: {
       pinnedTerminal: {

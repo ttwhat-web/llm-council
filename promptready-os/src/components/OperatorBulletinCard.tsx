@@ -56,7 +56,7 @@ function adapterRow(section: string, module: AdapterModule): BriefRow {
       : meta.tone === "bad"
         ? "feed error"
         : meta.tone === "accent"
-          ? "adapter ready"
+          ? "needs setup"
           : "no feed";
   return {
     section,
@@ -68,7 +68,7 @@ function adapterRow(section: string, module: AdapterModule): BriefRow {
 
 /** A category with no adapter seam yet · planned, never fabricated. */
 function plannedRow(section: string): BriefRow {
-  return { section, value: "no feed", pill: "planned", tone: "planned" };
+  return { section, value: "no feed", pill: "Coming soon", tone: "planned" };
 }
 
 function startOfToday(): number {

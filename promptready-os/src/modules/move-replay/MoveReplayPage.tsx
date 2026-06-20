@@ -66,15 +66,11 @@ export default function MoveReplayPage() {
   const events = useMemo(() => buildEvents(candles), [candles]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1180px] min-w-0 flex-col gap-3 overflow-y-auto overflow-x-hidden px-4 py-4">
-      <header className="flex max-w-full min-w-0 flex-wrap items-end justify-between gap-3 border-b border-white/8 pb-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
-            <Rewind className="h-3.5 w-3.5" />
-            markets · move replay
-          </span>
-          <h1 className="text-[22px] font-semibold leading-tight text-white">Move Replay</h1>
-          <p className="max-w-2xl text-[12px] leading-snug text-white/55">
+    <div className="mx-auto flex h-full w-full max-w-[1180px] min-w-0 flex-col gap-4 overflow-y-auto overflow-x-hidden px-6 py-6">
+      <header className="flex max-w-full min-w-0 flex-wrap items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="text-[24px] font-semibold leading-tight text-white">Move Replay</h1>
+          <p className="max-w-2xl text-[13px] leading-relaxed text-white/55">
             Walk through an asset&apos;s recent move as a single timeline. Swings and volume spikes come from Binance candles. News pins and funding flips appear once their provider archives are connected.
           </p>
         </div>

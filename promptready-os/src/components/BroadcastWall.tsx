@@ -67,8 +67,8 @@ export function BroadcastWall() {
           <Radio className="h-7 w-7 text-accent" />
           <div className="flex flex-col">
             <span className="text-2xl font-semibold tracking-tight">Broadcast Wall</span>
-            <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-white/40">
-              Operator.Center · live room view
+            <span className="text-[12px] text-white/45">
+              Operator Center · live room view
             </span>
           </div>
         </div>

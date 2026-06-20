@@ -180,7 +180,7 @@ export function ProviderDiagnostics() {
                     {fact.id === "ollama" && ollamaUp == null && (
                       <Loader2 className="h-2.5 w-2.5 animate-spin" />
                     )}
-                    {status}
+                    {status === "adapter-ready" ? "needs setup" : status}
                   </span>
                 </td>
                 <td className="py-1.5 pr-2 font-mono text-[10px] text-white/55">

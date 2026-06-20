@@ -165,13 +165,12 @@ export default function LaunchpadPage() {
     <div className="mx-auto flex h-full w-full max-w-[1100px] min-w-0 flex-col gap-6 overflow-y-auto overflow-x-hidden px-6 py-6">
       <header className="flex max-w-full min-w-0 flex-wrap items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-accent/85">launchpad</span>
           <h1 className="text-[24px] font-semibold leading-tight text-white">Launchpad</h1>
           <p className="max-w-2xl text-[13px] leading-relaxed text-white/60">
-            One click opens an official web tool in a new tab. Operator.Center does not embed, proxy, or read anything inside these tabs.
+            One click opens an official web tool in a new tab. Operator Center does not embed, proxy, or read anything inside these tabs.
           </p>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/[0.05] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald-200">
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/[0.08] px-3 py-1 text-[12px] text-emerald-200">
           <ShieldCheck className="h-3 w-3" /> external only · no credentials stored
         </span>
       </header>
@@ -187,7 +186,7 @@ export default function LaunchpadPage() {
       <Section
         eyebrow="communications"
         title="Communications"
-        sub="Gmail, WhatsApp Web, and Telegram Web open in their official web apps. Juan does not read messages unless a connector is added later."
+        sub="Gmail, WhatsApp Web, and Telegram Web open in their official web apps. Operator Center does not read messages unless a connector is added later."
       >
         <TileGrid tiles={COMMS_TILES} onLaunch={launch} />
         <div className="mt-1 flex items-start gap-2 rounded-lg border border-white/8 bg-white/[0.018] px-3 py-2">
@@ -224,7 +223,7 @@ export default function LaunchpadPage() {
         {error && <p className="text-[11.5px] text-rose-300">{error}</p>}
         {recentTiles.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/45">recents</span>
+            <span className="text-[11px] text-white/45">Recents</span>
             {recentTiles.map((r) => (
               <button
                 key={r.url}
@@ -256,9 +255,9 @@ function Section({
   return (
     <section className="flex min-w-0 flex-col gap-3">
       <header className="flex min-w-0 flex-col gap-0.5">
-        <span className="font-mono text-[9.5px] uppercase tracking-[0.28em] text-white/40">{eyebrow}</span>
-        <h2 className="text-[15px] font-semibold text-white">{title}</h2>
-        <p className="max-w-2xl text-[12px] leading-relaxed text-white/55">{sub}</p>
+        <span className="text-[11px] text-white/40">{eyebrow}</span>
+        <h2 className="text-[16px] font-semibold text-white">{title}</h2>
+        <p className="max-w-2xl text-[12.5px] leading-relaxed text-white/55">{sub}</p>
       </header>
       <div className="flex flex-col gap-2">{children}</div>
     </section>
@@ -281,7 +280,7 @@ function TileGrid({ tiles, onLaunch }: { tiles: Tile[]; onLaunch: (name: string,
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex min-w-0 items-center justify-between gap-2">
               <span className="truncate text-[13px] font-medium text-white">{t.name}</span>
-              <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.2em] text-white/40 group-hover:text-white/65">opens externally</span>
+              <span className="shrink-0 text-[11px] text-white/40 group-hover:text-white/65">opens externally</span>
             </span>
             <span className="truncate text-[11.5px] text-white/55">{t.reason}</span>
           </span>

@@ -40,15 +40,11 @@ export default function MarketBriefingPage() {
   }, [crypto.quotes]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1200px] min-w-0 flex-col gap-3 overflow-y-auto overflow-x-hidden px-4 py-4">
-      <header className="flex max-w-full min-w-0 flex-wrap items-end justify-between gap-3 border-b border-white/8 pb-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-accent">
-            <ShieldAlert className="h-3.5 w-3.5" />
-            markets · briefing
-          </span>
-          <h1 className="text-[22px] font-semibold leading-tight text-white">Market Briefing</h1>
-          <p className="max-w-2xl text-[12px] leading-snug text-white/55">
+    <div className="mx-auto flex h-full w-full max-w-[1200px] min-w-0 flex-col gap-4 overflow-y-auto overflow-x-hidden px-6 py-6">
+      <header className="flex max-w-full min-w-0 flex-wrap items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="text-[24px] font-semibold leading-tight text-white">Market Briefing</h1>
+          <p className="max-w-2xl text-[13px] leading-relaxed text-white/55">
             Today&apos;s risks, opportunities, and what&apos;s ahead. Each item is sourced and ranked by impact and confidence. Macro calendar items appear once an economic-calendar connector is added.
           </p>
         </div>
@@ -79,7 +75,7 @@ export default function MarketBriefingPage() {
 
       <section className="flex min-w-0 flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.012] p-3">
         <SectionHeader title="Upcoming events" icon={CalendarClock} count={0} />
-        <NeedsSetupBanner message="FOMC · CPI · earnings · ETF decisions need an economic-calendar adapter (TradingEconomics, ForexFactory, etc.). Not wired today — Juan will not invent dates." />
+        <NeedsSetupBanner message="FOMC · CPI · earnings · ETF decisions need an economic-calendar source (TradingEconomics, ForexFactory, etc.). Not wired today — we will not invent dates." />
         <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
           {["FOMC", "CPI", "Earnings", "ETF decisions"].map((k) => (
             <div key={k} className="flex flex-col gap-0.5 rounded border border-dashed border-white/12 bg-white/[0.012] px-2 py-1.5">

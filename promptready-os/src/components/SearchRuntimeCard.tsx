@@ -131,7 +131,7 @@ export function SearchRuntimeCard() {
                   TONE.muted
                 )}
               >
-                adapter ready · needs key
+                needs setup · provider key
               </span>
             </li>
           ))}

@@ -955,7 +955,7 @@ function WakeModeToggle() {
     >
       <Lock className="h-3 w-3" />
       <Radio className="h-3 w-3" />
-      wake mode · planned · local-only when shipped · off by default
+      wake mode · Coming soon · local-only when shipped · off by default
     </button>
   );
 }

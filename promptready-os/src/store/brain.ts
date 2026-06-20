@@ -271,7 +271,7 @@ export const useBrainStore = create<BrainState>((set, get) => ({
   }
 }));
 
-export const BRAIN_NAMES = ["Atlas", "Nova", "Helios"] as const;
+export const BRAIN_NAMES = ["Atlas", "Nova", "Vega"] as const;
 
 export const BRAIN_MODE_OPTIONS: Array<{
   value: BrainMode;

@@ -60,7 +60,7 @@ export function ShellLayout() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen max-w-full overflow-hidden bg-[#08090d] text-white">
+    <div className="flex h-screen w-screen max-w-full overflow-hidden text-white">
       {!secondScreen && (
         <aside className="flex w-[60px] shrink-0 flex-col items-center justify-between border-r border-white/[0.04] py-4">
           <div className="flex flex-col items-center gap-5">

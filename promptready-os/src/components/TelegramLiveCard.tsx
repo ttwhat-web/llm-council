@@ -50,7 +50,7 @@ export function TelegramLiveCard() {
   const onSend = async () => {
     setBusy("send");
     const r = await sendTelegramMessage(
-      "✅ Operator.Center · test message from Settings → Telegram Live"
+      "✅ Operator Center · test message from Settings → Telegram Live"
     );
     setStatus(getTelegramBridgeStatus());
     setFlash({ ok: r.ok, text: r.ok ? "round-trip ok" : r.error ?? "send failed" });

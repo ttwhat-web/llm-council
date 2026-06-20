@@ -128,7 +128,7 @@ export function RuntimeBus() {
       state: atlas.pairingCode ? "partial" : "planned",
       detail: atlas.pairingCode
         ? "pairing code issued · networking ships with desktop"
-        : "no pairing code · planned"
+        : "no pairing code · setup needed"
     },
     {
       id: "telegram",
@@ -136,8 +136,8 @@ export function RuntimeBus() {
       Icon: Send,
       state: atlas.telegram ? "partial" : "planned",
       detail: atlas.telegram
-        ? "link code issued · adapter seam ready · bot networking planned"
-        : "no link code · planned"
+        ? "link code issued · setup needed for live bot"
+        : "no link code · setup needed"
     },
     {
       id: "marketplace",
@@ -158,15 +158,15 @@ export function RuntimeBus() {
           <Cpu className="h-4 w-4 text-accent" />
           <span className="text-[13px] font-semibold text-white">Runtime Bus</span>
         </div>
-        <span className="rounded border border-white/10 bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white/55">
-          {rows.filter((r) => r.state === "ready").length} ready · {rows.filter((r) => r.state === "partial").length} partial · {rows.filter((r) => r.state === "planned").length} planned
+        <span className="text-[11px] text-white/55">
+          {rows.filter((r) => r.state === "ready").length} ready · {rows.filter((r) => r.state === "partial").length} partial · {rows.filter((r) => r.state === "planned").length} setup needed
         </span>
       </header>
 
       <p className="text-[11px] text-white/65">
-        Nine runtime modules wired into the Operator OS. Every state is
-        computed live from real local stores · planned states are honest
-        about what doesn't ship yet.
+        Runtime modules wired into Operator Center. Every state is computed
+        live from real local stores · setup-needed rows are honest about
+        what doesn't ship yet.
       </p>
 
       <ul className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -229,7 +229,7 @@ function intelRow(
       : s.status === "error"
         ? `last fetch failed · ${s.providers.join(" · ")}`
         : s.status === "adapter-ready"
-          ? `adapter ready · ${s.providers.join(" · ") || "awaiting provider"}`
+          ? `setup needed · ${s.providers.join(" · ") || "awaiting provider"}`
           : module === "email"
             ? "read-only adapters · not connected"
             : "offline · awaiting provider key";
@@ -245,7 +245,7 @@ function StatePill({ state }: { state: RuntimeState }) {
   }[state];
   return (
     <span className={clsx("rounded border px-1 py-px font-mono text-[9px] uppercase tracking-wider", cls)}>
-      {state}
+      {state === "planned" ? "setup" : state}
     </span>
   );
 }

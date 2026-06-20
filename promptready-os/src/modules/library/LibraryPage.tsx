@@ -91,7 +91,7 @@ export default function LibraryPage() {
                 {history.length === 0 ? "No missions archived yet." : `No receipts match "${query}".`}
               </p>
               <p className="max-w-[60ch] text-[11px] text-white/45">
-                Dispatch a mission from Mission Control. Receipts and named
+                Dispatch a mission from the Console. Receipts and named
                 deliverables land here automatically.
               </p>
             </div>

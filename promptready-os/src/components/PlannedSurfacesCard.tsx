@@ -74,7 +74,7 @@ export function ConnectorHubCard() {
     { Icon: Plug, name: "Obsidian vault", state: "planned", cap: "local folder watcher" },
     { Icon: Plug, name: "Notion", state: "planned", cap: "internal integration token" },
     { Icon: Plug, name: "Slack", state: "planned", cap: "read channels · receipt push" },
-    { Icon: Send, name: "Telegram", state: "local-only", cap: "bridge adapter ready · networking planned" },
+    { Icon: Send, name: "Telegram", state: "local-only", cap: "bridge needs setup · networking Coming soon" },
     { Icon: HardDrive, name: "Local folder", state: "ready", cap: "drag-drop import lands in Memory Vault" }
   ];
   return (

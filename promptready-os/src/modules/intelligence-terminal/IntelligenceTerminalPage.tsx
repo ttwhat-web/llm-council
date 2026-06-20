@@ -52,7 +52,7 @@ import { CommunicationsRuntimeCard } from "@/components/CommunicationsRuntimeCar
 import { SearchRuntimeCard } from "@/components/SearchRuntimeCard";
 import { NewsChannelMode } from "@/components/NewsChannelMode";
 import { BroadcastWall } from "@/components/BroadcastWall";
-import { BusinessCockpitCard } from "@/components/BusinessCockpitCard";
+import { BusinessBriefingCard } from "@/components/BusinessBriefingCard";
 import { LiveWall } from "@/components/LiveWall";
 import { Monitor } from "lucide-react";
 import {
@@ -555,7 +555,7 @@ export default function IntelligenceTerminalPage() {
       <SurfaceHeader
         eyebrow="terminal · intelligence layer"
         title="Intelligence Terminal"
-        sub="Markets · Research · Signals · Operator. Market surfaces live under the Intelligence Layer only — Operator.Center is not a trading app. External feeds are honest about being offline; the Operator group shows real local state."
+        sub="Markets · Research · Signals · Operator. Market surfaces live under the Intelligence Layer only — Operator Center is not a trading app. External feeds are honest about being offline; the Operator group shows real local state."
         right={
           <div className="flex items-center gap-2">
             <div className="inline-flex items-center gap-0.5 rounded-md border border-white/10 bg-white/[0.03] p-0.5">
@@ -702,7 +702,7 @@ export default function IntelligenceTerminalPage() {
       <NewsChannelMode />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SearchRuntimeCard />
-        <BusinessCockpitCard />
+        <BusinessBriefingCard />
       </div>
         </>
       )}
