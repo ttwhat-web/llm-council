@@ -1,31 +1,33 @@
 /**
- * Google OAuth client · UNVERIFIED — see banner below.
+ * Google OAuth client · UNVERIFIED — see banner in the Sources card.
  *
- * The flow is a manual-paste authorization code dance:
- *   1. User creates an OAuth client of type "Desktop app" in Google
- *      Cloud Console and pastes the Client ID + Client Secret into
+ * Manual-paste authorization-code flow:
+ *   1. User creates a "Desktop app" OAuth client in Google Cloud
+ *      Console and pastes the Client ID + Client Secret into
  *      Settings → Sources.
- *   2. We open Google's authorization URL in the system browser via
- *      window.open. The redirect URI is `http://127.0.0.1:0` — the
- *      browser will fail to load anything there, but the address bar
- *      will contain `?code=…`.
- *   3. User copies the FULL URL from the address bar back into our
+ *   2. User adds redirect URI `http://127.0.0.1:1421/oauth/google/callback`
+ *      to the OAuth client in Google Cloud Console.
+ *   3. We open Google's authorization URL in the system browser.
+ *      After consent the browser redirects to the loopback URL and
+ *      fails to load (we don't run a server there), but the address
+ *      bar carries `?code=…`.
+ *   4. User copies the FULL URL from the address bar back into our
  *      "Paste callback URL" field.
- *   4. We parse the code and exchange it at the token endpoint.
- *   5. Tokens stored in localStorage (not encrypted yet — banner
+ *   5. We parse the code and exchange it at the token endpoint.
+ *   6. Tokens stored in localStorage (not encrypted yet — banner
  *      tells the user; encryption lands before billing).
- *
- * THIS FILE COMPILES BUT IS NOT VERIFIED AGAINST A REAL GOOGLE
- * ACCOUNT FROM THIS SANDBOX. The user must test it live on Mac.
- * The protocol shape is the OAuth 2.0 spec — bugs, if any, will be
- * in (a) the redirect URI shape, (b) scope strings, (c) token
- * persistence keys. All easy to fix; none structural.
  */
 
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
-const REDIRECT_URI = "http://127.0.0.1:0";
+/**
+ * Fixed loopback redirect URI on a real port. Google's docs allow
+ * any loopback host + port for desktop apps. We use 1421 to avoid
+ * Tauri's dev server (1420). The user pastes the URL the browser
+ * fails to load — the URL still carries `?code=…`.
+ */
+export const REDIRECT_URI = "http://127.0.0.1:1421/oauth/google/callback";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
@@ -108,9 +110,22 @@ export function clearTokens(): void {
 // Authorization URL
 // ---------------------------------------------------------------------------
 
+/** Returns null when the id is empty or doesn't look like a Google
+ * OAuth Web/Desktop client id. */
+export function validateClientId(clientId: string): string | null {
+  const id = (clientId ?? "").trim();
+  if (!id) return "Client ID is empty.";
+  if (!id.endsWith(".apps.googleusercontent.com")) {
+    return "Client ID must end with .apps.googleusercontent.com.";
+  }
+  return null;
+}
+
 export function buildAuthorizationUrl(clientId: string): string {
+  const err = validateClientId(clientId);
+  if (err) throw new Error(err);
   const params = new URLSearchParams({
-    client_id: clientId,
+    client_id: clientId.trim(),
     redirect_uri: REDIRECT_URI,
     response_type: "code",
     scope: SCOPES.join(" "),

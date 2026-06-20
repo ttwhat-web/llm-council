@@ -8,7 +8,9 @@ import {
   buildAuthorizationUrl,
   exchangeCodeForTokens,
   parseAuthorizationCode,
-  readCredentials
+  readCredentials,
+  validateClientId,
+  REDIRECT_URI
 } from "@/services/google/oauthClient";
 
 /**
@@ -21,11 +23,13 @@ import {
  *
  * What this card does:
  *   1. Captures the user's OAuth Client ID + Client Secret (their
- *      own — created in Google Cloud Console as a "Desktop app").
+ *      own — created in Google Cloud Console as a "Desktop app"
+ *      with redirect URI matching REDIRECT_URI below).
  *   2. Opens Google's authorization URL in a new tab.
- *   3. After consent, the browser redirects to http://127.0.0.1:0 and
- *      fails to load. The user copies the FULL URL from the address
- *      bar and pastes it back into the "Paste callback URL" field.
+ *   3. After consent, the browser redirects to the loopback URL and
+ *      fails to load (no server runs there). The user copies the
+ *      FULL URL from the address bar back into our "Paste callback
+ *      URL" field.
  *   4. We parse the code and exchange it for tokens.
  *   5. Triggers a first sync and shows the result.
  *
@@ -66,20 +70,38 @@ export function GoogleSourceCard() {
       setLocalError("Both Client ID and Client Secret are required.");
       return;
     }
+    const formatErr = validateClientId(id);
+    if (formatErr) {
+      setLocalError(formatErr);
+      return;
+    }
     setLocalError(null);
     saveCreds(id, secret);
   }, [clientId, clientSecret, saveCreds]);
 
   const onOpenConsent = useCallback(() => {
-    const id = clientId.trim();
-    if (!id) {
+    // Always use the saved credentials' clientId, not the field, so
+    // the URL matches what Google Cloud Console has on file.
+    const stored = readCredentials();
+    if (!stored) {
       setLocalError("Save Client ID + Secret first.");
       return;
     }
     setLocalError(null);
-    const url = buildAuthorizationUrl(id);
-    window.open(url, "_blank", "noopener,noreferrer");
-  }, [clientId]);
+    let url: string;
+    try {
+      url = buildAuthorizationUrl(stored.clientId);
+    } catch (e) {
+      setLocalError(`Could not build the Google authorization URL: ${(e as Error).message}`);
+      return;
+    }
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      setLocalError(
+        "Browser blocked the popup. Allow pop-ups for Operator Center, or copy the URL manually: " + url
+      );
+    }
+  }, []);
 
   const onExchange = useCallback(async () => {
     const creds = readCredentials();
@@ -265,9 +287,14 @@ function SetupView(props: {
             Google Cloud Console <ExternalLink className="h-3 w-3" />
           </a>
           {" "}→ Credentials → Create OAuth client ID → Application type: <strong>Desktop app</strong>.
-          Add redirect URI <code className="rounded bg-white/[0.06] px-1.5 py-px text-[11.5px]">http://127.0.0.1:0</code>.
           Enable the Gmail, Calendar, and People APIs in your project.
         </p>
+        <div className="flex flex-col gap-1.5 rounded-lg bg-white/[0.025] p-3">
+          <span className="text-[11px] text-white/50">
+            Add this exact redirect URI to your OAuth client&apos;s &quot;Authorized redirect URIs&quot; list:
+          </span>
+          <RedirectUriBox uri={REDIRECT_URI} />
+        </div>
         <div className="grid grid-cols-1 gap-2 pt-2 md:grid-cols-2">
           <Field
             label="Client ID"
@@ -295,13 +322,18 @@ function SetupView(props: {
       <Step n={2} title="Authorize in your browser">
         <p className="text-[12.5px] leading-relaxed text-white/60">
           Opens Google&apos;s consent screen in a new tab. After you authorize, your browser will redirect to{" "}
-          <code className="rounded bg-white/[0.06] px-1.5 py-px text-[11.5px]">http://127.0.0.1:0/?code=…</code>{" "}
+          <code className="rounded bg-white/[0.06] px-1.5 py-px text-[11.5px]">{REDIRECT_URI}?code=…</code>{" "}
           and fail to load — that&apos;s expected. Copy the entire URL from the address bar.
         </p>
         <button
           type="button"
           onClick={props.onOpenConsent}
           disabled={props.state !== "needs-auth"}
+          title={
+            props.state !== "needs-auth"
+              ? "Save your Client ID and Client Secret first."
+              : undefined
+          }
           className="inline-flex w-fit items-center gap-1.5 rounded-full bg-accent/90 px-3 py-1.5 text-[12.5px] font-medium text-white transition hover:bg-accent disabled:cursor-not-allowed disabled:bg-white/[0.06] disabled:text-white/45"
         >
           <ExternalLink className="h-3.5 w-3.5" />
@@ -314,12 +346,12 @@ function SetupView(props: {
           label="Callback URL"
           value={props.callbackPaste}
           onChange={props.onCallbackPasteChange}
-          placeholder="http://127.0.0.1:0/?code=…"
+          placeholder={`${REDIRECT_URI}?code=…`}
         />
         <button
           type="button"
           onClick={props.onExchange}
-          disabled={props.busy || props.state !== "needs-auth"}
+          disabled={props.busy || props.state !== "needs-auth" || !props.callbackPaste.trim()}
           className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12.5px] font-medium text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:bg-white/[0.15] disabled:text-white/45"
         >
           {props.busy ? <Loader className="h-3.5 w-3.5 animate-spin" /> : null}
@@ -400,6 +432,31 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
       </header>
       <div className="flex flex-col gap-2 pl-9">{children}</div>
     </section>
+  );
+}
+
+function RedirectUriBox({ uri }: { uri: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(uri);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }, [uri]);
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-black/30 px-3 py-2">
+      <code className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-white">{uri}</code>
+      <button
+        type="button"
+        onClick={onCopy}
+        className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-white/65 transition hover:bg-white/[0.06] hover:text-white"
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </div>
   );
 }
 
