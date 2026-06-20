@@ -74,17 +74,59 @@ export type WorkspacePanels = Record<FocusKey, PanelData>;
 
 export function buildPanels(snap: WorkspaceSnapshot, now: number = snap.syncedAt): WorkspacePanels {
   return {
-    customers: buildCustomersPanel(snap, now),
-    revenue: buildRevenuePanel(snap, now),
-    tasks: buildTasksPanel(snap, now),
-    calendar: buildCalendarPanel(snap, now)
+    customers: safe("customers", "Customers", () => buildCustomersPanel(snap, now)),
+    revenue: safe("revenue", "Revenue", () => buildRevenuePanel(snap, now)),
+    tasks: safe("tasks", "Tasks", () => buildTasksPanel(snap, now)),
+    calendar: safe("calendar", "Calendar", () => buildCalendarPanel(snap, now))
   };
+}
+
+function safe(focus: FocusKey, label: string, fn: () => PanelData): PanelData {
+  try {
+    return fn();
+  } catch {
+    return {
+      focus,
+      label,
+      count: "error",
+      headline: "Bu paneli oluştururken hata oldu. Tekrar denersek düzelir.",
+      rows: []
+    };
+  }
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+const FREE_EMAIL_PROVIDERS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "yahoo.co.uk",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "yandex.com",
+  "yandex.ru",
+  "gmx.com",
+  "gmx.de",
+  "mail.ru"
+]);
+
+/**
+ * Empty string when the user is on a free email provider — there's
+ * no meaningful "company domain" to filter out. Senders that share
+ * the user's @gmail.com address are not "internal".
+ */
 function selfDomainOf(selfEmail: string): string {
-  return (selfEmail.split("@")[1] ?? "").toLowerCase();
+  const d = (selfEmail.split("@")[1] ?? "").toLowerCase();
+  if (FREE_EMAIL_PROVIDERS.has(d)) return "";
+  return d;
 }
 
 function daysAgo(ms: number, now: number): number {
@@ -103,7 +145,9 @@ function isNoisy(addr: string): boolean {
 
 function isExternal(addr: string, selfDomain: string): boolean {
   const d = (addr.split("@")[1] ?? "").toLowerCase();
-  return d !== "" && d !== selfDomain;
+  if (d === "") return false;
+  if (selfDomain === "") return true;
+  return d !== selfDomain;
 }
 
 // ---------------------------------------------------------------------------

@@ -29,9 +29,18 @@ export function readSnapshot(): WorkspaceSnapshot | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_SNAPSHOT);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as WorkspaceSnapshot;
-    if (typeof parsed?.syncedAt !== "number" || !Array.isArray(parsed?.messages)) return null;
-    return parsed;
+    const parsed = JSON.parse(raw) as Partial<WorkspaceSnapshot>;
+    if (typeof parsed?.syncedAt !== "number") return null;
+    // Coerce every list to an array so a malformed older snapshot
+    // can't crash the engine.
+    return {
+      syncedAt: parsed.syncedAt,
+      selfEmail: typeof parsed.selfEmail === "string" ? parsed.selfEmail : "",
+      messages: Array.isArray(parsed.messages) ? parsed.messages : [],
+      threads: Array.isArray(parsed.threads) ? parsed.threads : [],
+      events: Array.isArray(parsed.events) ? parsed.events : [],
+      contacts: Array.isArray(parsed.contacts) ? parsed.contacts : []
+    };
   } catch {
     return null;
   }

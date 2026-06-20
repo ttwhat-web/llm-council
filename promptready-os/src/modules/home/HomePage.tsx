@@ -298,9 +298,26 @@ export default function HomePage() {
   // mode keeps the hand-written content for reference / screenshots.
   const googleState = useSourcesStore((s) => s.google.state);
   const lastSyncMs = useSourcesStore((s) => s.google.lastSyncMs);
+  const lastErrors = useSourcesStore((s) => s.google.lastErrors);
+  const snapshot = useSourcesStore((s) => s.snapshot);
   const realBriefingItems = useSourcesStore((s) => s.briefing);
   const realPanelsRaw = useSourcesStore((s) => s.panels);
+  const syncGoogle = useSourcesStore((s) => s.syncGoogle);
   const sourcesConnected = googleState === "connected" || googleState === "syncing" || googleState === "error";
+
+  // Auto-sync on first mount when we have tokens but no snapshot
+  // (just-connected case) or the snapshot is older than 5 minutes.
+  const autoSyncedRef = useRef(false);
+  useEffect(() => {
+    if (autoSyncedRef.current) return;
+    if (googleState !== "connected" && googleState !== "error") return;
+    const stale = !snapshot || Date.now() - snapshot.syncedAt > 5 * 60 * 1000;
+    if (!stale) return;
+    autoSyncedRef.current = true;
+    void syncGoogle().catch(() => {
+      /* error state already captured by the store */
+    });
+  }, [googleState, snapshot, syncGoogle]);
 
   const firstName = getUserFirstName(isDemo);
   const greeting = greetingFor(now);
@@ -360,31 +377,42 @@ export default function HomePage() {
               {firstName ? `${greeting}, ${firstName}.` : `${greeting}.`}
             </h1>
             <p className="max-w-2xl text-[15px] leading-relaxed text-white/65">
-              {isDemo
-                ? "Bu sabah üç şeye dikkat etmen gerek. Aşağıdaki paneller dayanak veriyi gösteriyor."
-                : sourcesConnected
-                  ? briefing.length === 0
-                    ? "Sessiz bir sabah. Bugün için seni meşgul edecek bir şey görmüyorum."
-                    : `Bu sabah ${briefing.length === 1 ? "bir konu" : `${briefing.length} konu`} dikkatini hak ediyor. Paneller aşağıda dayanak veriyi gösteriyor.`
-                  : "Henüz bir kaynağa bağlı değilim, o yüzden bu sabah sana güvenebileceğin bir özet veremem. Bir kaynak bağlayalım — yarın gerçek bir özetle başlarız."}
+              {greetingSubtitle({
+                isDemo,
+                sourcesConnected,
+                googleState,
+                briefingCount: briefing.length,
+                snapshot,
+                lastErrors
+              })}
             </p>
             {sourcesConnected && (
-              <p className="text-[12.5px] text-white/40">
-                Watching · Gmail (last 14d) · Calendar (next 14d) · Contacts
-                {lastSyncMs ? ` · synced ${formatAgo(lastSyncMs)}` : ""}
+              <TrustLine
+                snapshot={snapshot}
+                lastSyncMs={lastSyncMs}
+                state={googleState}
+                onSyncNow={() => {
+                  autoSyncedRef.current = true;
+                  void syncGoogle().catch(() => {});
+                }}
+              />
+            )}
+            {googleState === "error" && lastErrors.length > 0 && (
+              <p className="rounded-lg bg-rose-500/[0.06] px-3 py-2 text-[12.5px] text-rose-200">
+                Last sync failed · {lastErrors[0]}
               </p>
             )}
           </header>
 
           {/* 40 % · Briefing — FACT / WHY / RECOMMENDATION */}
           <section aria-label="Executive briefing" className="flex flex-col gap-10">
-            {briefing.length === 0 ? (
-              <EmptyBriefing />
-            ) : (
+            {briefing.length > 0 ? (
               briefing.map((item) => (
                 <BriefingRow key={item.id} item={item} onOpen={() => openFocus(item.focus)} />
               ))
-            )}
+            ) : !sourcesConnected ? (
+              <EmptyBriefing />
+            ) : null}
           </section>
 
           {/* 40 % · Workspace · decision support */}
@@ -559,6 +587,95 @@ function liftPanel(p: RealPanelData): PanelData {
     why: [],
     move: []
   };
+}
+
+/**
+ * Choose the right greeting subtitle for the current state. Honest
+ * about why the briefing is short when it is.
+ */
+function greetingSubtitle(args: {
+  isDemo: boolean;
+  sourcesConnected: boolean;
+  googleState: string;
+  briefingCount: number;
+  snapshot: { messages: unknown[]; events: unknown[]; contacts: unknown[] } | null;
+  lastErrors: string[];
+}): string {
+  const { isDemo, sourcesConnected, googleState, briefingCount, snapshot, lastErrors } = args;
+  if (isDemo) {
+    return "Bu sabah üç şeye dikkat etmen gerek. Aşağıdaki paneller dayanak veriyi gösteriyor.";
+  }
+  if (!sourcesConnected) {
+    return "Henüz bir kaynağa bağlı değilim, o yüzden bu sabah sana güvenebileceğin bir özet veremem. Bir kaynak bağlayalım — yarın gerçek bir özetle başlarız.";
+  }
+  if (googleState === "syncing" && !snapshot) {
+    return "Operator senin için ilk taramayı yapıyor. Birkaç saniye…";
+  }
+  if (googleState === "error" && lastErrors.length > 0) {
+    return "Son senkronizasyon başarısız oldu. Aşağıda detayı, kaynaktan yeniden denemek için \"Sync now\" düğmesi var.";
+  }
+  if (!snapshot) {
+    return "Bağlandık, ama henüz veri taşımadım. Birkaç saniye içinde sabah özeti çıkacak.";
+  }
+  const msgs = snapshot.messages.length;
+  const evs = snapshot.events.length;
+  const con = snapshot.contacts.length;
+  if (briefingCount > 0) {
+    return `Bu sabah ${briefingCount === 1 ? "bir konu" : `${briefingCount} konu`} dikkatini hak ediyor. Paneller aşağıda dayanak veriyi gösteriyor.`;
+  }
+  // Connected with snapshot but no briefing items → say what we
+  // actually scanned and why it's quiet.
+  if (msgs === 0 && evs === 0) {
+    return `Son 14 günde gelen kutunda ve önümüzdeki 14 günde takviminde hiçbir şey yok. ${con} kişi rehberinde. Bir başka hesabı bağlamak ister misin?`;
+  }
+  if (msgs === 0) {
+    return `Son 14 günde gelen kutun boş. ${evs} takvim olayı var ama henüz dikkat isteyen bir şey yok.`;
+  }
+  if (evs === 0) {
+    return `${msgs} mesaj taradım, dikkat isteyen bir şey yok. Önümüzdeki 14 günde takvim olayı da yok.`;
+  }
+  return `${msgs} mesaj ve ${evs} takvim olayı taradım — bugün için seni meşgul edecek bir şey görmüyorum. Paneller aşağıda neyi gördüğümü gösteriyor.`;
+}
+
+/**
+ * The "Watching: …" trust line. Always shows what Operator can see,
+ * with a Sync now affordance for stale or error states.
+ */
+function TrustLine({
+  snapshot,
+  lastSyncMs,
+  state,
+  onSyncNow
+}: {
+  snapshot: { messages: unknown[]; events: unknown[]; contacts: unknown[] } | null;
+  lastSyncMs: number | null;
+  state: string;
+  onSyncNow: () => void;
+}) {
+  const msgs = snapshot?.messages.length ?? 0;
+  const evs = snapshot?.events.length ?? 0;
+  const con = snapshot?.contacts.length ?? 0;
+  const isSyncing = state === "syncing";
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-white/40">
+      <span>Watching · Gmail ({msgs} msgs, 14d) · Calendar ({evs} events, 14d) · Contacts ({con})</span>
+      {lastSyncMs && <span aria-hidden>·</span>}
+      {lastSyncMs && (
+        <span>
+          synced {formatAgo(lastSyncMs)}
+        </span>
+      )}
+      <span aria-hidden>·</span>
+      <button
+        type="button"
+        onClick={onSyncNow}
+        disabled={isSyncing}
+        className="text-white/65 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isSyncing ? "syncing…" : "sync now"}
+      </button>
+    </p>
+  );
 }
 
 function formatAgo(ts: number): string {

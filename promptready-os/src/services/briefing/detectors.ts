@@ -54,12 +54,47 @@ function isNoisySender(addr: string): boolean {
 
 function isExternalSender(addr: string, selfDomain: string): boolean {
   const d = (addr.split("@")[1] ?? "").toLowerCase();
-  return d !== "" && d !== selfDomain;
+  if (d === "") return false;
+  // For free email providers (personal Gmail, Yahoo, Outlook, etc.)
+  // the self-domain doesn't define a company boundary — every sender
+  // is "external". Returning true here means we don't filter anyone
+  // out based on domain match.
+  if (selfDomain === "") return true;
+  return d !== selfDomain;
 }
 
+/**
+ * Returns the company domain for the user, or "" if the user is on a
+ * free email provider where "internal vs external" makes no sense.
+ * When "" is returned, every sender is treated as external — only the
+ * noise filter (noreply / google notifications) trims results.
+ */
 function selfDomainOf(selfEmail: string): string {
-  return (selfEmail.split("@")[1] ?? "").toLowerCase();
+  const d = (selfEmail.split("@")[1] ?? "").toLowerCase();
+  if (FREE_EMAIL_PROVIDERS.has(d)) return "";
+  return d;
 }
+
+const FREE_EMAIL_PROVIDERS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "yahoo.co.uk",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "yandex.com",
+  "yandex.ru",
+  "gmx.com",
+  "gmx.de",
+  "mail.ru"
+]);
 
 function daysAgo(ms: number, now: number): number {
   return Math.max(0, Math.floor((now - ms) / DAY_MS));

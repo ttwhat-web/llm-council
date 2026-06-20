@@ -125,6 +125,27 @@ describe("detectStaleCustomerThreads", () => {
     expect(detectStaleCustomerThreads(snap({ threads: [thread("t1", [m1])] }))).toHaveLength(0);
   });
 
+  it("does NOT treat free-Gmail senders as internal when the user is on @gmail.com", () => {
+    // Personal Gmail users: no company domain → every external sender
+    // counts, even other @gmail.com addresses.
+    const personal = snap({
+      selfEmail: "tunc@gmail.com",
+      threads: [
+        thread("t1", [
+          msg({
+            id: "m1",
+            date: NOW - 5 * DAY,
+            fromAddress: "hans@gmail.com",
+            fromName: "Hans"
+          })
+        ])
+      ]
+    });
+    const out = detectStaleCustomerThreads(personal);
+    expect(out).toHaveLength(1);
+    expect(out[0].fact).toContain("Hans");
+  });
+
   it("returns one item with multiple evidence threads", () => {
     const t1 = thread("t1", [msg({ id: "a", date: NOW - 6 * DAY, fromAddress: "a@x.com" })]);
     const t2 = thread("t2", [msg({ id: "b", date: NOW - 4 * DAY, fromAddress: "b@x.com" })]);
