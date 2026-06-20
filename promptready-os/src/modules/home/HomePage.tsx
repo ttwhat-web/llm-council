@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import clsx from "clsx";
-import { ArrowRight, CornerDownLeft, Loader, X } from "lucide-react";
+import { ArrowRight, CornerDownLeft, ExternalLink, Loader, RefreshCw, X } from "lucide-react";
 import {
   useMissionStore,
   STAGES,
@@ -386,23 +386,20 @@ export default function HomePage() {
                 lastErrors
               })}
             </p>
-            {sourcesConnected && (
-              <TrustLine
-                snapshot={snapshot}
-                lastSyncMs={lastSyncMs}
-                state={googleState}
-                onSyncNow={() => {
-                  autoSyncedRef.current = true;
-                  void syncGoogle().catch(() => {});
-                }}
-              />
-            )}
-            {googleState === "error" && lastErrors.length > 0 && (
-              <p className="rounded-lg bg-rose-500/[0.06] px-3 py-2 text-[12.5px] text-rose-200">
-                Last sync failed · {lastErrors[0]}
-              </p>
-            )}
           </header>
+
+          {sourcesConnected && (
+            <WatchingBanner
+              snapshot={snapshot}
+              lastSyncMs={lastSyncMs}
+              state={googleState}
+              lastErrors={lastErrors}
+              onSyncNow={() => {
+                autoSyncedRef.current = true;
+                void syncGoogle().catch(() => {});
+              }}
+            />
+          )}
 
           {/* 40 % · Briefing — FACT / WHY / RECOMMENDATION */}
           <section aria-label="Executive briefing" className="flex flex-col gap-10">
@@ -414,6 +411,8 @@ export default function HomePage() {
               <EmptyBriefing />
             ) : null}
           </section>
+
+          {sourcesConnected && <DetectorSummary briefingItems={realBriefingItems} />}
 
           {/* 40 % · Workspace · decision support */}
           <section aria-label="Workspace" className="grid grid-cols-1 gap-x-10 gap-y-10 md:grid-cols-2">
@@ -638,43 +637,133 @@ function greetingSubtitle(args: {
 }
 
 /**
- * The "Watching: …" trust line. Always shows what Operator can see,
- * with a Sync now affordance for stale or error states.
+ * Watching banner · prominent, unmistakable acknowledgement that
+ * Operator is reading the connected source. This is the visible
+ * proof that Settings has done its job.
  */
-function TrustLine({
+function WatchingBanner({
   snapshot,
   lastSyncMs,
   state,
+  lastErrors,
   onSyncNow
 }: {
   snapshot: { messages: unknown[]; events: unknown[]; contacts: unknown[] } | null;
   lastSyncMs: number | null;
   state: string;
+  lastErrors: string[];
   onSyncNow: () => void;
 }) {
   const msgs = snapshot?.messages.length ?? 0;
   const evs = snapshot?.events.length ?? 0;
   const con = snapshot?.contacts.length ?? 0;
   const isSyncing = state === "syncing";
+  const isError = state === "error";
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-white/40">
-      <span>Watching · Gmail ({msgs} msgs, 14d) · Calendar ({evs} events, 14d) · Contacts ({con})</span>
-      {lastSyncMs && <span aria-hidden>·</span>}
-      {lastSyncMs && (
-        <span>
-          synced {formatAgo(lastSyncMs)}
+    <section
+      aria-label="Operator is watching"
+      className="flex flex-col gap-3 rounded-2xl bg-emerald-500/[0.04] px-5 py-4"
+    >
+      <header className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className={clsx(
+              "h-2 w-2 rounded-full",
+              isError ? "bg-rose-300" : isSyncing ? "animate-pulse bg-amber-300" : "bg-emerald-300"
+            )}
+          />
+          <span className="text-[13.5px] font-medium text-white">
+            Operator is watching Google Workspace
+          </span>
         </span>
+        <button
+          type="button"
+          onClick={onSyncNow}
+          disabled={isSyncing}
+          className="inline-flex items-center gap-1 rounded-full bg-white/[0.05] px-3 py-1 text-[11.5px] font-medium text-white/85 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <RefreshCw className={clsx("h-3 w-3", isSyncing && "animate-spin")} />
+          {isSyncing ? "syncing…" : "sync now"}
+        </button>
+      </header>
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-[13px] sm:grid-cols-3">
+        <SrcLine label="Gmail" detail={`${msgs} messages (last 14d)`} />
+        <SrcLine label="Calendar" detail={`${evs} events (next 14d)`} />
+        <SrcLine label="Contacts" detail={`${con}`} />
+      </dl>
+      <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[12px] text-white/55">
+        <span>{lastSyncMs ? `Last sync ${formatAgo(lastSyncMs)}` : "Not synced yet"}</span>
+        <span aria-hidden className="text-white/25">·</span>
+        <Link
+          to="/settings"
+          className="inline-flex items-center gap-1 text-white/75 transition hover:text-white"
+        >
+          Open Google source details <ExternalLink className="h-3 w-3" />
+        </Link>
+      </footer>
+      {isError && lastErrors.length > 0 && (
+        <p className="rounded-lg bg-rose-500/[0.08] px-3 py-2 text-[12.5px] text-rose-200">
+          Last sync failed · {lastErrors[0]}
+        </p>
       )}
-      <span aria-hidden>·</span>
-      <button
-        type="button"
-        onClick={onSyncNow}
-        disabled={isSyncing}
-        className="text-white/65 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {isSyncing ? "syncing…" : "sync now"}
-      </button>
-    </p>
+    </section>
+  );
+}
+
+function SrcLine({ label, detail }: { label: string; detail: string }) {
+  return (
+    <span className="flex items-baseline gap-2">
+      <dt className="text-white/55">{label}</dt>
+      <dd className="text-white tabular-nums">{detail}</dd>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Detector summary · what Operator looked for today
+// ---------------------------------------------------------------------------
+
+interface DetectorRow {
+  id: string;
+  label: string;
+}
+
+const DETECTOR_ROWS: DetectorRow[] = [
+  { id: "stale-customer-thread", label: "Stale customer threads" },
+  { id: "unanswered-email", label: "Unanswered inbox mail" },
+  { id: "commitment-detector", label: "Open commitments" },
+  { id: "payment-keyword", label: "Payment-related messages" },
+  { id: "calendar-conflict", label: "Calendar conflicts" },
+  { id: "unprepared-meeting", label: "Unprepared meetings" }
+];
+
+function DetectorSummary({ briefingItems }: { briefingItems: RealBriefingItem[] }) {
+  const fired: Set<string> = new Set(briefingItems.map((b) => b.detector));
+  return (
+    <section aria-label="What Operator looked for" className="flex flex-col gap-3">
+      <h2 className="text-[13px] font-medium text-white/45">What I looked for today</h2>
+      <ul className="grid grid-cols-1 gap-y-1.5 sm:grid-cols-2">
+        {DETECTOR_ROWS.map((d) => {
+          const found = fired.has(d.id);
+          return (
+            <li key={d.id} className="flex items-baseline gap-2 text-[13px]">
+              <span
+                aria-hidden
+                className={clsx(
+                  "h-1.5 w-1.5 shrink-0 translate-y-px rounded-full",
+                  found ? "bg-emerald-300" : "bg-white/25"
+                )}
+              />
+              <span className={found ? "text-white/85" : "text-white/55"}>{d.label}</span>
+              <span className={clsx("ml-auto text-[12px]", found ? "text-emerald-300" : "text-white/35")}>
+                {found ? "matched" : "nothing found"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
