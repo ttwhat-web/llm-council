@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { GoogleSourceCard } from "@/components/settings/GoogleSourceCard";
+import { MemoryCard } from "@/components/settings/MemoryCard";
 import { useAiProviderStore } from "@/store/aiProvider";
 import {
   AlertTriangle,
@@ -175,19 +176,176 @@ function ProviderKeyRow({ label, placeholder, storeBinding }: ProviderKeyRowProp
 }
 
 export default function SettingsPage() {
-  const [telemetry, setTelemetry] = useState(false);
-  const [safetyScreen, setSafetyScreen] = useState(true);
+  const [devMode, setDevMode] = useState<boolean>(() => readDevMode());
+  useEffect(() => writeDevMode(devMode), [devMode]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-5 py-5 md:px-7 md:py-7">
-      <SurfaceHeader
-        eyebrow="settings · operator preferences"
-        title="Settings"
-        sub="Auto-setup, appearance, BYOK keys, safety, telemetry, mobile companion. Keys you paste stay in memory for this session only — keychain lands with the desktop runtime."
-      />
+    <div className="mx-auto flex w-full max-w-[820px] flex-col gap-6 px-8 py-12">
+      <header className="flex flex-col gap-2">
+        <h1 className="text-[28px] font-semibold tracking-tight text-white">Settings</h1>
+        <p className="text-[13px] leading-relaxed text-white/55">
+          Sources, AI keys, and what Operator knows about you. Everything stays
+          on this device.
+        </p>
+      </header>
 
       <GoogleSourceCard />
 
+      <MemoryCard />
+
+      <AiKeysCard />
+
+      <VoiceCard />
+
+      <AccountCard />
+
+      <AboutCard devMode={devMode} onToggleDev={setDevMode} />
+
+      {devMode && (
+        <section className="flex flex-col gap-4 rounded-2xl bg-amber-500/[0.04] p-5">
+          <header className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-amber-300" />
+              <span className="text-[13px] font-medium text-white">
+                Developer Mode · legacy panels
+              </span>
+            </span>
+            <span className="rounded-full bg-amber-500/[0.12] px-3 py-1 text-[11px] text-amber-200">
+              experimental
+            </span>
+          </header>
+          <p className="text-[12.5px] leading-relaxed text-white/55">
+            These panels are not part of the shipped product surface. They survive
+            here so internal tools, diagnostics, and earlier experiments stay
+            reachable while the main product stays clean.
+          </p>
+          <LegacySettingsPanels />
+        </section>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// New cards
+// ---------------------------------------------------------------------------
+
+function AiKeysCard() {
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl bg-white/[0.025] p-5">
+      <header className="flex flex-col gap-1">
+        <span className="text-[11px] uppercase tracking-[0.15em] text-white/40">AI Keys</span>
+        <h2 className="text-[18px] font-semibold tracking-tight text-white">
+          <Key className="mr-2 inline h-4 w-4 -translate-y-px text-white/65" />
+          Bring your own provider keys
+        </h2>
+        <p className="text-[12.5px] leading-relaxed text-white/55">
+          Operator uses your own provider key for drafting and (later) briefing
+          narration. Keys live on this device only. Anthropic is wired today;
+          OpenAI and Google land later.
+        </p>
+      </header>
+      <ProviderKeyRow label="Anthropic" placeholder="sk-ant-…" storeBinding="anthropic" />
+      <p className="rounded-md bg-amber-500/[0.05] px-3 py-2 text-[11.5px] text-amber-200/85">
+        OpenAI and Google rows are visible for transparency but not wired yet.
+        Pasting a key there has no effect.
+      </p>
+      <div className="flex flex-col gap-1 opacity-60">
+        <ProviderKeyRow label="OpenAI" placeholder="sk-…" />
+        <ProviderKeyRow label="Google" placeholder="AIza…" />
+      </div>
+    </section>
+  );
+}
+
+function VoiceCard() {
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl bg-white/[0.025] p-5">
+      <header className="flex flex-col gap-1">
+        <span className="text-[11px] uppercase tracking-[0.15em] text-white/40">Voice</span>
+        <h2 className="text-[18px] font-semibold tracking-tight text-white">
+          Voice · coming later
+        </h2>
+      </header>
+      <p className="text-[12.5px] leading-relaxed text-white/55">
+        Voice will use ElevenLabs for low-latency speech-to-text and
+        text-to-speech. Push-to-talk from the header mic, hands-free in the car,
+        Operator reads briefings aloud. Not implemented yet — the mic button in
+        the header shows the same honest message.
+      </p>
+    </section>
+  );
+}
+
+function AccountCard() {
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl bg-white/[0.025] p-5">
+      <header className="flex flex-col gap-1">
+        <span className="text-[11px] uppercase tracking-[0.15em] text-white/40">Account</span>
+        <h2 className="text-[18px] font-semibold tracking-tight text-white">Local only</h2>
+      </header>
+      <p className="text-[12.5px] leading-relaxed text-white/55">
+        Operator runs on this device. There is no cloud account today — no
+        sign-in, no billing portal, no sync. Multi-device sync and billing land
+        before the first paid plan ships.
+      </p>
+    </section>
+  );
+}
+
+function AboutCard({ devMode, onToggleDev }: { devMode: boolean; onToggleDev: (v: boolean) => void }) {
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl bg-white/[0.025] p-5">
+      <header className="flex flex-col gap-1">
+        <span className="text-[11px] uppercase tracking-[0.15em] text-white/40">About</span>
+        <h2 className="text-[18px] font-semibold tracking-tight text-white">Operator Center</h2>
+      </header>
+      <p className="text-[12.5px] leading-relaxed text-white/55">
+        Your AI Chief of Staff. Local-first, BYOK, read-only sources by default.
+      </p>
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <label className="flex items-center gap-2 text-[12.5px] text-white/75">
+          <input
+            type="checkbox"
+            checked={devMode}
+            onChange={(e) => onToggleDev(e.target.checked)}
+            className="h-3.5 w-3.5 accent-accent"
+          />
+          Developer Mode · show legacy panels
+        </label>
+        <span className="text-[11px] text-white/35">v0.1 · BYOK · local</span>
+      </div>
+    </section>
+  );
+}
+
+const DEV_MODE_KEY = "operator.settings.devMode";
+function readDevMode(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(DEV_MODE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeDevMode(v: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DEV_MODE_KEY, v ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Legacy panels · everything that used to live on Settings, now behind
+// Developer Mode. Render path is preserved verbatim from the prior
+// shipped version so internal tools stay reachable.
+// ---------------------------------------------------------------------------
+
+function LegacySettingsPanels() {
+  return (
+    <div className="flex flex-col gap-5">
       <PerfectSetupGuide />
 
       <Foldable
@@ -249,127 +407,38 @@ export default function SettingsPage() {
         <ThemeSwitcher variant="inline" />
       </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <article className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <header className="flex items-center gap-2">
-            <Key className="h-3.5 w-3.5 text-accent" />
-            <span className="text-[13px] font-semibold text-white">BYOK · provider keys</span>
-          </header>
-          <p className="text-[11px] text-white/55">
-            Bring your own keys. Routing flips to your account when keys are
-            present. Local engines always work without keys.
-          </p>
-          <ProviderKeyRow label="Anthropic" placeholder="sk-ant-…" storeBinding="anthropic" />
-          <ProviderKeyRow label="OpenAI" placeholder="sk-…" />
-          <ProviderKeyRow label="Google" placeholder="AIza…" />
-          <p className="flex items-start gap-1.5 rounded-md border border-amber-400/25 bg-amber-500/[0.05] p-2 text-[10.5px] text-amber-200/80">
-            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-            Keys stay in this preview's memory only.
-          </p>
-        </article>
-
-        <article className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <header className="flex items-center gap-2">
-            <Cpu className="h-3.5 w-3.5 text-accent" />
-            <span className="text-[13px] font-semibold text-white">Local engine</span>
-          </header>
-          <p className="text-[11px] text-white/55">
-            Operator Core prefers a local Ollama instance when reachable.
-            The probe runs on first mission or from Auto-configure above.
-          </p>
-          <div className="rounded-md border border-white/8 bg-white/[0.015] p-3 font-mono text-[11px]">
-            <div className="flex items-center justify-between">
-              <span className="text-white/45">ollama host</span>
-              <span className="text-white">http://localhost:11434</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-white/45">status</span>
-              <span className="text-white/55">probe via Auto-configure</span>
-            </div>
-          </div>
-        </article>
-
-        <article className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <header className="flex items-center gap-2">
-            <ShieldCheck className="h-3.5 w-3.5 text-accent" />
-            <span className="text-[13px] font-semibold text-white">Safety screen</span>
-          </header>
-          <p className="text-[11px] text-white/55">
-            Before any terminal command runs, the screen previews + asks for
-            confirmation. Recommended on.
-          </p>
-          <Toggle
-            value={safetyScreen}
-            onToggle={() => setSafetyScreen((v) => !v)}
-            label={safetyScreen ? "Armed" : "Disarmed"}
-          />
-        </article>
-
-        <article className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-          <header className="flex items-center gap-2">
-            <TerminalIcon className="h-3.5 w-3.5 text-accent" />
-            <span className="text-[13px] font-semibold text-white">Telemetry</span>
-          </header>
-          <p className="text-[11px] text-white/55">
-            Off by default. When on, anonymous usage counts are sent —
-            never brief content or deliverables.
-          </p>
-          <Toggle
-            value={telemetry}
-            onToggle={() => setTelemetry((v) => !v)}
-            label={telemetry ? "Sharing anonymous counts" : "Off"}
-          />
-        </article>
-      </section>
-
-      <SettingsSection letter="R" label="Remote" hint="Comms · Phone · Telegram · Email" />
-      <RemoteTeaser />
-      <CommunicationsRuntimeCard />
-      <EmailRuntimeCard />
-      <TelegramCompanionCard />
-      <TelegramLiveCard />
-      <RuntimeShieldCard />
       <Foldable title="Mobile Companion" hint="planned · secure pairing" persistKey="mobile-companion">
         <MobileCompanionCard />
       </Foldable>
       <Foldable title="Compliance" hint="local · BYOK · no telemetry" persistKey="compliance">
         <ComplianceCard />
       </Foldable>
-
-      <SettingsSection letter="B" label="Brain" hint="Health · Snapshots · Restore" />
-      <BrainHealthCard />
-      <BrainScoreCard />
-      <BrainPassportCard />
-      <SnapshotsCard />
       <Foldable title="Audit Log" hint="local event ledger" persistKey="audit-log">
         <AuditLogCard />
       </Foldable>
-      <Foldable title="Desktop Trust" hint="storage · path · reset" persistKey="desktop-trust">
-        <DesktopTrustCard />
+      <Foldable title="Brain health" hint="size · sources · freshness" persistKey="brain-health">
+        <BrainHealthCard />
       </Foldable>
-      <Foldable title="Diagnostics" hint="export markdown" persistKey="diagnostics">
+      <Foldable title="Diagnostics" hint="export · scrub · share" persistKey="diagnostics">
         <DiagnosticsCard />
       </Foldable>
-
-      <SettingsSection letter="O" label="Operator" hint="Launch · Founder · Field Test" />
-      <LaunchReadinessCard />
-      <FounderBetaCard />
-      <ButtonAuditCard />
-      <FieldTestModeCard />
-      <Foldable title="Packaging" hint="macOS · Windows · Linux" persistKey="packaging">
+      <Foldable title="Packaging" hint="export · backup · share" persistKey="packaging">
         <PackagingCard />
       </Foldable>
-      <Foldable title="Connector Hub" hint="planned" persistKey="connector-hub" badge={<PlanBadge tier="elite" />}>
-        <ConnectorHubCard />
+      <Foldable title="Snapshots" hint="restore points" persistKey="snapshots">
+        <SnapshotsCard />
       </Foldable>
-      <Foldable title="Cloud Sync" hint="planned · opt-in" persistKey="cloud-sync" badge={<PlanBadge tier="elite" />}>
-        <CloudSyncCard />
+      <Foldable title="Desktop Trust" hint="cmd allowlist · trust" persistKey="desktop-trust">
+        <DesktopTrustCard />
       </Foldable>
-      <Foldable title="Mobile Companion · roadmap" hint="planned" persistKey="mobile-roadmap">
-        <MobileCompanionRoadmapCard />
+      <Foldable title="Command Console" hint="trusted shell commands" persistKey="command-console">
+        <CommandConsole />
       </Foldable>
-      <Foldable title="Enterprise Server" hint="planned" persistKey="enterprise-server" badge={<PlanBadge tier="elite" />}>
-        <EnterpriseServerCard />
+      <Foldable title="Telegram Companion" hint="bridge · presence · queue" persistKey="telegram-companion">
+        <TelegramCompanionCard />
+      </Foldable>
+      <Foldable title="Telegram Bridge Simulator" hint="local test queue" persistKey="bridge-simulator">
+        <BridgeSimulator />
       </Foldable>
     </div>
   );

@@ -21,6 +21,7 @@ import { Check, Copy, ExternalLink, Loader, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { useSourcesStore } from "@/store/sources";
 import { useAiProviderStore } from "@/store/aiProvider";
+import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import {
   buildGmailComposeUrl,
   draftReply
@@ -48,11 +49,15 @@ type DraftState =
 export function DraftReplies() {
   const snapshot = useSourcesStore((s) => s.snapshot);
   const anthropicKey = useAiProviderStore((s) => s.anthropicKey);
+  const memory = useOperatorMemoryStore((s) => s.memory);
   const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
   const [busy, setBusy] = useState(false);
 
   const candidates = useMemo(() => collectCandidates(snapshot), [snapshot]);
-  const founderFirstName = readFounderName();
+  // Prefer the memory's firstName when set; otherwise fall back to
+  // the legacy localStorage value so existing users don't lose their
+  // greeting after this commit.
+  const founderFirstName = memory.firstName?.trim() || readFounderName();
 
   const draftAll = useCallback(async () => {
     if (!anthropicKey) return;
@@ -70,7 +75,8 @@ export function DraftReplies() {
         {
           context: c,
           founderFirstName,
-          intent: "follow-up"
+          intent: "follow-up",
+          memory
         },
         anthropicKey
       );
@@ -83,7 +89,7 @@ export function DraftReplies() {
       }));
     }
     setBusy(false);
-  }, [anthropicKey, candidates, founderFirstName]);
+  }, [anthropicKey, candidates, founderFirstName, memory]);
 
   if (candidates.length === 0) return null;
 
@@ -114,11 +120,16 @@ export function DraftReplies() {
           The deterministic engine surfaced these customers. To generate replies,
           add an Anthropic API key in{" "}
           <Link to="/settings" className="underline-offset-2 hover:underline">
-            Settings → BYOK · provider keys
+            Settings → AI Keys
           </Link>
           . Keys stay on this device.
         </div>
       )}
+
+      <p className="text-[12px] leading-relaxed text-white/45">
+        Sending happens in Gmail. Operator prepares the draft; you review and send.
+        Operator does not have permission to send mail on your behalf.
+      </p>
 
       <ul className="flex flex-col gap-3">
         {candidates.slice(0, MAX_DRAFTS_PER_BATCH).map((c) => {

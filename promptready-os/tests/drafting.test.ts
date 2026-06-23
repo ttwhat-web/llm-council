@@ -15,7 +15,14 @@ import {
   buildGmailComposeUrl
 } from "@/services/drafting/draftReply";
 import { OPERATOR_SYSTEM_PROMPT } from "@/services/operator/voice";
-import { DEMO_FOUNDER_SEED, renderFounderProfile } from "@/services/operator/memorySeed";
+import {
+  DEMO_FOUNDER_SEED,
+  EMPTY_MEMORY,
+  isMemoryPopulated,
+  renderFounderProfile,
+  renderMemoryForPrompt,
+  type FounderMemory
+} from "@/services/operator/memorySeed";
 import type { DraftRequest } from "@/services/drafting/types";
 import type { GmailMessage } from "@/services/google/types";
 
@@ -211,5 +218,71 @@ describe("memorySeed", () => {
       expect(OPERATOR_SYSTEM_PROMPT).not.toContain(company);
     }
     expect(OPERATOR_SYSTEM_PROMPT).not.toContain(DEMO_FOUNDER_SEED.firstName);
+  });
+});
+
+describe("FounderMemory v0", () => {
+  it("EMPTY_MEMORY is reported as empty by isMemoryPopulated", () => {
+    expect(isMemoryPopulated(EMPTY_MEMORY)).toBe(false);
+  });
+
+  it("renderMemoryForPrompt returns '' for empty memory (no prompt pollution)", () => {
+    expect(renderMemoryForPrompt(EMPTY_MEMORY)).toBe("");
+    expect(renderMemoryForPrompt(null)).toBe("");
+  });
+
+  it("renderMemoryForPrompt produces a profile block when fields are populated", () => {
+    const m: FounderMemory = {
+      ...EMPTY_MEMORY,
+      firstName: "Tunç",
+      preferredLanguage: "Turkish",
+      companies: ["Habitat VIP Travel", "Erguvan Turizm"],
+      communicationRules: "Warm but brief. Sign Tunç."
+    };
+    const out = renderMemoryForPrompt(m);
+    expect(out).toContain("Founder profile (from memory)");
+    expect(out).toContain("Name: Tunç");
+    expect(out).toContain("Preferred language: Turkish");
+    expect(out).toContain("Companies: Habitat VIP Travel, Erguvan Turizm");
+    expect(out).toContain("Communication rules: Warm but brief. Sign Tunç.");
+  });
+});
+
+describe("draft prompt + memory", () => {
+  const baseReq = {
+    context: {
+      customerName: "Hans Müller",
+      customerEmail: "hans@acme.de",
+      threadMessages: [],
+      daysSinceLastInbound: 5,
+      subject: "Tour package"
+    },
+    founderFirstName: "Tunç",
+    intent: "follow-up" as const
+  };
+
+  it("includes the founder profile block when memory is provided", () => {
+    const m: FounderMemory = {
+      ...EMPTY_MEMORY,
+      firstName: "Tunç",
+      companies: ["Habitat VIP Travel"],
+      tonePreference: "Warm, slightly formal"
+    };
+    const out = buildDraftPrompt({ ...baseReq, memory: m });
+    expect(out).toContain("Founder profile (from memory)");
+    expect(out).toContain("Habitat VIP Travel");
+    expect(out).toContain("Tone preference: Warm, slightly formal");
+  });
+
+  it("does NOT include a profile block when memory is null or empty", () => {
+    const a = buildDraftPrompt({ ...baseReq, memory: null });
+    const b = buildDraftPrompt({ ...baseReq, memory: EMPTY_MEMORY });
+    expect(a).not.toContain("Founder profile (from memory)");
+    expect(b).not.toContain("Founder profile (from memory)");
+  });
+
+  it("instructs the model to not invent facts outside the thread + profile", () => {
+    const out = buildDraftPrompt({ ...baseReq, memory: null });
+    expect(out).toContain("Do not invent customer-specific facts");
   });
 });

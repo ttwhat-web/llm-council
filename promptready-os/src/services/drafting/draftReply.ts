@@ -18,6 +18,7 @@
 import type { DraftRequest, DraftResult } from "./types";
 import type { GmailMessage } from "@/services/google/types";
 import { OPERATOR_SYSTEM_PROMPT } from "@/services/operator/voice";
+import { renderMemoryForPrompt } from "@/services/operator/memorySeed";
 
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5-20251001";
@@ -29,16 +30,23 @@ interface RawAnthropicResponse {
 }
 
 export function buildDraftPrompt(req: DraftRequest): string {
-  const { context, founderFirstName } = req;
+  const { context, founderFirstName, memory } = req;
   const signature = founderFirstName ? `— ${founderFirstName}` : "—";
   const transcript = context.threadMessages
     .slice(-5)
     .map(messageToTranscriptLine)
     .join("\n\n");
 
+  const memoryBlock = renderMemoryForPrompt(memory ?? null);
+
   // The system prompt (Operator voice) carries identity, tone, and
-  // response rules. This user message carries the task and the data.
-  return [
+  // response rules. This user message carries the task, the data,
+  // and — when present — the founder profile block from memory.
+  const parts: string[] = [];
+  if (memoryBlock) {
+    parts.push(memoryBlock, "");
+  }
+  parts.push(
     `Task: draft a follow-up email body for the customer below.`,
     ``,
     `Customer: ${context.customerName} <${context.customerEmail}>`,
@@ -57,8 +65,11 @@ export function buildDraftPrompt(req: DraftRequest): string {
     `  * Sign off with exactly: "${signature}"`,
     `  * Return ONLY the email body — no subject line, no "Re: …",`,
     `    no commentary, no quotation marks. Just the text the founder`,
-    `    will paste into Gmail.`
-  ].join("\n");
+    `    will paste into Gmail.`,
+    `  * Do not invent customer-specific facts that are not in the`,
+    `    thread or the founder profile above.`
+  );
+  return parts.join("\n");
 }
 
 function messageToTranscriptLine(m: GmailMessage): string {

@@ -7,6 +7,7 @@
  */
 
 import type { GmailMessage } from "@/services/google/types";
+import type { FounderMemory } from "@/services/operator/memorySeed";
 
 export interface DraftContext {
   /** The customer we're drafting to. */
@@ -26,6 +27,11 @@ export interface DraftRequest {
   founderFirstName: string | null;
   /** "follow-up" is the only intent in P0. More verbs land in P1. */
   intent: "follow-up";
+  /** Optional founder memory. When present, spliced into the prompt
+   *  as a profile block so the draft uses real company / tone /
+   *  preferred-language context. When null, no profile block is
+   *  added and Operator stays generic. */
+  memory?: FounderMemory | null;
 }
 
 export interface DraftResponse {

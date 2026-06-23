@@ -14,6 +14,57 @@
  * universal regardless.
  */
 
+/**
+ * The shape of editable founder memory. Every field is optional;
+ * empty memory means Operator stays generic.
+ *
+ * Stored locally in the user memory store (operatorMemory). Demo
+ * mode loads DEMO_FOUNDER_SEED into this same shape when ?demo=1.
+ */
+export interface FounderMemory {
+  firstName?: string;
+  fullName?: string;
+  preferredLanguage?: string;
+  tonePreference?: string;
+  companies: string[];
+  keyCustomers: string[];
+  projects: string[];
+  importantMarkets: string[];
+  communicationRules: string;
+  rememberThese: string;
+  avoidThese: string;
+}
+
+export const EMPTY_MEMORY: FounderMemory = {
+  firstName: undefined,
+  fullName: undefined,
+  preferredLanguage: undefined,
+  tonePreference: undefined,
+  companies: [],
+  keyCustomers: [],
+  projects: [],
+  importantMarkets: [],
+  communicationRules: "",
+  rememberThese: "",
+  avoidThese: ""
+};
+
+/** True when memory contains at least one usable field. */
+export function isMemoryPopulated(m: FounderMemory): boolean {
+  if (m.firstName?.trim()) return true;
+  if (m.fullName?.trim()) return true;
+  if (m.preferredLanguage?.trim()) return true;
+  if (m.tonePreference?.trim()) return true;
+  if (m.companies.length > 0) return true;
+  if (m.keyCustomers.length > 0) return true;
+  if (m.projects.length > 0) return true;
+  if (m.importantMarkets.length > 0) return true;
+  if (m.communicationRules.trim()) return true;
+  if (m.rememberThese.trim()) return true;
+  if (m.avoidThese.trim()) return true;
+  return false;
+}
+
 export interface FounderMemorySeed {
   firstName: string;
   fullName?: string;
@@ -58,6 +109,46 @@ export function renderFounderProfile(seed: FounderMemorySeed | null): string {
   }
   if (seed.customerSegments && seed.customerSegments.length > 0) {
     lines.push(`  Customer segments: ${seed.customerSegments.join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Render the editable FounderMemory as a profile block for AI calls.
+ * Returns "" when memory is empty so the prompt stays clean.
+ */
+export function renderMemoryForPrompt(m: FounderMemory | null): string {
+  if (!m || !isMemoryPopulated(m)) return "";
+  const lines: string[] = ["Founder profile (from memory):"];
+  if (m.firstName?.trim()) {
+    lines.push(`  Name: ${m.firstName.trim()}${m.fullName?.trim() ? ` (${m.fullName.trim()})` : ""}`);
+  }
+  if (m.preferredLanguage?.trim()) {
+    lines.push(`  Preferred language: ${m.preferredLanguage.trim()}`);
+  }
+  if (m.tonePreference?.trim()) {
+    lines.push(`  Tone preference: ${m.tonePreference.trim()}`);
+  }
+  if (m.companies.length > 0) {
+    lines.push(`  Companies: ${m.companies.join(", ")}`);
+  }
+  if (m.keyCustomers.length > 0) {
+    lines.push(`  Key customers: ${m.keyCustomers.join(", ")}`);
+  }
+  if (m.projects.length > 0) {
+    lines.push(`  Projects: ${m.projects.join(", ")}`);
+  }
+  if (m.importantMarkets.length > 0) {
+    lines.push(`  Important markets: ${m.importantMarkets.join(", ")}`);
+  }
+  if (m.communicationRules.trim()) {
+    lines.push(`  Communication rules: ${m.communicationRules.trim()}`);
+  }
+  if (m.rememberThese.trim()) {
+    lines.push(`  Remember: ${m.rememberThese.trim()}`);
+  }
+  if (m.avoidThese.trim()) {
+    lines.push(`  Avoid: ${m.avoidThese.trim()}`);
   }
   return lines.join("\n");
 }
