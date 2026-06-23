@@ -15,6 +15,7 @@ import {
   buildGmailComposeUrl
 } from "@/services/drafting/draftReply";
 import { OPERATOR_SYSTEM_PROMPT } from "@/services/operator/voice";
+import { DEMO_FOUNDER_SEED, renderFounderProfile } from "@/services/operator/memorySeed";
 import type { DraftRequest } from "@/services/drafting/types";
 import type { GmailMessage } from "@/services/google/types";
 
@@ -131,12 +132,20 @@ describe("OPERATOR_SYSTEM_PROMPT", () => {
     expect(idx("4. Reputation")).toBeGreaterThan(idx("3. Deadlines"));
   });
 
-  it("knows the founder's businesses", () => {
-    expect(OPERATOR_SYSTEM_PROMPT).toContain("Tunç");
-    expect(OPERATOR_SYSTEM_PROMPT).toContain("Habitat VIP Travel");
-    expect(OPERATOR_SYSTEM_PROMPT).toContain("Erguvan Turizm");
-    expect(OPERATOR_SYSTEM_PROMPT).toContain("Avanos Halı");
-    expect(OPERATOR_SYSTEM_PROMPT).toContain("Perge Jewels");
+  it("does NOT hardcode any specific founder name or company", () => {
+    // The voice contract is universal. Personal context lives in
+    // memory / sources / profile — never in the global prompt.
+    expect(OPERATOR_SYSTEM_PROMPT).not.toContain("Tunç");
+    expect(OPERATOR_SYSTEM_PROMPT).not.toContain("Habitat VIP Travel");
+    expect(OPERATOR_SYSTEM_PROMPT).not.toContain("Erguvan Turizm");
+    expect(OPERATOR_SYSTEM_PROMPT).not.toContain("Avanos Halı");
+    expect(OPERATOR_SYSTEM_PROMPT).not.toContain("Perge Jewels");
+  });
+
+  it("instructs the model to source company context from memory + sources", () => {
+    expect(OPERATOR_SYSTEM_PROMPT).toMatch(/come from memory and connected sources/);
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Never invent company context.");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("If memory is empty, stay generic.");
   });
 });
 
@@ -171,5 +180,36 @@ describe("buildGmailComposeUrl", () => {
     expect(u.searchParams.get("su")).toBe("Re: Tour package");
     expect(u.searchParams.get("body")).toContain("Lieber Hans");
     expect(u.searchParams.get("body")).toContain("— Tunç");
+  });
+});
+
+describe("memorySeed", () => {
+  it("DEMO_FOUNDER_SEED carries the demo-only founder context", () => {
+    expect(DEMO_FOUNDER_SEED.firstName).toBe("Tunç");
+    expect(DEMO_FOUNDER_SEED.companies).toContain("Habitat VIP Travel");
+    expect(DEMO_FOUNDER_SEED.companies).toContain("Erguvan Turizm");
+    expect(DEMO_FOUNDER_SEED.companies).toContain("Avanos Halı");
+    expect(DEMO_FOUNDER_SEED.companies).toContain("Perge Jewels");
+  });
+
+  it("renderFounderProfile returns '' for a null seed (so callers can interpolate unconditionally)", () => {
+    expect(renderFounderProfile(null)).toBe("");
+  });
+
+  it("renderFounderProfile names the founder + companies + markets when provided", () => {
+    const out = renderFounderProfile(DEMO_FOUNDER_SEED);
+    expect(out).toContain("Founder profile (from memory)");
+    expect(out).toContain("Tunç");
+    expect(out).toContain("Habitat VIP Travel");
+    expect(out).toContain("European luxury");
+  });
+
+  it("the seed file is not the voice prompt — the global prompt stays clean", () => {
+    // Belt-and-braces: the voice prompt must not contain any string
+    // that uniquely lives in the seed.
+    for (const company of DEMO_FOUNDER_SEED.companies) {
+      expect(OPERATOR_SYSTEM_PROMPT).not.toContain(company);
+    }
+    expect(OPERATOR_SYSTEM_PROMPT).not.toContain(DEMO_FOUNDER_SEED.firstName);
   });
 });
