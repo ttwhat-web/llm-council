@@ -11,6 +11,7 @@ import {
   type MissionStage
 } from "@/store/mission";
 import { useSourcesStore } from "@/store/sources";
+import { DraftReplies } from "@/components/home/DraftReplies";
 import type { BriefingItem as RealBriefingItem } from "@/services/briefing/types";
 import type { PanelData as RealPanelData } from "@/services/briefing/engine";
 
@@ -434,7 +435,7 @@ export default function HomePage() {
       </main>
 
       {focus && (
-        <FocusColumn focus={focus} data={panels?.[focus] ?? null} onClose={closeFocus} />
+        <FocusColumn focus={focus} data={panels?.[focus] ?? null} isDemo={isDemo} onClose={closeFocus} />
       )}
     </div>
   );
@@ -795,10 +796,12 @@ function defaultLabel(focus: FocusKey): string {
 function FocusColumn({
   focus,
   data,
+  isDemo,
   onClose
 }: {
   focus: FocusKey;
   data: PanelData | null;
+  isDemo: boolean;
   onClose: () => void;
 }) {
   const label = data?.label ?? defaultLabel(focus);
@@ -896,6 +899,9 @@ function FocusColumn({
               ))}
             </ul>
           </section>
+
+          {/* P0 closed loop · drafts for stale customer threads. */}
+          {focus === "customers" && !isDemo && <DraftReplies />}
         </div>
       ) : (
         <div className="px-7 pt-6">

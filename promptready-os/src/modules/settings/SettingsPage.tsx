@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { GoogleSourceCard } from "@/components/settings/GoogleSourceCard";
+import { useAiProviderStore } from "@/store/aiProvider";
 import {
   AlertTriangle,
   Apple,
@@ -111,15 +112,35 @@ import {
 interface ProviderKeyRowProps {
   label: string;
   placeholder: string;
+  /** Optional binding to the AI provider store — when set, the row
+   *  persists keystrokes (debounced) and shows a "Saved" pill. */
+  storeBinding?: "anthropic";
 }
 
-function ProviderKeyRow({ label, placeholder }: ProviderKeyRowProps) {
-  const [value, setValue] = useState("");
+function ProviderKeyRow({ label, placeholder, storeBinding }: ProviderKeyRowProps) {
+  const anthropicKey = useAiProviderStore((s) => s.anthropicKey);
+  const saveKey = useAiProviderStore((s) => s.saveKey);
+  const clearKey = useAiProviderStore((s) => s.clearKey);
+  const stored = storeBinding === "anthropic" ? anthropicKey : null;
+  const [value, setValue] = useState<string>(stored ?? "");
   const [show, setShow] = useState(false);
+
+  const onSave = () => {
+    if (!storeBinding) return;
+    const t = value.trim();
+    if (t) saveKey(storeBinding, t);
+    else clearKey(storeBinding);
+  };
+
+  const persisted = !!stored && stored === value.trim();
+
   return (
     <div className="flex flex-col gap-1">
-      <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/40">
+      <span className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/40">
         {label}
+        {storeBinding && persisted && (
+          <span className="rounded-full bg-emerald-500/[0.12] px-1.5 py-px text-[9px] text-emerald-200">saved</span>
+        )}
       </span>
       <div className="flex items-center gap-1.5">
         <input
@@ -138,6 +159,16 @@ function ProviderKeyRow({ label, placeholder }: ProviderKeyRowProps) {
           {show ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
           {show ? "Hide" : "Show"}
         </button>
+        {storeBinding && (
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!value.trim() && !stored}
+            className="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/[0.08] px-2 py-1.5 text-[10.5px] text-accent transition hover:bg-accent/[0.15] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {value.trim() ? "Save" : "Clear"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -228,7 +259,7 @@ export default function SettingsPage() {
             Bring your own keys. Routing flips to your account when keys are
             present. Local engines always work without keys.
           </p>
-          <ProviderKeyRow label="Anthropic" placeholder="sk-ant-…" />
+          <ProviderKeyRow label="Anthropic" placeholder="sk-ant-…" storeBinding="anthropic" />
           <ProviderKeyRow label="OpenAI" placeholder="sk-…" />
           <ProviderKeyRow label="Google" placeholder="AIza…" />
           <p className="flex items-start gap-1.5 rounded-md border border-amber-400/25 bg-amber-500/[0.05] p-2 text-[10.5px] text-amber-200/80">
