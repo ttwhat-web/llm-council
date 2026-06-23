@@ -17,6 +17,7 @@
 
 import type { DraftRequest, DraftResult } from "./types";
 import type { GmailMessage } from "@/services/google/types";
+import { OPERATOR_SYSTEM_PROMPT } from "@/services/operator/voice";
 
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5-20251001";
@@ -35,8 +36,10 @@ export function buildDraftPrompt(req: DraftRequest): string {
     .map(messageToTranscriptLine)
     .join("\n\n");
 
+  // The system prompt (Operator voice) carries identity, tone, and
+  // response rules. This user message carries the task and the data.
   return [
-    `You are drafting a follow-up email body on behalf of the user.`,
+    `Task: draft a follow-up email body for the customer below.`,
     ``,
     `Customer: ${context.customerName} <${context.customerEmail}>`,
     `Days since their last message: ${context.daysSinceLastInbound}`,
@@ -47,17 +50,14 @@ export function buildDraftPrompt(req: DraftRequest): string {
     transcript || "(no messages available)",
     `---`,
     ``,
-    `Write a SHORT follow-up email body (2 to 3 sentences) that:`,
-    `  * Acknowledges the gap without apologizing or grovelling.`,
-    `  * Asks ONE specific question or proposes ONE concrete next step.`,
-    `  * Matches the language of the most recent customer message`,
-    `    (German if they wrote in German, English if English, etc.).`,
-    `  * Sounds warm but professional. No marketing speak, no exclamation marks.`,
-    `  * Signs off with exactly: "${signature}"`,
-    ``,
-    `Return ONLY the email body. No subject line. No "Re: …". No`,
-    `commentary, no quotation marks around the body. Just the text the`,
-    `user will paste into their email client.`
+    `Constraints for the body you return:`,
+    `  * 2 to 3 sentences. Never longer.`,
+    `  * Match the language of the customer's most recent message.`,
+    `  * One specific question OR one concrete next step. Not both.`,
+    `  * Sign off with exactly: "${signature}"`,
+    `  * Return ONLY the email body — no subject line, no "Re: …",`,
+    `    no commentary, no quotation marks. Just the text the founder`,
+    `    will paste into Gmail.`
   ].join("\n");
 }
 
@@ -96,6 +96,7 @@ export async function draftReply(req: DraftRequest, apiKey: string | null): Prom
       body: JSON.stringify({
         model: MODEL,
         max_tokens: MAX_TOKENS,
+        system: OPERATOR_SYSTEM_PROMPT,
         messages: [{ role: "user", content: prompt }]
       })
     });

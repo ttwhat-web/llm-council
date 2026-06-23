@@ -14,6 +14,7 @@ import {
   buildDraftSubject,
   buildGmailComposeUrl
 } from "@/services/drafting/draftReply";
+import { OPERATOR_SYSTEM_PROMPT } from "@/services/operator/voice";
 import type { DraftRequest } from "@/services/drafting/types";
 import type { GmailMessage } from "@/services/google/types";
 
@@ -91,14 +92,51 @@ describe("buildDraftPrompt", () => {
 
   it("instructs language matching, length, and the founder signature", () => {
     const out = buildDraftPrompt(req);
-    expect(out).toContain("Matches the language of the most recent customer message");
-    expect(out).toMatch(/SHORT/);
-    expect(out).toContain(`Signs off with exactly: "— Tunç"`);
+    expect(out).toContain("Match the language of the customer's most recent message");
+    expect(out).toMatch(/2 to 3 sentences/);
+    expect(out).toContain(`Sign off with exactly: "— Tunç"`);
   });
 
   it("falls back to an em-dash signature when no founder name is set", () => {
     const out = buildDraftPrompt({ ...req, founderFirstName: null });
-    expect(out).toContain(`Signs off with exactly: "—"`);
+    expect(out).toContain(`Sign off with exactly: "—"`);
+  });
+});
+
+describe("OPERATOR_SYSTEM_PROMPT", () => {
+  it("declares Operator's identity and primary question", () => {
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("You are Operator.");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Chief of Staff");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("What deserves my attention right now?");
+  });
+
+  it("locks the voice rules (no ChatGPT-isms, calm, brief)", () => {
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Never act like ChatGPT.");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Never give long essays.");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Silence is better than hallucination.");
+  });
+
+  it("locks the FACT / WHY IT MATTERS / RECOMMENDATION format", () => {
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("FACT");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("WHY IT MATTERS");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("RECOMMENDATION");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Exactly one action.");
+  });
+
+  it("locks the prioritization order: money, customers, deadlines, reputation", () => {
+    const idx = (s: string) => OPERATOR_SYSTEM_PROMPT.indexOf(s);
+    expect(idx("1. Money")).toBeGreaterThan(-1);
+    expect(idx("2. Customers")).toBeGreaterThan(idx("1. Money"));
+    expect(idx("3. Deadlines")).toBeGreaterThan(idx("2. Customers"));
+    expect(idx("4. Reputation")).toBeGreaterThan(idx("3. Deadlines"));
+  });
+
+  it("knows the founder's businesses", () => {
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Tunç");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Habitat VIP Travel");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Erguvan Turizm");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Avanos Halı");
+    expect(OPERATOR_SYSTEM_PROMPT).toContain("Perge Jewels");
   });
 });
 
