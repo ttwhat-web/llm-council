@@ -1,9 +1,12 @@
 /**
- * Gmail · read-only client. UNVERIFIED against a live account from
- * this sandbox; tested only with synthetic fixtures via the briefing
- * engine. Shape conforms to the Gmail v1 REST API documentation.
+ * Gmail client. UNVERIFIED against a live account from this sandbox;
+ * tested with synthetic fixtures. Shape conforms to the Gmail v1 REST
+ * API documentation.
  *
- * Scope used: gmail.readonly. No send, no modify, no delete — ever.
+ * Scopes used: gmail.readonly (sync) + gmail.send (the approve→send
+ * loop). No modify, no delete — ever. Every send is explicitly
+ * approved by the founder, shown, and undoable for 30 seconds before
+ * it leaves the queue.
  */
 
 import { ensureAccessToken } from "./oauthClient";
@@ -202,4 +205,87 @@ export async function syncRecentMail(
     }
   }
   return { messages, threads: groupIntoThreads(messages) };
+}
+
+// ---------------------------------------------------------------------------
+// Send · gmail.send scope. Builds an RFC 2822 message, base64url-encodes
+// it, and posts to users/me/messages/send. When `threadId` is provided
+// the reply is threaded under the original conversation.
+//
+// UNVERIFIED against a live account from this sandbox. The MIME builder
+// and base64url encoding are unit-tested in tests/sendQueue.test.ts.
+// ---------------------------------------------------------------------------
+
+export interface SendMessageInput {
+  to: string;
+  subject: string;
+  body: string;
+  /** Thread to reply within (keeps Gmail conversation grouping). */
+  threadId?: string;
+  /** Message-ID of the email we're replying to, for In-Reply-To. */
+  inReplyTo?: string;
+}
+
+export interface SendMessageResult {
+  id: string;
+  threadId: string;
+}
+
+/** Build an RFC 2822 message string. Exported for tests. */
+export function buildRfc2822(input: SendMessageInput, from: string): string {
+  const headers: string[] = [];
+  headers.push(`From: ${from}`);
+  headers.push(`To: ${input.to}`);
+  headers.push(`Subject: ${encodeHeaderWord(input.subject)}`);
+  headers.push("MIME-Version: 1.0");
+  headers.push('Content-Type: text/plain; charset="UTF-8"');
+  headers.push("Content-Transfer-Encoding: 8bit");
+  if (input.inReplyTo) {
+    headers.push(`In-Reply-To: ${input.inReplyTo}`);
+    headers.push(`References: ${input.inReplyTo}`);
+  }
+  return `${headers.join("\r\n")}\r\n\r\n${input.body}`;
+}
+
+/** RFC 2047 encode a header value when it contains non-ASCII. */
+export function encodeHeaderWord(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7F]*$/.test(value)) return value;
+  const b64 = base64Utf8(value);
+  return `=?UTF-8?B?${b64}?=`;
+}
+
+/** base64url(no padding) of a UTF-8 string. Exported for tests. */
+export function toBase64Url(raw: string): string {
+  const b64 = base64Utf8(raw);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64Utf8(s: string): string {
+  // Encode UTF-8 → binary string → base64. btoa exists in the Tauri
+  // webview and in the test (jsdom-free) environment via globalThis.
+  // The unescape(encodeURIComponent()) dance handles multibyte safely.
+  const bytes = unescape(encodeURIComponent(s));
+  return btoa(bytes);
+}
+
+export async function sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
+  const token = await ensureAccessToken();
+  const from = await fetchUserEmail();
+  const raw = toBase64Url(buildRfc2822(input, from));
+  const payload: Record<string, unknown> = { raw };
+  if (input.threadId) payload.threadId = input.threadId;
+  const res = await fetch(`${API}/messages/send`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    throw new Error(`Gmail send failed (${res.status}): ${await res.text().catch(() => "")}`);
+  }
+  const data = (await res.json()) as { id?: string; threadId?: string };
+  return { id: data.id ?? "", threadId: data.threadId ?? input.threadId ?? "" };
 }

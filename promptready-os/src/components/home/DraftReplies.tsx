@@ -1,31 +1,31 @@
 "use client";
 
 /**
- * Draft Replies · the P0 closed-loop UI.
+ * Draft Replies · the approve→send loop.
  *
- * Rendered inside the Customer focus column. When the user clicks
- * "Draft N replies", we run the drafting service once per receipt
- * (limited to 4 to keep first-time cost low), render each draft
- * inline with Copy and "Open in Gmail" buttons, and the founder
- * sends through Gmail's own compose window. No Gmail Send scope.
+ * Rendered inside the Customer focus column. "Draft N replies" runs
+ * the drafting service once per stale thread (max 4). Each draft can
+ * be edited, then Approved. Approve queues the send with a 30-second
+ * undo window (see services/drafting/sendQueue.ts); after the window
+ * the reply is sent through the founder's Gmail (gmail.send) and a
+ * receipt is shown. One keystroke closes a thread the founder had
+ * been avoiding — this is the ✓.
  *
  * Honest fallbacks:
- *  * No Anthropic key → CTA: "Add an Anthropic API key in Settings".
- *  * Per-draft errors render with the error message; other drafts
- *    still succeed and render normally.
+ *  * No Anthropic key → CTA pointing at Settings → AI Keys.
+ *  * Per-draft errors render inline; other drafts still succeed.
+ *  * Send errors render with the message + an Approve & retry.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, Copy, ExternalLink, Loader, RefreshCw } from "lucide-react";
+import { Check, Copy, Loader, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { useSourcesStore } from "@/store/sources";
 import { useAiProviderStore } from "@/store/aiProvider";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
-import {
-  buildGmailComposeUrl,
-  draftReply
-} from "@/services/drafting/draftReply";
+import { draftReply } from "@/services/drafting/draftReply";
+import { useSendQueueStore, undoSecondsLeft } from "@/services/drafting/sendQueue";
 import type { DraftResponse } from "@/services/drafting/types";
 import type { GmailMessage } from "@/services/google/types";
 
@@ -127,8 +127,8 @@ export function DraftReplies() {
       )}
 
       <p className="text-[12px] leading-relaxed text-white/45">
-        Sending happens in Gmail. Operator prepares the draft; you review and send.
-        Operator does not have permission to send mail on your behalf.
+        Approve sends the reply through your Gmail. Nothing leaves for 30 seconds —
+        one tap on Undo cancels it. Every send is shown here with a receipt.
       </p>
 
       <ul className="flex flex-col gap-3">
@@ -173,51 +173,187 @@ function DraftCard({
           {state.error}
         </p>
       )}
-      {state.kind === "drafted" && <DraftBody draft={state.draft} />}
+      {state.kind === "drafted" && (
+        <DraftBody draft={state.draft} threadId={candidate.threadMessages[0]?.threadId} />
+      )}
     </li>
   );
 }
 
-function DraftBody({ draft }: { draft: DraftResponse }) {
+function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: string }) {
   const [copied, setCopied] = useState(false);
+  const [body, setBody] = useState(draft.body);
+  const [editing, setEditing] = useState(false);
+
+  const queueId = useMemo(() => `send-${draft.customerEmail}`, [draft.customerEmail]);
+  const sent = useSendQueueStore((s) => s.items[queueId]);
+  const approve = useSendQueueStore((s) => s.approve);
+  const undo = useSendQueueStore((s) => s.undo);
+
+  // Re-render every second while in the undo window for the countdown.
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (sent?.status !== "sending") return;
+    const t = window.setInterval(() => force((n) => n + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [sent?.status]);
+
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(draft.body);
+      await navigator.clipboard.writeText(body);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
       /* ignore clipboard failure */
     }
   };
+
+  const onApprove = () => {
+    approve({
+      id: queueId,
+      to: draft.to,
+      subject: draft.subject,
+      body,
+      threadId
+    });
+  };
+
+  // Terminal / in-flight states replace the action row.
+  if (sent?.status === "sending") {
+    const left = undoSecondsLeft(sent);
+    return (
+      <div className="flex flex-col gap-2">
+        <ReceiptLine tone="amber">
+          Sending to {draft.to} in {left}s…
+          <button
+            type="button"
+            onClick={() => undo(queueId)}
+            className="ml-2 underline-offset-2 hover:underline"
+          >
+            Undo
+          </button>
+        </ReceiptLine>
+      </div>
+    );
+  }
+  if (sent?.status === "sent") {
+    return <ReceiptLine tone="emerald">✓ Sent to {draft.to}.</ReceiptLine>;
+  }
+  if (sent?.status === "undone") {
+    return (
+      <div className="flex flex-col gap-2">
+        <ReceiptLine tone="muted">Not sent. The draft is below if you want to try again.</ReceiptLine>
+        <DraftEditor body={body} editing={editing} onEdit={setBody} subject={draft.subject} />
+        <ApproveRow onApprove={onApprove} onCopy={copy} copied={copied} onEditToggle={() => setEditing((v) => !v)} />
+      </div>
+    );
+  }
+  if (sent?.status === "error") {
+    return (
+      <div className="flex flex-col gap-2">
+        <ReceiptLine tone="rose">Send failed · {sent.error}</ReceiptLine>
+        <ApproveRow onApprove={onApprove} onCopy={copy} copied={copied} onEditToggle={() => setEditing((v) => !v)} retry />
+      </div>
+    );
+  }
+
+  // Default · drafted, not yet approved.
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[11.5px] text-white/45">Subject · {draft.subject}</span>
-      <pre className="whitespace-pre-wrap rounded-lg bg-black/30 p-3 font-sans text-[13px] leading-relaxed text-white/90">
-        {draft.body}
-      </pre>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={copy}
-          className={clsx(
-            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] font-medium transition",
-            copied ? "bg-emerald-500/[0.12] text-emerald-200" : "bg-white/[0.05] text-white/80 hover:bg-white/[0.08]"
-          )}
-        >
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          {copied ? "Copied" : "Copy body"}
-        </button>
-        <a
-          href={buildGmailComposeUrl(draft)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[11.5px] font-medium text-black transition hover:bg-white/90"
-        >
-          Open in Gmail <ExternalLink className="h-3 w-3" />
-        </a>
-      </div>
+      <DraftEditor body={body} editing={editing} onEdit={setBody} subject={draft.subject} />
+      <ApproveRow onApprove={onApprove} onCopy={copy} copied={copied} onEditToggle={() => setEditing((v) => !v)} />
     </div>
   );
+}
+
+function DraftEditor({
+  body,
+  subject,
+  editing,
+  onEdit
+}: {
+  body: string;
+  subject: string;
+  editing: boolean;
+  onEdit: (v: string) => void;
+}) {
+  return (
+    <>
+      <span className="text-[11.5px] text-white/45">Subject · {subject}</span>
+      {editing ? (
+        <textarea
+          value={body}
+          onChange={(e) => onEdit(e.target.value)}
+          rows={5}
+          className="min-h-[120px] w-full resize-y rounded-lg bg-black/30 p-3 text-[13px] leading-relaxed text-white focus:outline-none"
+        />
+      ) : (
+        <pre className="whitespace-pre-wrap rounded-lg bg-black/30 p-3 font-sans text-[13px] leading-relaxed text-white/90">
+          {body}
+        </pre>
+      )}
+    </>
+  );
+}
+
+function ApproveRow({
+  onApprove,
+  onCopy,
+  copied,
+  onEditToggle,
+  retry
+}: {
+  onApprove: () => void;
+  onCopy: () => void;
+  copied: boolean;
+  onEditToggle: () => void;
+  retry?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={onApprove}
+        className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1 text-[12px] font-semibold text-black transition hover:bg-white/90"
+      >
+        <Check className="h-3.5 w-3.5" /> {retry ? "Approve & retry" : "Approve & send"}
+      </button>
+      <button
+        type="button"
+        onClick={onEditToggle}
+        className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-3 py-1 text-[11.5px] text-white/80 transition hover:bg-white/[0.08]"
+      >
+        Edit
+      </button>
+      <button
+        type="button"
+        onClick={onCopy}
+        className={clsx(
+          "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] transition",
+          copied ? "bg-emerald-500/[0.12] text-emerald-200" : "bg-white/[0.05] text-white/80 hover:bg-white/[0.08]"
+        )}
+      >
+        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
+function ReceiptLine({
+  tone,
+  children
+}: {
+  tone: "emerald" | "amber" | "rose" | "muted";
+  children: React.ReactNode;
+}) {
+  const cls = {
+    emerald: "bg-emerald-500/[0.08] text-emerald-200",
+    amber: "bg-amber-500/[0.08] text-amber-200",
+    rose: "bg-rose-500/[0.08] text-rose-200",
+    muted: "bg-white/[0.04] text-white/60"
+  }[tone];
+  return <p className={clsx("rounded-lg px-3 py-2 text-[12.5px]", cls)}>{children}</p>;
 }
 
 // ---------------------------------------------------------------------------

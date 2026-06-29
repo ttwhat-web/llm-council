@@ -220,7 +220,9 @@ function HonestyBanners() {
   return (
     <div className="flex flex-col gap-2">
       <Banner tone="emerald" icon={<ShieldCheck className="h-3.5 w-3.5" />}>
-        Read-only — no send, no delete, no modify. Ever.
+        Read for the briefing; send only what you approve. Operator never deletes
+        or modifies mail, and never sends without your one-tap approval + a
+        30-second undo.
       </Banner>
       <Banner tone="amber">
         Tokens are stored locally on this device, not encrypted in this build.
