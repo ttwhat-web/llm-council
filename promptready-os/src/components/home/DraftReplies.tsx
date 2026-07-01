@@ -59,6 +59,45 @@ export function DraftReplies() {
   // greeting after this commit.
   const founderFirstName = memory.firstName?.trim() || readFounderName();
 
+  const approve = useActionQueue((s) => s.approve);
+  const queueItems = useActionQueue((s) => s.items);
+
+  const batch = useMemo(() => candidates.slice(0, MAX_DRAFTS_PER_BATCH), [candidates]);
+
+  // Which drafted replies are ready to approve but not yet queued/done.
+  const drafted = batch.filter((c) => drafts[c.customerEmail]?.kind === "drafted");
+  const pendingApproval = drafted.filter((c) => {
+    const q = queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`];
+    return !q || q.status === "undone" || q.status === "error";
+  });
+  // "Morning complete" when every drafted reply reached a terminal
+  // state (sent or intentionally skipped) and nothing is left to do.
+  const settled = drafted.filter((c) => {
+    const q = queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`];
+    return q?.status === "done" || q?.status === "undone";
+  });
+  const sentCount = drafted.filter(
+    (c) => queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`]?.status === "done"
+  ).length;
+  const morningComplete = drafted.length > 0 && settled.length === drafted.length;
+
+  const approveAll = useCallback(() => {
+    for (const c of pendingApproval) {
+      const state = drafts[c.customerEmail];
+      if (state?.kind !== "drafted") continue;
+      approve({
+        id: `${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`,
+        executorId: GMAIL_SEND_EXECUTOR_ID,
+        params: {
+          to: state.draft.to,
+          subject: state.draft.subject,
+          body: state.draft.body,
+          threadId: c.threadMessages[0]?.threadId
+        }
+      });
+    }
+  }, [approve, drafts, pendingApproval]);
+
   const draftAll = useCallback(async () => {
     if (!anthropicKey) return;
     if (candidates.length === 0) return;
@@ -99,21 +138,46 @@ export function DraftReplies() {
         <span className="text-[10.5px] font-semibold uppercase tracking-[0.15em] text-white/30">
           Drafts
         </span>
-        <button
-          type="button"
-          onClick={draftAll}
-          disabled={busy || !anthropicKey}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1 text-[11.5px] font-medium text-white/85 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
-          title={
-            anthropicKey
-              ? `Draft ${Math.min(candidates.length, MAX_DRAFTS_PER_BATCH)} replies`
-              : "Add an Anthropic API key in Settings to enable drafts."
-          }
-        >
-          {busy ? <Loader className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-          {busy ? "Drafting…" : `Draft ${Math.min(candidates.length, MAX_DRAFTS_PER_BATCH)} replies`}
-        </button>
+        <div className="flex items-center gap-2">
+          {pendingApproval.length > 0 && (
+            <button
+              type="button"
+              onClick={approveAll}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[11.5px] font-semibold text-black transition hover:bg-white/90"
+              title="Approve and send every draft below (30-second undo on each)"
+            >
+              <Check className="h-3 w-3" /> Approve all ({pendingApproval.length})
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={draftAll}
+            disabled={busy || !anthropicKey}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1 text-[11.5px] font-medium text-white/85 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
+            title={
+              anthropicKey
+                ? `Draft ${batch.length} replies`
+                : "Add an Anthropic API key in Settings to enable drafts."
+            }
+          >
+            {busy ? <Loader className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            {busy ? "Drafting…" : `Draft ${batch.length} replies`}
+          </button>
+        </div>
       </header>
+
+      {morningComplete && (
+        <div className="rounded-xl bg-emerald-500/[0.06] px-4 py-3">
+          <p className="text-[14px] font-medium text-emerald-200">
+            Morning complete.
+          </p>
+          <p className="text-[12.5px] text-emerald-200/70">
+            {sentCount === 0
+              ? "Nothing sent — you skipped them all."
+              : `${sentCount} repl${sentCount === 1 ? "y" : "ies"} sent. Close the laptop.`}
+          </p>
+        </div>
+      )}
 
       {!anthropicKey && (
         <div className="rounded-lg bg-amber-500/[0.06] px-3 py-2 text-[12.5px] text-amber-200/85">
