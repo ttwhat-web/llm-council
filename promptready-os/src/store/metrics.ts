@@ -53,6 +53,8 @@ export interface MetricsAggregates {
   approvalWithoutEditRate: number | null;
   /** median (generated → sent) in ms. null when no sends yet. */
   medianCompletionMs: number | null;
+  /** median (generated → approved) in ms — the decision, not the send delay. null when no approvals yet. */
+  medianTimeToApproveMs: number | null;
 }
 
 const STORAGE_KEY = "operator.metrics.v0";
@@ -94,22 +96,20 @@ export function computeAggregates(events: MetricEvent[]): MetricsAggregates {
   for (const id of approved) if (!edited.has(id)) approvalWithoutEdit++;
   const approvalWithoutEditRate = approved.size === 0 ? null : approvalWithoutEdit / approved.size;
 
-  // completion times: first generated → first sent, per action.
+  // completion times: first generated → first {sent, approved}, per action.
   const firstAt = (type: MetricType, id: string): number | undefined =>
     events.find((e) => e.type === type && e.actionId === id)?.at;
-  const durations: number[] = [];
-  for (const id of sent) {
-    const g = firstAt("generated", id);
-    const s = firstAt("sent", id);
-    if (g != null && s != null && s >= g) durations.push(s - g);
-  }
-  durations.sort((a, b) => a - b);
-  const medianCompletionMs =
-    durations.length === 0
-      ? null
-      : durations.length % 2 === 1
-        ? durations[(durations.length - 1) / 2]
-        : Math.round((durations[durations.length / 2 - 1] + durations[durations.length / 2]) / 2);
+  const durationsBetween = (ids: Set<string>, endType: MetricType): number[] => {
+    const out: number[] = [];
+    for (const id of ids) {
+      const g = firstAt("generated", id);
+      const e = firstAt(endType, id);
+      if (g != null && e != null && e >= g) out.push(e - g);
+    }
+    return out.sort((a, b) => a - b);
+  };
+  const medianCompletionMs = median(durationsBetween(sent, "sent"));
+  const medianTimeToApproveMs = median(durationsBetween(approved, "approved"));
 
   return {
     generated: generated.size,
@@ -121,8 +121,17 @@ export function computeAggregates(events: MetricEvent[]): MetricsAggregates {
     failed: failed.size,
     approvalWithoutEdit,
     approvalWithoutEditRate,
-    medianCompletionMs
+    medianCompletionMs,
+    medianTimeToApproveMs
   };
+}
+
+function median(sortedAsc: number[]): number | null {
+  if (sortedAsc.length === 0) return null;
+  const mid = Math.floor((sortedAsc.length - 1) / 2);
+  return sortedAsc.length % 2 === 1
+    ? sortedAsc[mid]
+    : Math.round((sortedAsc[mid] + sortedAsc[mid + 1]) / 2);
 }
 
 interface MetricsState {

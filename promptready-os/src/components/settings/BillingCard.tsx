@@ -4,17 +4,18 @@
  * Billing · trial status + upgrade.
  *
  * No backend, no webhook — so this card can't verify a payment on its
- * own. It opens your Stripe Payment Link in the browser, then waits
- * for you to confirm. That confirmation is a local flag on this
- * device, same honesty rule as everywhere else in Operator: it never
- * claims to know something it can't actually see.
+ * own. It opens your Stripe Payment Link in the browser. Self-confirm
+ * ("I've completed payment") is a manual override with NO verification
+ * behind it, so it is gated to Developer Mode only and labelled BETA.
+ * This is not production billing — real upgrade state must come from a
+ * Stripe webhook or a verified Checkout Session before public release.
  */
 
 import { useState } from "react";
 import { CreditCard, ExternalLink } from "lucide-react";
 import { useBillingStore, TRIAL_LENGTH_DAYS } from "@/store/billing";
 
-export function BillingCard() {
+export function BillingCard({ devMode }: { devMode: boolean }) {
   const paymentLinkUrl = useBillingStore((s) => s.paymentLinkUrl);
   const setPaymentLinkUrl = useBillingStore((s) => s.setPaymentLinkUrl);
   const confirmUpgrade = useBillingStore((s) => s.confirmUpgrade);
@@ -107,14 +108,33 @@ export function BillingCard() {
             >
               <ExternalLink className="h-3.5 w-3.5" /> Upgrade
             </button>
-            <button
-              type="button"
-              onClick={onConfirm}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-3 py-1.5 text-[12px] font-medium text-white/85 transition hover:bg-white/[0.08]"
-            >
-              I&apos;ve completed payment
-            </button>
           </div>
+
+          {devMode ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-amber-400/20 bg-amber-500/[0.05] px-3 py-2.5">
+              <span className="inline-flex w-fit items-center gap-1 rounded-full bg-amber-500/[0.15] px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-amber-200">
+                Beta · unverified
+              </span>
+              <p className="text-[11.5px] leading-relaxed text-amber-100/80">
+                No webhook exists yet to verify a real payment. This button
+                only flips a local flag on this device — do not treat it as
+                production billing.
+              </p>
+              <button
+                type="button"
+                onClick={onConfirm}
+                className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/[0.05] px-3 py-1.5 text-[12px] font-medium text-white/85 transition hover:bg-white/[0.08]"
+              >
+                I&apos;ve completed payment (beta override)
+              </button>
+            </div>
+          ) : (
+            <p className="text-[11px] leading-relaxed text-white/40">
+              Automatic unlock after payment isn&apos;t live yet — it ships with
+              Stripe webhook verification. Enable Developer Mode below for a
+              manual, unverified beta override.
+            </p>
+          )}
         </>
       )}
     </section>

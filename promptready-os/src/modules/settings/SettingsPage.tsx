@@ -197,7 +197,7 @@ export default function SettingsPage() {
 
       <MemoryCard />
 
-      <BillingCard />
+      <BillingCard devMode={devMode} />
 
       <AiKeysCard />
 

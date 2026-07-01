@@ -84,7 +84,11 @@ export function MetricsCard() {
         <Stat label="Undone" value={a.undone} />
         <Stat label="Failed" value={a.failed} tone={a.failed > 0 ? "rose" : undefined} />
         <Stat
-          label="Median time"
+          label="Time to approve"
+          value={a.medianTimeToApproveMs == null ? "—" : formatMs(a.medianTimeToApproveMs)}
+        />
+        <Stat
+          label="Time to send"
           value={a.medianCompletionMs == null ? "—" : formatMs(a.medianCompletionMs)}
         />
       </dl>

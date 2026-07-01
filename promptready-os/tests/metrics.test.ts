@@ -87,4 +87,21 @@ describe("computeAggregates · funnel + timing", () => {
     const a = computeAggregates([ev("a", "generated", 0), ev("a", "approved", 1)]);
     expect(a.medianCompletionMs).toBeNull();
   });
+
+  it("computes median time-to-approve (generated → approved) separately from send", () => {
+    const a = computeAggregates([
+      ev("a", "generated", 0),
+      ev("a", "approved", 500),
+      ev("a", "sent", 30_500), // 30s undo window shouldn't pollute time-to-approve
+      ev("b", "generated", 0),
+      ev("b", "approved", 1500)
+    ]);
+    // approve durations 500, 1500 → median 1000
+    expect(a.medianTimeToApproveMs).toBe(1000);
+  });
+
+  it("returns null time-to-approve when nothing has been approved", () => {
+    const a = computeAggregates([ev("a", "generated", 0)]);
+    expect(a.medianTimeToApproveMs).toBeNull();
+  });
 });
