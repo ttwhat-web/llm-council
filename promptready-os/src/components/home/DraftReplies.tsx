@@ -287,13 +287,25 @@ function DraftCard({
         </p>
       )}
       {state.kind === "drafted" && (
-        <DraftBody draft={state.draft} threadId={candidate.threadMessages[0]?.threadId} />
+        <DraftBody
+          draft={state.draft}
+          threadId={candidate.threadMessages[0]?.threadId}
+          customerName={candidate.customerName}
+        />
       )}
     </li>
   );
 }
 
-function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: string }) {
+function DraftBody({
+  draft,
+  threadId,
+  customerName
+}: {
+  draft: DraftResponse;
+  threadId?: string;
+  customerName: string;
+}) {
   const [copied, setCopied] = useState(false);
   const [body, setBody] = useState(draft.body);
   const [editing, setEditing] = useState(false);
@@ -380,6 +392,8 @@ function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: strin
           model={draft.model}
           originalBody={draft.body}
           finalBody={body}
+          subjectLabel={customerName}
+          subjectKey={draft.customerEmail}
         />
       </div>
     );

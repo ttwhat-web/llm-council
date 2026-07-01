@@ -21,6 +21,8 @@ import { Check } from "lucide-react";
 import { useSourcesStore } from "@/store/sources";
 import { findConflictPairs } from "@/services/briefing/detectors";
 import { useActionQueue, undoSecondsLeft, CALENDAR_MOVE_EXECUTOR_ID } from "@/services/executors";
+import { useMemoryCandidatesStore } from "@/store/memoryCandidates";
+import { behaviorCandidateFromCalendarMove } from "@/services/memory/candidates";
 import { ReceiptLine } from "@/components/home/DraftControls";
 
 function fmtTime(ms: number): string {
@@ -33,6 +35,7 @@ export function CalendarConflicts() {
   const approve = useActionQueue((s) => s.approve);
   const undo = useActionQueue((s) => s.undo);
   const queueItems = useActionQueue((s) => s.items);
+  const observeMemoryCandidate = useMemoryCandidatesStore((s) => s.observe);
 
   const [swapped, setSwapped] = useState(false);
   // Re-render every second while a move is in its undo window.
@@ -43,22 +46,31 @@ export function CalendarConflicts() {
     return findConflictPairs(snapshot.events, snapshot.syncedAt)[0] ?? null;
   }, [snapshot]);
 
-  if (!conflict) return null;
-
-  const staying = swapped ? conflict.b : conflict.a;
-  const moving = swapped ? conflict.a : conflict.b;
-  const duration = moving.endMs - moving.startMs;
-  const newStartMs = staying.endMs;
-  const newEndMs = newStartMs + duration;
-
-  const queueId = `${CALENDAR_MOVE_EXECUTOR_ID}:${moving.id}`;
-  const item = queueItems[queueId];
+  // All hooks stay unconditional (Rules of Hooks) — the missing-conflict
+  // early return happens after every hook below has been declared.
+  const staying = conflict ? (swapped ? conflict.b : conflict.a) : null;
+  const moving = conflict ? (swapped ? conflict.a : conflict.b) : null;
+  const newStartMs = staying ? staying.endMs : 0;
+  const newEndMs = moving ? newStartMs + (moving.endMs - moving.startMs) : 0;
+  const queueId = moving ? `${CALENDAR_MOVE_EXECUTOR_ID}:${moving.id}` : null;
+  const item = queueId ? queueItems[queueId] : undefined;
 
   useEffect(() => {
     if (item?.status !== "queued") return;
     const t = window.setInterval(() => force((n) => n + 1), 1000);
     return () => window.clearInterval(t);
   }, [item?.status]);
+
+  // Repeated behavior · a real move just executed. The store decides
+  // whether this is the 2nd+ time this meeting title needed moving
+  // before it's worth asking the founder.
+  useEffect(() => {
+    if (item?.status === "done" && moving) {
+      observeMemoryCandidate(behaviorCandidateFromCalendarMove({ summary: moving.summary }));
+    }
+  }, [item?.status, moving, observeMemoryCandidate]);
+
+  if (!conflict || !staying || !moving || !queueId) return null;
 
   const onApprove = () => {
     approve({

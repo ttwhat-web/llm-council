@@ -16,6 +16,7 @@ import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { useBillingStore, computeTrialStatus } from "@/store/billing";
 import { DraftReplies } from "@/components/home/DraftReplies";
 import { CalendarConflicts } from "@/components/home/CalendarConflicts";
+import { MemoryCandidatePrompt } from "@/components/home/MemoryCandidatePrompt";
 import { fetchOperatorRead } from "@/services/briefing/operatorRead";
 import type { BriefingItem as RealBriefingItem } from "@/services/briefing/types";
 import type { PanelData as RealPanelData } from "@/services/briefing/engine";
@@ -462,6 +463,7 @@ export default function HomePage() {
            *  no focus column — the value is here the moment you land. */}
           {!isDemo && sourcesConnected && <DraftReplies />}
           {!isDemo && sourcesConnected && <CalendarConflicts />}
+          {!isDemo && sourcesConnected && <MemoryCandidatePrompt />}
 
           {/* Briefing · the context behind the prepared work. */}
           <section aria-label="Executive briefing" className="flex flex-col gap-10">

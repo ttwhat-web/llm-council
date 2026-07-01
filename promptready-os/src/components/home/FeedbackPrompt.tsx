@@ -12,6 +12,12 @@
 import { useState } from "react";
 import { useFeedbackStore, EDIT_REASONS, type EditReason } from "@/store/feedback";
 import { useMetricsStore, getActionTiming } from "@/store/metrics";
+import { useMemoryCandidatesStore } from "@/store/memoryCandidates";
+import {
+  languageCandidateFromApprovedSend,
+  toneCandidateFromEdit,
+  avoidCandidateFromFeedback
+} from "@/services/memory/candidates";
 import { levenshteinDistance } from "@/services/text/editDistance";
 
 type Step = "idle" | "reasons" | "correction" | "done";
@@ -21,19 +27,28 @@ export function FeedbackPrompt({
   promptVersion,
   model,
   originalBody,
-  finalBody
+  finalBody,
+  subjectLabel,
+  subjectKey
 }: {
   actionId: string;
   promptVersion: string;
   model: string;
   originalBody: string;
   finalBody: string;
+  /** Who this draft was for — "Hans Müller", "Bridge & Co." — used only
+   *  to phrase memory candidates, never persisted onto the feedback event. */
+  subjectLabel: string;
+  /** Stable identifier for the subject (customer email) — dedupe key
+   *  for memory candidates, distinct from the queue's actionId. */
+  subjectKey: string;
 }) {
   const already = useFeedbackStore((s) => s.hasFeedback(actionId));
   const recordPerfect = useFeedbackStore((s) => s.recordPerfect);
   const recordNeededEdits = useFeedbackStore((s) => s.recordNeededEdits);
   const recordNotUsable = useFeedbackStore((s) => s.recordNotUsable);
   const metricsEvents = useMetricsStore((s) => s.events);
+  const observeMemoryCandidate = useMemoryCandidatesStore((s) => s.observe);
 
   const [step, setStep] = useState<Step>("idle");
   const [otherPicked, setOtherPicked] = useState(false);
@@ -53,6 +68,9 @@ export function FeedbackPrompt({
       approvalWithoutEdit: !timing.wasEdited,
       timeToApproveMs: timing.timeToApproveMs
     });
+    observeMemoryCandidate(
+      languageCandidateFromApprovedSend({ subjectLabel, subjectKey, draftBody: originalBody })
+    );
     setStep("done");
   };
 
@@ -65,6 +83,9 @@ export function FeedbackPrompt({
       editReason: reason,
       editReasonOther: otherTextVal
     });
+    observeMemoryCandidate(
+      toneCandidateFromEdit({ subjectLabel, subjectKey, originalBody, finalBody, editReason: reason })
+    );
     setStep("done");
   };
 
@@ -84,6 +105,9 @@ export function FeedbackPrompt({
   const onSubmitCorrection = () => {
     if (!correctionText.trim()) return;
     recordNotUsable({ actionId, promptVersion, model, correction: correctionText });
+    observeMemoryCandidate(
+      avoidCandidateFromFeedback({ subjectLabel, subjectKey, correction: correctionText })
+    );
     setStep("done");
   };
 
