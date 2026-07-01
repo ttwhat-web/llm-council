@@ -25,7 +25,7 @@ import { useSourcesStore } from "@/store/sources";
 import { useAiProviderStore } from "@/store/aiProvider";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { draftReply } from "@/services/drafting/draftReply";
-import { useSendQueueStore, undoSecondsLeft } from "@/services/drafting/sendQueue";
+import { useActionQueue, undoSecondsLeft, GMAIL_SEND_EXECUTOR_ID } from "@/services/executors";
 import type { DraftResponse } from "@/services/drafting/types";
 import type { GmailMessage } from "@/services/google/types";
 
@@ -185,15 +185,15 @@ function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: strin
   const [body, setBody] = useState(draft.body);
   const [editing, setEditing] = useState(false);
 
-  const queueId = useMemo(() => `send-${draft.customerEmail}`, [draft.customerEmail]);
-  const sent = useSendQueueStore((s) => s.items[queueId]);
-  const approve = useSendQueueStore((s) => s.approve);
-  const undo = useSendQueueStore((s) => s.undo);
+  const queueId = useMemo(() => `${GMAIL_SEND_EXECUTOR_ID}:${draft.customerEmail}`, [draft.customerEmail]);
+  const sent = useActionQueue((s) => s.items[queueId]);
+  const approve = useActionQueue((s) => s.approve);
+  const undo = useActionQueue((s) => s.undo);
 
   // Re-render every second while in the undo window for the countdown.
   const [, force] = useState(0);
   useEffect(() => {
-    if (sent?.status !== "sending") return;
+    if (sent?.status !== "queued") return;
     const t = window.setInterval(() => force((n) => n + 1), 1000);
     return () => window.clearInterval(t);
   }, [sent?.status]);
@@ -211,15 +211,13 @@ function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: strin
   const onApprove = () => {
     approve({
       id: queueId,
-      to: draft.to,
-      subject: draft.subject,
-      body,
-      threadId
+      executorId: GMAIL_SEND_EXECUTOR_ID,
+      params: { to: draft.to, subject: draft.subject, body, threadId }
     });
   };
 
   // Terminal / in-flight states replace the action row.
-  if (sent?.status === "sending") {
+  if (sent?.status === "queued") {
     const left = undoSecondsLeft(sent);
     return (
       <div className="flex flex-col gap-2">
@@ -236,8 +234,11 @@ function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: strin
       </div>
     );
   }
-  if (sent?.status === "sent") {
-    return <ReceiptLine tone="emerald">✓ Sent to {draft.to}.</ReceiptLine>;
+  if (sent?.status === "executing") {
+    return <ReceiptLine tone="amber">Sending to {draft.to}…</ReceiptLine>;
+  }
+  if (sent?.status === "done") {
+    return <ReceiptLine tone="emerald">✓ {sent.receipt ?? `Sent to ${draft.to}.`}</ReceiptLine>;
   }
   if (sent?.status === "undone") {
     return (
