@@ -12,6 +12,7 @@ import {
   validateClientId,
   REDIRECT_URI
 } from "@/services/google/oauthClient";
+import { CalendarWriteConsent } from "@/components/settings/CalendarWriteConsent";
 
 /**
  * Google Workspace · Sources card.
@@ -153,7 +154,9 @@ export function GoogleSourceCard() {
           <span className="text-[11px] uppercase tracking-[0.15em] text-white/40">Sources</span>
           <h2 className="text-[18px] font-semibold tracking-tight text-white">Google Workspace</h2>
           <p className="text-[13px] leading-relaxed text-white/60">
-            Read-only Gmail, Calendar, and Contacts. Operator reads to brief you — never sends, deletes, or modifies anything.
+            Reads Gmail, Calendar, and Contacts to brief you. Sending mail and
+            moving calendar events only ever happen when you explicitly
+            approve them, one action at a time — never automatically.
           </p>
         </div>
         <ConnectionPill state={google.state} />
@@ -168,6 +171,7 @@ export function GoogleSourceCard() {
           state={google.state}
           errors={google.lastErrors}
           busy={busy === "sync"}
+          calendarWriteGranted={google.calendarWriteGranted}
           onSync={onSync}
           onDisconnect={onDisconnect}
         />
@@ -374,6 +378,7 @@ function ConnectedView(props: {
   state: string;
   errors: string[];
   busy: boolean;
+  calendarWriteGranted: boolean;
   onSync: () => void;
   onDisconnect: () => void;
 }) {
@@ -415,6 +420,8 @@ function ConnectedView(props: {
           ))}
         </ul>
       )}
+
+      <CalendarWriteConsent granted={props.calendarWriteGranted} />
     </div>
   );
 }

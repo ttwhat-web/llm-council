@@ -17,7 +17,8 @@ import {
   detectPaymentMail,
   detectStaleCustomerThreads,
   detectUnansweredInboxMail,
-  detectUnpreparedMeetings
+  detectUnpreparedMeetings,
+  findConflictPairs
 } from "@/services/briefing/detectors";
 import { buildBriefing, buildPanels } from "@/services/briefing/engine";
 import type {
@@ -346,6 +347,39 @@ describe("detectCalendarConflicts", () => {
       endMs: NOW - 1 * 60 * 60 * 1000
     });
     expect(detectCalendarConflicts(snap({ events: [e1, e2] }))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findConflictPairs · shared by the detector above and the Calendar move
+// executor's UI, so both must agree on what counts as a conflict.
+// ---------------------------------------------------------------------------
+
+describe("findConflictPairs", () => {
+  it("returns the overlapping pair with 'a' as the earlier-starting event", () => {
+    const e1 = event({ id: "e1", startMs: NOW + 2 * 60 * 60 * 1000, endMs: NOW + 3 * 60 * 60 * 1000 });
+    const e2 = event({ id: "e2", startMs: NOW + 2.5 * 60 * 60 * 1000, endMs: NOW + 3.5 * 60 * 60 * 1000 });
+    const pairs = findConflictPairs([e2, e1], NOW); // deliberately unsorted input
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0].a.id).toBe("e1");
+    expect(pairs[0].b.id).toBe("e2");
+  });
+
+  it("returns an empty list when nothing overlaps", () => {
+    const e1 = event({ id: "e1", startMs: NOW + 60 * 60 * 1000, endMs: NOW + 2 * 60 * 60 * 1000 });
+    const e2 = event({ id: "e2", startMs: NOW + 3 * 60 * 60 * 1000, endMs: NOW + 4 * 60 * 60 * 1000 });
+    expect(findConflictPairs([e1, e2], NOW)).toEqual([]);
+  });
+
+  it("sorts multiple conflicts soonest-first", () => {
+    const later = event({ id: "later", startMs: NOW + 5 * 60 * 60 * 1000, endMs: NOW + 6 * 60 * 60 * 1000 });
+    const laterB = event({ id: "laterB", startMs: NOW + 5.5 * 60 * 60 * 1000, endMs: NOW + 6.5 * 60 * 60 * 1000 });
+    const soon = event({ id: "soon", startMs: NOW + 60 * 60 * 1000, endMs: NOW + 2 * 60 * 60 * 1000 });
+    const soonB = event({ id: "soonB", startMs: NOW + 90 * 60 * 1000, endMs: NOW + 150 * 60 * 1000 });
+    const pairs = findConflictPairs([later, laterB, soon, soonB], NOW);
+    expect(pairs).toHaveLength(2);
+    expect(pairs[0].a.id).toBe("soon");
+    expect(pairs[1].a.id).toBe("later");
   });
 });
 

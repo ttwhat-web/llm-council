@@ -38,6 +38,17 @@ const SCOPES = [
   "email"
 ];
 
+/**
+ * Calendar write scope — NOT in the base SCOPES list. The initial
+ * "Connect Google" flow only ever requests read access. This scope is
+ * only ever requested when the founder explicitly clicks "Grant
+ * Calendar write access" in Settings, via buildAuthorizationUrl's
+ * extraScopes param (Google's incremental-auth pattern: the new
+ * consent screen shows only the new scope, previously granted scopes
+ * stay granted).
+ */
+export const CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+
 const STORAGE_CREDENTIALS = "operator.google.credentials.v1";
 const STORAGE_TOKENS = "operator.google.tokens.v1";
 
@@ -55,6 +66,10 @@ export interface GoogleTokens {
   idToken?: string;
   /** Lowercased user email parsed from the id_token, if present. */
   email?: string;
+  /** Scopes Google actually granted (from the token response's `scope`
+   *  field) — the authoritative answer to "can we write to Calendar",
+   *  never assumed from which URL we happened to open. */
+  grantedScopes?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -122,14 +137,21 @@ export function validateClientId(clientId: string): string | null {
   return null;
 }
 
-export function buildAuthorizationUrl(clientId: string): string {
+/**
+ * extraScopes lets a caller request additional, narrower scopes on
+ * top of the base set — used for the Calendar-write upgrade, which is
+ * never bundled into the base connect flow. include_granted_scopes
+ * means previously granted scopes are preserved; the consent screen
+ * only asks about what's new.
+ */
+export function buildAuthorizationUrl(clientId: string, extraScopes: string[] = []): string {
   const err = validateClientId(clientId);
   if (err) throw new Error(err);
   const params = new URLSearchParams({
     client_id: clientId.trim(),
     redirect_uri: REDIRECT_URI,
     response_type: "code",
-    scope: SCOPES.join(" "),
+    scope: [...SCOPES, ...extraScopes].join(" "),
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true"
@@ -206,10 +228,18 @@ export async function exchangeCodeForTokens(
     refreshToken: raw.refresh_token,
     expiresAtMs: Date.now() + (raw.expires_in - 60) * 1000,
     idToken: raw.id_token,
-    email: raw.id_token ? extractEmailFromIdToken(raw.id_token) : undefined
+    email: raw.id_token ? extractEmailFromIdToken(raw.id_token) : undefined,
+    grantedScopes: raw.scope ? raw.scope.split(" ").filter(Boolean) : undefined
   };
   writeTokens(tokens);
   return tokens;
+}
+
+/** True only when Google's token response actually included the
+ *  Calendar write scope — never inferred from which button was
+ *  clicked or which flow ran. */
+export function hasCalendarWriteScope(): boolean {
+  return !!readTokens()?.grantedScopes?.includes(CALENDAR_WRITE_SCOPE);
 }
 
 /**
@@ -252,7 +282,11 @@ async function refreshAccessToken(
     refreshToken: raw.refresh_token ?? refreshToken,
     expiresAtMs: Date.now() + (raw.expires_in - 60) * 1000,
     idToken: raw.id_token,
-    email: raw.id_token ? extractEmailFromIdToken(raw.id_token) : readTokens()?.email
+    email: raw.id_token ? extractEmailFromIdToken(raw.id_token) : readTokens()?.email,
+    // Google's refresh response doesn't always echo `scope`; the grant
+    // itself didn't change on a refresh, so fall back to what we
+    // already had rather than losing the calendar-write flag.
+    grantedScopes: raw.scope ? raw.scope.split(" ").filter(Boolean) : readTokens()?.grantedScopes
   };
 }
 

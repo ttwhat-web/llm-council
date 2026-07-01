@@ -374,16 +374,21 @@ export function detectPaymentMail(
 // Two events that overlap (excluding all-day events as background).
 // ---------------------------------------------------------------------------
 
-interface ConflictPair {
+export interface ConflictPair {
   a: CalendarEvent;
   b: CalendarEvent;
 }
 
-export function detectCalendarConflicts(
-  snap: WorkspaceSnapshot,
-  now: number = snap.syncedAt
-): BriefingItem[] {
-  const upcoming = snap.events
+/**
+ * Pure · every overlapping pair of (non-all-day) events in the next
+ * 7 days, sorted so the soonest-starting conflict comes first. `a` is
+ * always the earlier-starting event of the pair, `b` the one that
+ * overlaps into it — shared by the briefing detector below and by the
+ * calendar move executor's UI, so both agree on what counts as a
+ * conflict and which event is "the one that moved".
+ */
+export function findConflictPairs(events: CalendarEvent[], now: number): ConflictPair[] {
+  const upcoming = events
     .filter((e) => !e.isAllDay)
     .filter((e) => e.endMs > now && e.startMs < now + 7 * DAY_MS)
     .sort((a, b) => a.startMs - b.startMs);
@@ -397,11 +402,18 @@ export function detectCalendarConflicts(
       pairs.push({ a, b });
     }
   }
+  return pairs.sort((p, q) => p.a.startMs - q.a.startMs);
+}
+
+export function detectCalendarConflicts(
+  snap: WorkspaceSnapshot,
+  now: number = snap.syncedAt
+): BriefingItem[] {
+  const pairs = findConflictPairs(snap.events, now);
 
   if (pairs.length === 0) return [];
 
-  // Highest priority: the one that starts soonest.
-  pairs.sort((p, q) => p.a.startMs - q.a.startMs);
+  // findConflictPairs already sorts soonest-first.
   const first = pairs[0];
   const evidence: EvidenceRef[] = [
     { kind: "event", eventId: first.a.id },

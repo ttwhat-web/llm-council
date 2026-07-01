@@ -19,6 +19,7 @@ import {
   clearCredentials,
   clearTokens,
   disconnect as oauthDisconnect,
+  hasCalendarWriteScope,
   readCredentials,
   readTokens,
   writeCredentials
@@ -46,6 +47,9 @@ export interface SourcesState {
     selfEmail: string | null;
     lastSyncMs: number | null;
     lastErrors: string[];
+    /** True only when Google's token grant actually includes the
+     *  Calendar write scope — read live from tokens, never assumed. */
+    calendarWriteGranted: boolean;
   };
   snapshot: WorkspaceSnapshot | null;
   briefing: BriefingItem[];
@@ -63,12 +67,16 @@ export interface SourcesState {
   recomputeFromSnapshot(): void;
 }
 
-function evalGoogleState(): { state: GoogleConnectionState; email: string | null } {
+function evalGoogleState(): {
+  state: GoogleConnectionState;
+  email: string | null;
+  calendarWriteGranted: boolean;
+} {
   const creds = readCredentials();
   const tokens = readTokens();
-  if (!creds) return { state: "disconnected", email: null };
-  if (!tokens) return { state: "needs-auth", email: null };
-  return { state: "connected", email: tokens.email ?? null };
+  if (!creds) return { state: "disconnected", email: null, calendarWriteGranted: false };
+  if (!tokens) return { state: "needs-auth", email: null, calendarWriteGranted: false };
+  return { state: "connected", email: tokens.email ?? null, calendarWriteGranted: hasCalendarWriteScope() };
 }
 
 export const useSourcesStore = create<SourcesState>((set, get) => {
@@ -83,7 +91,8 @@ export const useSourcesStore = create<SourcesState>((set, get) => {
       state: initialEval.state,
       selfEmail: initialEval.email ?? initialSnapshot?.selfEmail ?? null,
       lastSyncMs: initialSnapshot?.syncedAt ?? null,
-      lastErrors: []
+      lastErrors: [],
+      calendarWriteGranted: initialEval.calendarWriteGranted
     },
     snapshot: initialSnapshot,
     briefing: initialBriefing,
@@ -100,7 +109,13 @@ export const useSourcesStore = create<SourcesState>((set, get) => {
       clearTokens();
       clearSnapshot();
       set({
-        google: { state: "disconnected", selfEmail: null, lastSyncMs: null, lastErrors: [] },
+        google: {
+          state: "disconnected",
+          selfEmail: null,
+          lastSyncMs: null,
+          lastErrors: [],
+          calendarWriteGranted: false
+        },
         snapshot: null,
         briefing: [],
         panels: null
@@ -110,7 +125,12 @@ export const useSourcesStore = create<SourcesState>((set, get) => {
     refreshGoogleState() {
       const e = evalGoogleState();
       set((s) => ({
-        google: { ...s.google, state: e.state, selfEmail: e.email ?? s.google.selfEmail }
+        google: {
+          ...s.google,
+          state: e.state,
+          selfEmail: e.email ?? s.google.selfEmail,
+          calendarWriteGranted: e.calendarWriteGranted
+        }
       }));
     },
 
@@ -125,7 +145,8 @@ export const useSourcesStore = create<SourcesState>((set, get) => {
             state: result.errors.length > 0 ? "error" : "connected",
             selfEmail: result.snapshot.selfEmail || null,
             lastSyncMs: result.snapshot.syncedAt,
-            lastErrors: result.errors
+            lastErrors: result.errors,
+            calendarWriteGranted: hasCalendarWriteScope()
           },
           snapshot: result.snapshot,
           briefing,
