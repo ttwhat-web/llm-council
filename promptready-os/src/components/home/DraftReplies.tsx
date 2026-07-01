@@ -27,6 +27,7 @@ import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { draftReply } from "@/services/drafting/draftReply";
 import { useActionQueue, undoSecondsLeft, GMAIL_SEND_EXECUTOR_ID } from "@/services/executors";
 import { recordMetric } from "@/store/metrics";
+import { useBillingStore, computeTrialStatus } from "@/store/billing";
 import type { DraftResponse } from "@/services/drafting/types";
 import type { GmailMessage } from "@/services/google/types";
 
@@ -62,6 +63,13 @@ export function DraftReplies() {
 
   const approve = useActionQueue((s) => s.approve);
   const queueItems = useActionQueue((s) => s.items);
+
+  const billingStartedAt = useBillingStore((s) => s.startedAt);
+  const billingUpgraded = useBillingStore((s) => s.upgraded);
+  const trialExpired = useMemo(
+    () => !billingUpgraded && computeTrialStatus(billingStartedAt, billingUpgraded, Date.now()).isExpired,
+    [billingStartedAt, billingUpgraded]
+  );
 
   const batch = useMemo(() => candidates.slice(0, MAX_DRAFTS_PER_BATCH), [candidates]);
 
@@ -150,6 +158,8 @@ export function DraftReplies() {
 
   if (candidates.length === 0) return null;
 
+  if (trialExpired) return <TrialEndedCard count={batch.length} />;
+
   return (
     <section className="flex flex-col gap-3">
       <header className="flex items-baseline justify-between gap-3">
@@ -221,6 +231,26 @@ export function DraftReplies() {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+function TrialEndedCard({ count }: { count: number }) {
+  return (
+    <section className="flex flex-col gap-2 rounded-xl bg-amber-500/[0.06] px-4 py-3.5">
+      <p className="text-[14px] font-medium text-amber-100">
+        {count} repl{count === 1 ? "y is" : "ies are"} ready, but your trial has ended.
+      </p>
+      <p className="text-[12.5px] leading-relaxed text-amber-100/70">
+        Operator can still read your inbox — sending is a paid feature.
+        Upgrade to keep the drafts flowing.
+      </p>
+      <Link
+        to="/settings"
+        className="self-start text-[13px] font-medium text-white transition hover:text-white/80"
+      >
+        ▸ Upgrade in Settings
+      </Link>
     </section>
   );
 }

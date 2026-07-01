@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import clsx from "clsx";
 import { ArrowRight, CornerDownLeft, ExternalLink, Loader, RefreshCw, X } from "lucide-react";
@@ -13,6 +13,7 @@ import {
 import { useSourcesStore } from "@/store/sources";
 import { useAiProviderStore } from "@/store/aiProvider";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
+import { useBillingStore, computeTrialStatus } from "@/store/billing";
 import { DraftReplies } from "@/components/home/DraftReplies";
 import { fetchOperatorRead } from "@/services/briefing/operatorRead";
 import type { BriefingItem as RealBriefingItem } from "@/services/briefing/types";
@@ -350,6 +351,14 @@ export default function HomePage() {
     };
   }, [isDemo, anthropicKey, realBriefingItems, memory]);
 
+  const billingStartedAt = useBillingStore((s) => s.startedAt);
+  const billingUpgraded = useBillingStore((s) => s.upgraded);
+  const trialStatus = useMemo(
+    () => computeTrialStatus(billingStartedAt, billingUpgraded, now.getTime()),
+    [billingStartedAt, billingUpgraded, now]
+  );
+  const trialNearingEnd = !isDemo && trialStatus.isActive && trialStatus.daysRemaining <= 3;
+
   const firstName = getUserFirstName(isDemo);
   const greeting = greetingFor(now);
 
@@ -418,6 +427,15 @@ export default function HomePage() {
               })}
             </p>
           </header>
+
+          {trialNearingEnd && (
+            <p className="text-[13px] text-amber-200/85">
+              Trial ends in {trialStatus.daysRemaining} day{trialStatus.daysRemaining === 1 ? "" : "s"} ·{" "}
+              <Link to="/settings" className="underline-offset-2 hover:underline">
+                Upgrade
+              </Link>
+            </p>
+          )}
 
           {sourcesConnected && (
             <WatchingBanner

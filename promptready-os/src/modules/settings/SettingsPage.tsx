@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { GoogleSourceCard } from "@/components/settings/GoogleSourceCard";
 import { MemoryCard } from "@/components/settings/MemoryCard";
 import { MetricsCard } from "@/components/settings/MetricsCard";
+import { BillingCard } from "@/components/settings/BillingCard";
 import { useAiProviderStore } from "@/store/aiProvider";
 import {
   AlertTriangle,
@@ -196,6 +197,8 @@ export default function SettingsPage() {
 
       <MemoryCard />
 
+      <BillingCard />
+
       <AiKeysCard />
 
       <VoiceCard />
@@ -289,8 +292,8 @@ function AccountCard() {
       </header>
       <p className="text-[12.5px] leading-relaxed text-white/55">
         Operator runs on this device. There is no cloud account today — no
-        sign-in, no billing portal, no sync. Multi-device sync and billing land
-        before the first paid plan ships.
+        sign-in, no sync. Trial and upgrade status live in the Billing card
+        above. Multi-device sync lands later.
       </p>
     </section>
   );
