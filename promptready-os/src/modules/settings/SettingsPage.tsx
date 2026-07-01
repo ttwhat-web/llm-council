@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { GoogleSourceCard } from "@/components/settings/GoogleSourceCard";
 import { MemoryCard } from "@/components/settings/MemoryCard";
+import { MetricsCard } from "@/components/settings/MetricsCard";
 import { useAiProviderStore } from "@/store/aiProvider";
 import {
   AlertTriangle,
@@ -190,6 +191,8 @@ export default function SettingsPage() {
       </header>
 
       <GoogleSourceCard />
+
+      <MetricsCard />
 
       <MemoryCard />
 

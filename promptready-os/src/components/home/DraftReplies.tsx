@@ -26,6 +26,7 @@ import { useAiProviderStore } from "@/store/aiProvider";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { draftReply } from "@/services/drafting/draftReply";
 import { useActionQueue, undoSecondsLeft, GMAIL_SEND_EXECUTOR_ID } from "@/services/executors";
+import { recordMetric } from "@/store/metrics";
 import type { DraftResponse } from "@/services/drafting/types";
 import type { GmailMessage } from "@/services/google/types";
 
@@ -85,8 +86,10 @@ export function DraftReplies() {
     for (const c of pendingApproval) {
       const state = drafts[c.customerEmail];
       if (state?.kind !== "drafted") continue;
+      const actionId = `${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`;
+      recordMetric(actionId, "approved");
       approve({
-        id: `${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`,
+        id: actionId,
         executorId: GMAIL_SEND_EXECUTOR_ID,
         params: {
           to: state.draft.to,
@@ -119,6 +122,7 @@ export function DraftReplies() {
         },
         anthropicKey
       );
+      if (result.ok) recordMetric(`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`, "generated");
       setDrafts((d) => ({
         ...d,
         [c.customerEmail]:
@@ -268,6 +272,18 @@ function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: strin
   const approve = useActionQueue((s) => s.approve);
   const undo = useActionQueue((s) => s.undo);
 
+  // Metric · this draft was shown to the founder (once).
+  useEffect(() => {
+    recordMetric(queueId, "shown");
+  }, [queueId]);
+
+  // Metric · reflect the executor's terminal outcome (once each).
+  useEffect(() => {
+    if (sent?.status === "done") recordMetric(queueId, "sent");
+    else if (sent?.status === "error") recordMetric(queueId, "failed");
+    else if (sent?.status === "undone") recordMetric(queueId, "undone");
+  }, [sent?.status, queueId]);
+
   // Re-render every second while in the undo window for the countdown.
   const [, force] = useState(0);
   useEffect(() => {
@@ -286,7 +302,15 @@ function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: strin
     }
   };
 
+  const onEditBody = (v: string) => {
+    // Metric · the founder changed the draft (once). This is the signal
+    // that decides the KPI: an edited draft is NOT an approval-without-edit.
+    if (v !== draft.body) recordMetric(queueId, "edited");
+    setBody(v);
+  };
+
   const onApprove = () => {
+    recordMetric(queueId, "approved");
     approve({
       id: queueId,
       executorId: GMAIL_SEND_EXECUTOR_ID,
@@ -322,7 +346,7 @@ function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: strin
     return (
       <div className="flex flex-col gap-2">
         <ReceiptLine tone="muted">Not sent. The draft is below if you want to try again.</ReceiptLine>
-        <DraftEditor body={body} editing={editing} onEdit={setBody} subject={draft.subject} />
+        <DraftEditor body={body} editing={editing} onEdit={onEditBody} subject={draft.subject} />
         <ApproveRow onApprove={onApprove} onCopy={copy} copied={copied} onEditToggle={() => setEditing((v) => !v)} />
       </div>
     );
@@ -339,7 +363,7 @@ function DraftBody({ draft, threadId }: { draft: DraftResponse; threadId?: strin
   // Default · drafted, not yet approved.
   return (
     <div className="flex flex-col gap-2">
-      <DraftEditor body={body} editing={editing} onEdit={setBody} subject={draft.subject} />
+      <DraftEditor body={body} editing={editing} onEdit={onEditBody} subject={draft.subject} />
       <ApproveRow onApprove={onApprove} onCopy={copy} copied={copied} onEditToggle={() => setEditing((v) => !v)} />
     </div>
   );
