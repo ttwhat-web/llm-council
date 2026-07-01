@@ -43,6 +43,13 @@ export interface DraftResponse {
   body: string;
   /** Identifier the UI uses to key the draft to its customer. */
   customerEmail: string;
+  /** Prompt template version active when this draft was generated —
+   *  attached at generation time so feedback always attributes to the
+   *  version that actually produced the text, even after the live
+   *  constant moves on to a newer version. */
+  promptVersion: string;
+  /** Model that generated this draft. */
+  model: string;
 }
 
 export type DraftResult =

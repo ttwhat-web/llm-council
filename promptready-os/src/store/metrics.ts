@@ -134,6 +134,24 @@ function median(sortedAsc: number[]): number | null {
     : Math.round((sortedAsc[mid] + sortedAsc[mid + 1]) / 2);
 }
 
+export interface ActionTiming {
+  /** generated → approved, ms. null when either event is missing. */
+  timeToApproveMs: number | null;
+  /** whether the founder changed the body before approving. */
+  wasEdited: boolean;
+}
+
+/** Pure · per-action timing, read at feedback time (single action, not the aggregate). */
+export function getActionTiming(events: MetricEvent[], actionId: string): ActionTiming {
+  const at = (type: MetricType) => events.find((e) => e.actionId === actionId && e.type === type)?.at;
+  const g = at("generated");
+  const a = at("approved");
+  return {
+    timeToApproveMs: g != null && a != null && a >= g ? a - g : null,
+    wasEdited: events.some((e) => e.actionId === actionId && e.type === "edited")
+  };
+}
+
 interface MetricsState {
   events: MetricEvent[];
   /** Record an event once per (actionId, type). Idempotent. */

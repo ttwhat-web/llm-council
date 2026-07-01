@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { computeAggregates, type MetricEvent } from "@/store/metrics";
+import { computeAggregates, getActionTiming, type MetricEvent } from "@/store/metrics";
 
 function ev(actionId: string, type: MetricEvent["type"], at: number): MetricEvent {
   return { actionId, type, at };
@@ -103,5 +103,26 @@ describe("computeAggregates · funnel + timing", () => {
   it("returns null time-to-approve when nothing has been approved", () => {
     const a = computeAggregates([ev("a", "generated", 0)]);
     expect(a.medianTimeToApproveMs).toBeNull();
+  });
+});
+
+describe("getActionTiming · single-action lookup for feedback", () => {
+  it("reports timeToApproveMs and wasEdited=false for an unedited action", () => {
+    const t = getActionTiming([ev("a", "generated", 100), ev("a", "approved", 900)], "a");
+    expect(t.timeToApproveMs).toBe(800);
+    expect(t.wasEdited).toBe(false);
+  });
+
+  it("reports wasEdited=true when an edit event exists for the action", () => {
+    const t = getActionTiming(
+      [ev("a", "generated", 0), ev("a", "edited", 100), ev("a", "approved", 200)],
+      "a"
+    );
+    expect(t.wasEdited).toBe(true);
+  });
+
+  it("returns null timeToApproveMs when the action hasn't been approved yet", () => {
+    const t = getActionTiming([ev("a", "generated", 0)], "a");
+    expect(t.timeToApproveMs).toBeNull();
   });
 });

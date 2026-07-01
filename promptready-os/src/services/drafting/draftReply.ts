@@ -19,6 +19,7 @@ import type { DraftRequest, DraftResult } from "./types";
 import type { GmailMessage } from "@/services/google/types";
 import { OPERATOR_SYSTEM_PROMPT } from "@/services/operator/voice";
 import { renderMemoryForPrompt } from "@/services/operator/memorySeed";
+import { CURRENT_PROMPT_VERSION } from "./promptVersions";
 
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5-20251001";
@@ -139,7 +140,9 @@ export async function draftReply(req: DraftRequest, apiKey: string | null): Prom
       to: req.context.customerEmail,
       subject: buildDraftSubject(req.context),
       body,
-      customerEmail: req.context.customerEmail
+      customerEmail: req.context.customerEmail,
+      promptVersion: CURRENT_PROMPT_VERSION,
+      model: MODEL
     }
   };
 }
