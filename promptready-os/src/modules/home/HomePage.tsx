@@ -11,7 +11,10 @@ import {
   type MissionStage
 } from "@/store/mission";
 import { useSourcesStore } from "@/store/sources";
+import { useAiProviderStore } from "@/store/aiProvider";
+import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { DraftReplies } from "@/components/home/DraftReplies";
+import { fetchOperatorRead } from "@/services/briefing/operatorRead";
 import type { BriefingItem as RealBriefingItem } from "@/services/briefing/types";
 import type { PanelData as RealPanelData } from "@/services/briefing/engine";
 
@@ -320,6 +323,33 @@ export default function HomePage() {
     });
   }, [googleState, snapshot, syncGoogle]);
 
+  // Operator's read · the felt-intelligence line above the briefing.
+  // Runs when connected, an AI key is present, and there are ≥2 items
+  // to rank. Silent (hidden) otherwise; the deterministic briefing
+  // always stands on its own.
+  const anthropicKey = useAiProviderStore((s) => s.anthropicKey);
+  const memory = useOperatorMemoryStore((s) => s.memory);
+  const [operatorRead, setOperatorRead] = useState<string | null>(null);
+  const readForRef = useRef<string>("");
+  useEffect(() => {
+    if (isDemo || !anthropicKey || realBriefingItems.length < 2) {
+      setOperatorRead(null);
+      return;
+    }
+    // Only re-run when the set of items actually changes.
+    const key = realBriefingItems.map((i) => i.id).join("|");
+    if (readForRef.current === key) return;
+    readForRef.current = key;
+    let cancelled = false;
+    void fetchOperatorRead(realBriefingItems, memory, anthropicKey).then((r) => {
+      if (cancelled) return;
+      setOperatorRead(r.ok ? r.text : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDemo, anthropicKey, realBriefingItems, memory]);
+
   const firstName = getUserFirstName(isDemo);
   const greeting = greetingFor(now);
 
@@ -400,6 +430,13 @@ export default function HomePage() {
                 void syncGoogle().catch(() => {});
               }}
             />
+          )}
+
+          {/* Operator's read · felt intelligence, above the items. */}
+          {!isDemo && operatorRead && briefing.length > 0 && (
+            <p className="max-w-2xl text-[16px] font-medium leading-relaxed text-white">
+              {operatorRead}
+            </p>
           )}
 
           {/* 40 % · Briefing — FACT / WHY / RECOMMENDATION */}
