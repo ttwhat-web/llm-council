@@ -17,7 +17,7 @@
  *  * Send errors render with the message + an Approve & retry.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Copy, Loader, RefreshCw } from "lucide-react";
 import clsx from "clsx";
@@ -130,38 +130,52 @@ export function DraftReplies() {
     setBusy(false);
   }, [anthropicKey, candidates, founderFirstName, memory]);
 
+  // Auto-prepare on load · the work is ready before the founder asks.
+  // Runs once per distinct candidate set; only when an AI key exists
+  // and nothing has been drafted yet. This is what turns "click Draft"
+  // into "it's already done" — fewer clicks, calmer morning.
+  const autoDraftedRef = useRef<string>("");
+  useEffect(() => {
+    if (!anthropicKey || candidates.length === 0) return;
+    const key = candidates.slice(0, MAX_DRAFTS_PER_BATCH).map((c) => c.customerEmail).join("|");
+    if (autoDraftedRef.current === key) return;
+    if (Object.keys(drafts).length > 0) return;
+    autoDraftedRef.current = key;
+    void draftAll();
+  }, [anthropicKey, candidates, drafts, draftAll]);
+
   if (candidates.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-3 pt-2">
+    <section className="flex flex-col gap-3">
       <header className="flex items-baseline justify-between gap-3">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.15em] text-white/30">
-          Drafts
+        <span className="text-[15px] font-semibold text-white">
+          {busy
+            ? "Preparing your replies…"
+            : pendingApproval.length > 0
+              ? `${pendingApproval.length} ${pendingApproval.length === 1 ? "reply is" : "replies are"} ready to send`
+              : "Replies"}
         </span>
         <div className="flex items-center gap-2">
-          {pendingApproval.length > 0 && (
+          {pendingApproval.length > 1 && (
             <button
               type="button"
               onClick={approveAll}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[11.5px] font-semibold text-black transition hover:bg-white/90"
-              title="Approve and send every draft below (30-second undo on each)"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1 text-[12px] font-semibold text-black transition hover:bg-white/90"
+              title="Approve and send every reply below (30-second undo on each)"
             >
-              <Check className="h-3 w-3" /> Approve all ({pendingApproval.length})
+              <Check className="h-3.5 w-3.5" /> Approve all ({pendingApproval.length})
             </button>
           )}
           <button
             type="button"
             onClick={draftAll}
             disabled={busy || !anthropicKey}
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1 text-[11.5px] font-medium text-white/85 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
-            title={
-              anthropicKey
-                ? `Draft ${batch.length} replies`
-                : "Add an Anthropic API key in Settings to enable drafts."
-            }
+            title={anthropicKey ? "Re-draft all replies" : "Add an Anthropic API key in Settings to enable drafts."}
+            aria-label="Re-draft replies"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-white/70 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {busy ? <Loader className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-            {busy ? "Drafting…" : `Draft ${batch.length} replies`}
+            {busy ? <Loader className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           </button>
         </div>
       </header>

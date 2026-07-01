@@ -432,14 +432,18 @@ export default function HomePage() {
             />
           )}
 
-          {/* Operator's read · felt intelligence, above the items. */}
+          {/* Operator's read · felt intelligence, above everything. */}
           {!isDemo && operatorRead && briefing.length > 0 && (
             <p className="max-w-2xl text-[16px] font-medium leading-relaxed text-white">
               {operatorRead}
             </p>
           )}
 
-          {/* 40 % · Briefing — FACT / WHY / RECOMMENDATION */}
+          {/* THE WORK · prepared actions, on the front page. No panel,
+           *  no focus column — the value is here the moment you land. */}
+          {!isDemo && sourcesConnected && <DraftReplies />}
+
+          {/* Briefing · the context behind the prepared work. */}
           <section aria-label="Executive briefing" className="flex flex-col gap-10">
             {briefing.length > 0 ? (
               briefing.map((item) => (
@@ -936,9 +940,6 @@ function FocusColumn({
               ))}
             </ul>
           </section>
-
-          {/* P0 closed loop · drafts for stale customer threads. */}
-          {focus === "customers" && !isDemo && <DraftReplies />}
         </div>
       ) : (
         <div className="px-7 pt-6">
