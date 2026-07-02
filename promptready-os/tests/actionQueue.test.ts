@@ -200,3 +200,43 @@ describe("action queue · approve → execute", () => {
     expect(undoSecondsLeft(done)).toBe(0);
   });
 });
+
+describe("action queue · prepare() — pipeline-populated, approval-only Home", () => {
+  it("prepare() registers work as 'prepared' without starting the undo window", () => {
+    registerExecutor(makeExecutor());
+    useActionQueue.getState().prepare({ id: "a1", executorId: TEST_EXECUTOR_ID, params: { name: "reply" } });
+    const item = useActionQueue.getState().items["a1"];
+    expect(item.status).toBe("prepared");
+    expect(item.title).toBe("do reply");
+    expect(item.undoUntil).toBeUndefined();
+  });
+
+  it("approve() on an already-prepared id transitions it straight to queued", () => {
+    vi.useFakeTimers();
+    registerExecutor(makeExecutor());
+    useActionQueue.getState().prepare({ id: "a1", executorId: TEST_EXECUTOR_ID, params: { name: "reply" } });
+    useActionQueue.getState().approve({ id: "a1", executorId: TEST_EXECUTOR_ID, params: { name: "reply" } });
+    const item = useActionQueue.getState().items["a1"];
+    expect(item.status).toBe("queued");
+    expect(undoSecondsLeft(item)).toBeGreaterThan(0);
+  });
+
+  it("a pipeline re-run's prepare() never clobbers an action the founder already approved", async () => {
+    vi.useFakeTimers();
+    const ex = makeExecutor();
+    registerExecutor(ex);
+    useActionQueue.getState().approve({ id: "a1", executorId: TEST_EXECUTOR_ID, params: { name: "reply" } });
+    await vi.advanceTimersByTimeAsync(30_000 + 10);
+    expect(useActionQueue.getState().items["a1"].status).toBe("done");
+
+    // A second Morning Run re-detects the same candidate and calls
+    // prepare() again — must not reset a completed action.
+    useActionQueue.getState().prepare({ id: "a1", executorId: TEST_EXECUTOR_ID, params: { name: "reply v2" } });
+    expect(useActionQueue.getState().items["a1"].status).toBe("done");
+  });
+
+  it("prepare() is silent (no error entry) for an unregistered executor", () => {
+    useActionQueue.getState().prepare({ id: "a1", executorId: "does.not.exist", params: {} });
+    expect(useActionQueue.getState().items["a1"]).toBeUndefined();
+  });
+});

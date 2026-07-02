@@ -58,6 +58,11 @@ export interface Executor<P = unknown> {
 }
 
 export type ActionStatus =
+  /** Generated/detected by a pipeline (e.g. Morning Run) and waiting
+   *  for approval. Not in the undo window yet — approve() is what
+   *  starts the clock. This is what makes "Home only approves work
+   *  that already exists" literally true instead of aspirational. */
+  | "prepared"
   /** In the undo window; not yet executed. */
   | "queued"
   /** Undo window elapsed; executor is running. */

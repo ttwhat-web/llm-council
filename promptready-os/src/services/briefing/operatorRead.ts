@@ -27,15 +27,31 @@ const MAX_TOKENS = 160;
 interface RawAnthropicResponse {
   content?: Array<{ type: string; text?: string }>;
   error?: { message?: string };
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
 }
 
 export type OperatorReadResult =
-  | { ok: true; text: string }
+  | { ok: true; text: string; usage?: TokenUsage }
   | { ok: false; error: string };
+
+/** Real counts of work Morning Run already prepared — never invented,
+ *  never "handled". Passed in so the read can honestly say what's
+ *  ready without the model guessing at numbers. */
+export interface OperatorReadPreparedSummary {
+  repliesReady: number;
+  conflictsNeedingApproval: number;
+  overdueThreads: number;
+}
 
 export function buildOperatorReadPrompt(
   items: BriefingItem[],
-  memory: FounderMemory | null
+  memory: FounderMemory | null,
+  prepared?: OperatorReadPreparedSummary
 ): string {
   const memoryBlock = renderMemoryForPrompt(memory ?? null);
   const list = items
@@ -44,6 +60,15 @@ export function buildOperatorReadPrompt(
 
   const parts: string[] = [];
   if (memoryBlock) parts.push(memoryBlock, "");
+  if (prepared) {
+    parts.push(
+      `Already prepared and waiting for approval — nothing has been sent yet:`,
+      `  Replies ready to send: ${prepared.repliesReady}`,
+      `  Calendar conflicts needing approval: ${prepared.conflictsNeedingApproval}`,
+      `  Threads still waiting on a reply: ${prepared.overdueThreads}`,
+      ``
+    );
+  }
   parts.push(
     `This morning's surfaced items, already filtered from the founder's`,
     `real inbox and calendar:`,
@@ -53,21 +78,29 @@ export function buildOperatorReadPrompt(
     `Write the founder's "read" of this morning: 1–2 short sentences,`,
     `no more. Rank by what matters most (money first, then customers,`,
     `then deadlines, then reputation) and say where to start and why.`,
-    `Reference the actual items — do not invent anything not listed.`,
-    `No greeting, no list, no preamble. Just the read, in your voice.`
+    `Reference the actual items — do not invent anything not listed.`
   );
+  if (prepared) {
+    parts.push(
+      `Use only the counts above and the honest verbs "reviewed",`,
+      `"prepared", "found", or "noticed" — never say "handled" or "sent";`,
+      `nothing has actually gone out yet, only been prepared for approval.`
+    );
+  }
+  parts.push(`No greeting, no list, no preamble. Just the read, in your voice.`);
   return parts.join("\n");
 }
 
 export async function fetchOperatorRead(
   items: BriefingItem[],
   memory: FounderMemory | null,
-  apiKey: string | null
+  apiKey: string | null,
+  prepared?: OperatorReadPreparedSummary
 ): Promise<OperatorReadResult> {
   if (!apiKey) return { ok: false, error: "no-key" };
   if (items.length === 0) return { ok: false, error: "no-items" };
 
-  const prompt = buildOperatorReadPrompt(items, memory);
+  const prompt = buildOperatorReadPrompt(items, memory, prepared);
   let raw: RawAnthropicResponse;
   try {
     const res = await fetch(API_URL, {
@@ -100,5 +133,8 @@ export async function fetchOperatorRead(
     .join(" ")
     .trim();
   if (!text) return { ok: false, error: "empty" };
-  return { ok: true, text };
+  const usage: TokenUsage | undefined = raw.usage
+    ? { inputTokens: raw.usage.input_tokens ?? 0, outputTokens: raw.usage.output_tokens ?? 0 }
+    : undefined;
+  return { ok: true, text, usage };
 }

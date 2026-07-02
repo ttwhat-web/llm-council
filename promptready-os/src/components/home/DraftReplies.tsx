@@ -24,24 +24,18 @@ import { useSourcesStore } from "@/store/sources";
 import { useAiProviderStore } from "@/store/aiProvider";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { draftReply } from "@/services/drafting/draftReply";
+import {
+  collectCandidates,
+  readFounderName,
+  MAX_DRAFTS_PER_BATCH,
+  type CustomerCandidate
+} from "@/services/drafting/candidates";
 import { useActionQueue, undoSecondsLeft, GMAIL_SEND_EXECUTOR_ID } from "@/services/executors";
 import { recordMetric } from "@/store/metrics";
 import { useBillingStore, computeTrialStatus } from "@/store/billing";
 import { FeedbackPrompt } from "@/components/home/FeedbackPrompt";
 import { DraftEditor, ApproveRow, ReceiptLine } from "@/components/home/DraftControls";
 import type { DraftResponse } from "@/services/drafting/types";
-import type { GmailMessage } from "@/services/google/types";
-
-const MAX_DRAFTS_PER_BATCH = 4;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-interface CustomerCandidate {
-  customerName: string;
-  customerEmail: string;
-  threadMessages: GmailMessage[];
-  daysSinceLastInbound: number;
-  subject: string;
-}
 
 type DraftState =
   | { kind: "idle" }
@@ -63,6 +57,7 @@ export function DraftReplies() {
   const founderFirstName = memory.firstName?.trim() || readFounderName();
 
   const approve = useActionQueue((s) => s.approve);
+  const prepare = useActionQueue((s) => s.prepare);
   const queueItems = useActionQueue((s) => s.items);
 
   const billingStartedAt = useBillingStore((s) => s.startedAt);
@@ -78,7 +73,7 @@ export function DraftReplies() {
   const drafted = batch.filter((c) => drafts[c.customerEmail]?.kind === "drafted");
   const pendingApproval = drafted.filter((c) => {
     const q = queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`];
-    return !q || q.status === "undone" || q.status === "error";
+    return !q || q.status === "prepared" || q.status === "undone" || q.status === "error";
   });
   // "Morning complete" when every drafted reply reached a terminal
   // state (sent or intentionally skipped) and nothing is left to do.
@@ -104,58 +99,111 @@ export function DraftReplies() {
           to: state.draft.to,
           subject: state.draft.subject,
           body: state.draft.body,
-          threadId: c.threadMessages[0]?.threadId
+          threadId: c.threadMessages[0]?.threadId,
+          promptVersion: state.draft.promptVersion,
+          model: state.draft.model
         }
       });
     }
   }, [approve, drafts, pendingApproval]);
 
-  const draftAll = useCallback(async () => {
-    if (!anthropicKey) return;
-    if (candidates.length === 0) return;
-    setBusy(true);
-    const batch = candidates.slice(0, MAX_DRAFTS_PER_BATCH);
-    setDrafts((d) => {
-      const next = { ...d };
-      for (const c of batch) next[c.customerEmail] = { kind: "drafting" };
-      return next;
-    });
-    // Run serially to stay polite to the API on first run.
-    for (const c of batch) {
-      const result = await draftReply(
-        {
-          context: c,
-          founderFirstName,
-          intent: "follow-up",
-          memory
-        },
-        anthropicKey
-      );
-      if (result.ok) recordMetric(`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`, "generated");
-      setDrafts((d) => ({
-        ...d,
-        [c.customerEmail]:
-          result.ok
+  // Draft (or re-draft) a specific set of candidates, then register
+  // each success as a "prepared" queue entry — the same call Morning
+  // Run makes, so the queue stays the one source of truth regardless
+  // of whether the pipeline or this manual path produced the draft.
+  const draftSpecific = useCallback(
+    async (list: CustomerCandidate[]) => {
+      if (!anthropicKey || list.length === 0) return;
+      setBusy(true);
+      setDrafts((d) => {
+        const next = { ...d };
+        for (const c of list) next[c.customerEmail] = { kind: "drafting" };
+        return next;
+      });
+      // Run serially to stay polite to the API on first run.
+      for (const c of list) {
+        const result = await draftReply(
+          { context: c, founderFirstName, intent: "follow-up", memory },
+          anthropicKey
+        );
+        if (result.ok) {
+          const actionId = `${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`;
+          recordMetric(actionId, "generated");
+          prepare({
+            id: actionId,
+            executorId: GMAIL_SEND_EXECUTOR_ID,
+            params: {
+              to: result.draft.to,
+              subject: result.draft.subject,
+              body: result.draft.body,
+              threadId: c.threadMessages[0]?.threadId,
+              promptVersion: result.draft.promptVersion,
+              model: result.draft.model
+            }
+          });
+        }
+        setDrafts((d) => ({
+          ...d,
+          [c.customerEmail]: result.ok
             ? { kind: "drafted", draft: result.draft }
             : { kind: "error", error: result.error }
-      }));
-    }
-    setBusy(false);
-  }, [anthropicKey, candidates, founderFirstName, memory]);
+        }));
+      }
+      setBusy(false);
+    },
+    [anthropicKey, founderFirstName, memory, prepare]
+  );
 
-  // Auto-prepare on load · the work is ready before the founder asks.
-  // Runs once per distinct candidate set; only when an AI key exists
-  // and nothing has been drafted yet. This is what turns "click Draft"
-  // into "it's already done" — fewer clicks, calmer morning.
-  const autoDraftedRef = useRef<string>("");
+  const draftAll = useCallback(() => draftSpecific(batch), [draftSpecific, batch]);
+
+  // Hydrate from whatever Morning Run already prepared, then draft
+  // only what's genuinely missing — zero duplicate AI calls when the
+  // pipeline already ran before the founder opened Home. Runs once
+  // per distinct batch.
+  const autoRunRef = useRef<string>("");
   useEffect(() => {
-    if (!anthropicKey || candidates.length === 0) return;
-    const key = candidates.slice(0, MAX_DRAFTS_PER_BATCH).map((c) => c.customerEmail).join("|");
-    if (autoDraftedRef.current === key) return;
-    if (Object.keys(drafts).length > 0) return;
-    autoDraftedRef.current = key;
-    void draftAll();
-  }, [anthropicKey, candidates, drafts, draftAll]);
+    if (batch.length === 0) return;
+    const key = batch.map((c) => c.customerEmail).join("|");
+    if (autoRunRef.current === key) return;
+
+    const hydrated: Array<[string, DraftState]> = [];
+    const missing: CustomerCandidate[] = [];
+    for (const c of batch) {
+      if (drafts[c.customerEmail]) continue; // already local (drafted/drafting/error)
+      const params = queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`]?.params as
+        | { to?: string; subject?: string; body?: string; promptVersion?: string; model?: string }
+        | undefined;
+      if (params?.to && params.subject && params.body) {
+        hydrated.push([
+          c.customerEmail,
+          {
+            kind: "drafted",
+            draft: {
+              to: params.to,
+              subject: params.subject,
+              body: params.body,
+              customerEmail: c.customerEmail,
+              promptVersion: params.promptVersion ?? "unknown",
+              model: params.model ?? "unknown"
+            }
+          }
+        ]);
+      } else if (anthropicKey) {
+        missing.push(c);
+      }
+    }
+    if (hydrated.length === 0 && missing.length === 0) return;
+
+    autoRunRef.current = key;
+    if (hydrated.length > 0) {
+      setDrafts((d) => {
+        const next = { ...d };
+        for (const [email, state] of hydrated) next[email] = state;
+        return next;
+      });
+    }
+    if (missing.length > 0) void draftSpecific(missing);
+  }, [batch, drafts, queueItems, anthropicKey, draftSpecific]);
 
   if (candidates.length === 0) return null;
 
@@ -357,7 +405,14 @@ function DraftBody({
     approve({
       id: queueId,
       executorId: GMAIL_SEND_EXECUTOR_ID,
-      params: { to: draft.to, subject: draft.subject, body, threadId }
+      params: {
+        to: draft.to,
+        subject: draft.subject,
+        body,
+        threadId,
+        promptVersion: draft.promptVersion,
+        model: draft.model
+      }
     });
   };
 
@@ -423,61 +478,4 @@ function DraftBody({
       <ApproveRow onApprove={onApprove} onCopy={copy} copied={copied} onEditToggle={() => setEditing((v) => !v)} />
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Candidate selection · same heuristic as the customers panel
-// ---------------------------------------------------------------------------
-
-function collectCandidates(
-  snapshot: ReturnType<typeof useSourcesStore.getState>["snapshot"]
-): CustomerCandidate[] {
-  if (!snapshot) return [];
-  const now = snapshot.syncedAt;
-  const out: CustomerCandidate[] = [];
-  for (const t of snapshot.threads) {
-    const msgs = t.messages;
-    if (msgs.length === 0) continue;
-    const last = msgs[msgs.length - 1];
-    if (last.isFromMe) continue;
-    if (isNoise(last.fromAddress)) continue;
-    const days = Math.max(0, Math.floor((now - last.date) / DAY_MS));
-    if (days < 1) continue;
-    out.push({
-      customerName: last.fromName || last.fromAddress,
-      customerEmail: last.fromAddress,
-      threadMessages: msgs,
-      daysSinceLastInbound: days,
-      subject: t.subject || last.subject
-    });
-  }
-  return out.sort((a, b) => b.daysSinceLastInbound - a.daysSinceLastInbound);
-}
-
-const NOISE_PREFIXES = ["noreply", "no-reply", "donotreply", "do-not-reply", "notifications"];
-const NOISE_DOMAINS = new Set([
-  "google.com",
-  "googlemail.com",
-  "youtube.com",
-  "linkedin.com",
-  "github.com"
-]);
-
-function isNoise(addr: string): boolean {
-  const a = addr.trim().toLowerCase();
-  if (!a) return true;
-  const [local, domain] = a.split("@");
-  if (NOISE_PREFIXES.some((p) => (local ?? "").startsWith(p))) return true;
-  if (NOISE_DOMAINS.has(domain ?? "")) return true;
-  return false;
-}
-
-function readFounderName(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const v = window.localStorage.getItem("operator.user.firstName");
-    return v && v.trim() ? v.trim() : null;
-  } catch {
-    return null;
-  }
 }

@@ -28,6 +28,11 @@ export interface ApproveInput {
 interface ActionQueueState {
   items: Record<string, Action>;
   order: string[];
+  /** Pipeline-side: register work that's ready for approval, without
+   *  starting the undo window. A no-op if this id already progressed
+   *  past "prepared" (queued/executing/done/undone/error) — a
+   *  pipeline re-run never clobbers a founder's decision. */
+  prepare(input: ApproveInput): void;
   approve(input: ApproveInput): void;
   undo(id: string): void;
   get(id: string): Action | undefined;
@@ -40,6 +45,28 @@ const timers = new Map<string, ReturnType<typeof setTimeout>>();
 export const useActionQueue = create<ActionQueueState>((set, get) => ({
   items: {},
   order: [],
+
+  prepare(input) {
+    const existing = get().items[input.id];
+    if (existing && existing.status !== "prepared") return; // don't clobber a real decision
+
+    const executor = getExecutor(input.executorId);
+    if (!executor) return; // silently skip — approve() will surface the honest error if clicked
+
+    const desc = executor.describe(input.params);
+    const action: Action = {
+      id: input.id,
+      executorId: input.executorId,
+      params: input.params,
+      title: desc.title,
+      detail: desc.detail,
+      status: "prepared"
+    };
+    set((s) => ({
+      items: { ...s.items, [input.id]: action },
+      order: s.order.includes(input.id) ? s.order : [input.id, ...s.order]
+    }));
+  },
 
   approve(input) {
     const executor = getExecutor(input.executorId);

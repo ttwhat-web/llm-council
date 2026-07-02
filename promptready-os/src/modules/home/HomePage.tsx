@@ -11,13 +11,11 @@ import {
   type MissionStage
 } from "@/store/mission";
 import { useSourcesStore } from "@/store/sources";
-import { useAiProviderStore } from "@/store/aiProvider";
-import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { useBillingStore, computeTrialStatus } from "@/store/billing";
+import { useMorningRunStore } from "@/store/morningRun";
 import { DraftReplies } from "@/components/home/DraftReplies";
 import { CalendarConflicts } from "@/components/home/CalendarConflicts";
 import { MemoryCandidatePrompt } from "@/components/home/MemoryCandidatePrompt";
-import { fetchOperatorRead } from "@/services/briefing/operatorRead";
 import type { BriefingItem as RealBriefingItem } from "@/services/briefing/types";
 import type { PanelData as RealPanelData } from "@/services/briefing/engine";
 
@@ -309,49 +307,27 @@ export default function HomePage() {
   const snapshot = useSourcesStore((s) => s.snapshot);
   const realBriefingItems = useSourcesStore((s) => s.briefing);
   const realPanelsRaw = useSourcesStore((s) => s.panels);
-  const syncGoogle = useSourcesStore((s) => s.syncGoogle);
   const sourcesConnected = googleState === "connected" || googleState === "syncing" || googleState === "error";
 
-  // Auto-sync on first mount when we have tokens but no snapshot
-  // (just-connected case) or the snapshot is older than 5 minutes.
-  const autoSyncedRef = useRef(false);
+  // Morning Run · the whole pipeline (sync → detect → draft → prepare
+  // → Operator's Read), run once per staleness window by whoever opens
+  // Home. "Sync now" below re-fires the exact same orchestrator — a
+  // manual trigger is just another caller, same as a future scheduled
+  // run or desktop launch would be.
+  const runMorningRun = useMorningRunStore((s) => s.run);
+  const morningRunStatus = useMorningRunStore((s) => s.status);
+  const lastMorningRun = useMorningRunStore((s) => s.lastRun);
+  const autoRunRef = useRef(false);
   useEffect(() => {
-    if (autoSyncedRef.current) return;
+    if (isDemo || autoRunRef.current) return;
     if (googleState !== "connected" && googleState !== "error") return;
     const stale = !snapshot || Date.now() - snapshot.syncedAt > 5 * 60 * 1000;
     if (!stale) return;
-    autoSyncedRef.current = true;
-    void syncGoogle().catch(() => {
-      /* error state already captured by the store */
-    });
-  }, [googleState, snapshot, syncGoogle]);
+    autoRunRef.current = true;
+    void runMorningRun();
+  }, [isDemo, googleState, snapshot, runMorningRun]);
 
-  // Operator's read · the felt-intelligence line above the briefing.
-  // Runs when connected, an AI key is present, and there are ≥2 items
-  // to rank. Silent (hidden) otherwise; the deterministic briefing
-  // always stands on its own.
-  const anthropicKey = useAiProviderStore((s) => s.anthropicKey);
-  const memory = useOperatorMemoryStore((s) => s.memory);
-  const [operatorRead, setOperatorRead] = useState<string | null>(null);
-  const readForRef = useRef<string>("");
-  useEffect(() => {
-    if (isDemo || !anthropicKey || realBriefingItems.length < 2) {
-      setOperatorRead(null);
-      return;
-    }
-    // Only re-run when the set of items actually changes.
-    const key = realBriefingItems.map((i) => i.id).join("|");
-    if (readForRef.current === key) return;
-    readForRef.current = key;
-    let cancelled = false;
-    void fetchOperatorRead(realBriefingItems, memory, anthropicKey).then((r) => {
-      if (cancelled) return;
-      setOperatorRead(r.ok ? r.text : null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [isDemo, anthropicKey, realBriefingItems, memory]);
+  const operatorRead = !isDemo ? (lastMorningRun?.operatorRead ?? null) : null;
 
   const billingStartedAt = useBillingStore((s) => s.startedAt);
   const billingUpgraded = useBillingStore((s) => s.upgraded);
@@ -443,11 +419,11 @@ export default function HomePage() {
             <WatchingBanner
               snapshot={snapshot}
               lastSyncMs={lastSyncMs}
-              state={googleState}
+              state={morningRunStatus === "running" ? "syncing" : googleState}
               lastErrors={lastErrors}
               onSyncNow={() => {
-                autoSyncedRef.current = true;
-                void syncGoogle().catch(() => {});
+                autoRunRef.current = true;
+                void runMorningRun();
               }}
             />
           )}

@@ -28,6 +28,7 @@ const MAX_TOKENS = 400;
 interface RawAnthropicResponse {
   content?: Array<{ type: string; text?: string }>;
   error?: { type?: string; message?: string };
+  usage?: { input_tokens?: number; output_tokens?: number };
 }
 
 export function buildDraftPrompt(req: DraftRequest): string {
@@ -143,7 +144,10 @@ export async function draftReply(req: DraftRequest, apiKey: string | null): Prom
       customerEmail: req.context.customerEmail,
       promptVersion: CURRENT_PROMPT_VERSION,
       model: MODEL
-    }
+    },
+    usage: raw.usage
+      ? { inputTokens: raw.usage.input_tokens ?? 0, outputTokens: raw.usage.output_tokens ?? 0 }
+      : undefined
   };
 }
 

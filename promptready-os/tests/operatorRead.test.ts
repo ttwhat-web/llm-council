@@ -59,4 +59,24 @@ describe("buildOperatorReadPrompt", () => {
     const out = buildOperatorReadPrompt(items, EMPTY_MEMORY);
     expect(out).not.toContain("Founder profile (from memory)");
   });
+
+  it("without a prepared summary, says nothing about counts or honest verbs", () => {
+    const out = buildOperatorReadPrompt(items, null);
+    expect(out).not.toContain("Already prepared");
+    expect(out).not.toContain("honest verbs");
+  });
+
+  it("with a prepared summary, states the exact counts and forbids 'handled'/'sent'", () => {
+    const out = buildOperatorReadPrompt(items, null, {
+      repliesReady: 3,
+      conflictsNeedingApproval: 1,
+      overdueThreads: 1
+    });
+    expect(out).toContain("Replies ready to send: 3");
+    expect(out).toContain("Calendar conflicts needing approval: 1");
+    expect(out).toContain("Threads still waiting on a reply: 1");
+    expect(out).toContain('"reviewed"');
+    expect(out).toContain('"prepared"');
+    expect(out).toMatch(/never say "handled" or "sent"/);
+  });
 });

@@ -52,6 +52,11 @@ export interface DraftResponse {
   model: string;
 }
 
+export interface DraftTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export type DraftResult =
-  | { ok: true; draft: DraftResponse }
+  | { ok: true; draft: DraftResponse; usage?: DraftTokenUsage }
   | { ok: false; error: string };
