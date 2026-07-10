@@ -158,6 +158,10 @@ interface ActionQueueState {
   undo(id: string): void;
   /** Re-attempt a failed action's execute() from scratch. */
   retry(id: string): void;
+  /** Approve every not-yet-approved action across every executor at
+   *  once — "the same loop, no exceptions": one global gesture, not
+   *  a per-executor bulk button. Returns how many were approved. */
+  approveAllPending(): number;
   get(id: string): Action | undefined;
   /** Count of actions that reached "completed" (for "Morning complete"). */
   doneCount(): number;
@@ -452,6 +456,22 @@ export const useActionQueue = create<ActionQueueState>((set, get) => {
         appendLog(get().log, { at: now, actionId: id, executor: item.executor, event: "retried", detail: "manual retry" })
       );
       void runExecute(id);
+    },
+
+    approveAllPending() {
+      const items = get().items;
+      const approveFn = get().approve;
+      let count = 0;
+      for (const [id, action] of Object.entries(items)) {
+        const isPending =
+          action.status === "prepared" ||
+          action.status === "cancelled" ||
+          (action.status === "waiting_approval" && action.approvedAt == null);
+        if (!isPending) continue;
+        approveFn(id);
+        count++;
+      }
+      return count;
     },
 
     get(id) {

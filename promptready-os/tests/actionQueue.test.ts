@@ -398,6 +398,32 @@ describe("a pipeline re-run never clobbers a founder's decision", () => {
   });
 });
 
+describe("approveAllPending() — one global gesture across every executor", () => {
+  it("approves every prepared/waiting/cancelled action, across executors, and returns the count", async () => {
+    vi.useFakeTimers();
+    registerExecutor(makePreExecutor());
+    registerExecutor(makePostExecutor());
+    useActionQueue.getState().prepare({ id: "a1", executor: PRE_EXECUTOR_ID, params: { name: "x" } });
+    useActionQueue.getState().prepare({ id: "a2", executor: POST_EXECUTOR_ID, params: {} });
+
+    const count = useActionQueue.getState().approveAllPending();
+    expect(count).toBe(2);
+    expect(useActionQueue.getState().items["a1"].status).toBe("waiting_approval");
+
+    await vi.advanceTimersByTimeAsync(30_000 + 10);
+    expect(useActionQueue.getState().items["a1"].status).toBe("completed");
+    expect(useActionQueue.getState().items["a2"].status).toBe("completed");
+  });
+
+  it("never touches actions that are already executing, completed, or genuinely done", () => {
+    registerExecutor(makePreExecutor());
+    const done: Action = { id: "done1", executor: PRE_EXECUTOR_ID, params: {}, title: "t", status: "completed", createdAt: 0 };
+    useActionQueue.setState({ items: { done1: done }, order: ["done1"], log: [] });
+    expect(useActionQueue.getState().approveAllPending()).toBe(0);
+    expect(useActionQueue.getState().items["done1"].status).toBe("completed");
+  });
+});
+
 describe("updateParams() — editing before a decision commits", () => {
   it("updates a prepared item's params and re-describes it", () => {
     registerExecutor(makePreExecutor());
