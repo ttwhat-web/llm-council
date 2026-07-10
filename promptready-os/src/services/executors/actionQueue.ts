@@ -298,6 +298,7 @@ export const useActionQueue = create<ActionQueueState>((set, get) => {
       if (!executor) return; // no phantom entries for a capability that isn't registered
       const desc = executor.describe(input.params);
       const now = Date.now();
+      const silent = executor.requiresApproval === false;
       const action: Action = {
         id: input.id,
         executor: input.executor,
@@ -308,13 +309,18 @@ export const useActionQueue = create<ActionQueueState>((set, get) => {
         priority: input.priority ?? desc?.priority,
         status: "prepared",
         createdAt: existing?.createdAt ?? now,
-        metadata: input.metadata ?? existing?.metadata
+        metadata: silent ? { ...input.metadata, silent: true } : (input.metadata ?? existing?.metadata)
       };
       commit(
         { ...get().items, [input.id]: action },
         appendLog(get().log, { at: now, actionId: input.id, executor: input.executor, event: "prepared" }),
         get().order.includes(input.id) ? get().order : [input.id, ...get().order]
       );
+      // Silent executor: trusted to run without ever asking. Still
+      // real approve() → execute() → receipt/undo — just no founder
+      // decision pause in between. Never used for anything that
+      // sends, deletes, moves money, or touches customer data.
+      if (silent) get().approve(input.id);
     },
 
     markWaitingApproval(id) {

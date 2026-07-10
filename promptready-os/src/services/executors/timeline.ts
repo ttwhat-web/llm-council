@@ -51,12 +51,16 @@ export function buildTimeline(log: ActionLogEntry[], items: Record<string, Actio
           : entry.event === "failed"
             ? action?.error ?? entry.detail
             : entry.detail;
+      // Silent executors never asked for approval — the label says so
+      // rather than implying a decision the founder never made.
+      const isSilent = action?.metadata?.silent === true;
+      const suffix = isSilent && (entry.event === "completed" || entry.event === "approved") ? " · auto" : "";
       return {
         at: entry.at,
         actionId: entry.actionId,
         executor: entry.executor,
         event: entry.event,
-        label: `${verb}: ${title}`,
+        label: `${verb}: ${title}${suffix}`,
         evidence
       };
     })

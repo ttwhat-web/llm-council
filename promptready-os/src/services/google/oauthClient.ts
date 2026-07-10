@@ -49,6 +49,15 @@ const SCOPES = [
  */
 export const CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 
+/**
+ * Gmail modify scope — same incremental-consent rule as Calendar
+ * write: never bundled into the base connect flow, only requested
+ * when the founder explicitly grants it. Powers the one silent
+ * executor (archiving obvious noise) — never delete, never send,
+ * only add/remove labels.
+ */
+export const GMAIL_MODIFY_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
+
 const STORAGE_CREDENTIALS = "operator.google.credentials.v1";
 const STORAGE_TOKENS = "operator.google.tokens.v1";
 
@@ -240,6 +249,12 @@ export async function exchangeCodeForTokens(
  *  clicked or which flow ran. */
 export function hasCalendarWriteScope(): boolean {
   return !!readTokens()?.grantedScopes?.includes(CALENDAR_WRITE_SCOPE);
+}
+
+/** Same rule as hasCalendarWriteScope — read from what Google's grant
+ *  actually contains. */
+export function hasGmailModifyScope(): boolean {
+  return !!readTokens()?.grantedScopes?.includes(GMAIL_MODIFY_SCOPE);
 }
 
 /**

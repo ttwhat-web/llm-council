@@ -11,6 +11,7 @@
 import { registerExecutor } from "./registry";
 import { gmailSendExecutor } from "./gmailSendExecutor";
 import { calendarMoveExecutor } from "./calendarMoveExecutor";
+import { gmailArchiveExecutor } from "./gmailArchiveExecutor";
 
 let booted = false;
 
@@ -19,6 +20,7 @@ export function bootExecutors(): void {
   booted = true;
   registerExecutor(gmailSendExecutor);
   registerExecutor(calendarMoveExecutor);
+  registerExecutor(gmailArchiveExecutor);
   // Future:
   //   registerExecutor(whatsappSendExecutor);    // native or computer-use
   //   registerExecutor(stripeChargeExecutor);    // native · Stripe
@@ -27,6 +29,7 @@ export function bootExecutors(): void {
 
 export { GMAIL_SEND_EXECUTOR_ID } from "./gmailSendExecutor";
 export { CALENDAR_MOVE_EXECUTOR_ID, type CalendarMoveParams } from "./calendarMoveExecutor";
+export { GMAIL_ARCHIVE_EXECUTOR_ID, type GmailArchiveParams } from "./gmailArchiveExecutor";
 export { useActionQueue, undoSecondsLeft } from "./actionQueue";
 export type { ApproveInput } from "./actionQueue";
 export { computeQueueMetrics, computeActionTiming } from "./actionMetrics";

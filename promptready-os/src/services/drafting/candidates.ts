@@ -28,7 +28,10 @@ const NOISE_DOMAINS = new Set([
   "github.com"
 ]);
 
-function isNoise(addr: string): boolean {
+/** Exported so the archive-candidate detector uses the exact same
+ *  definition of "noise" as the reply-drafting candidates do — one
+ *  heuristic, not two that could quietly drift apart. */
+export function isNoise(addr: string): boolean {
   const a = addr.trim().toLowerCase();
   if (!a) return true;
   const [local, domain] = a.split("@");

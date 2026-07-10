@@ -20,8 +20,14 @@
 import { useSourcesStore } from "@/store/sources";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { useAiProviderStore } from "@/store/aiProvider";
-import { useActionQueue, GMAIL_SEND_EXECUTOR_ID, CALENDAR_MOVE_EXECUTOR_ID } from "@/services/executors";
+import {
+  useActionQueue,
+  GMAIL_SEND_EXECUTOR_ID,
+  CALENDAR_MOVE_EXECUTOR_ID,
+  GMAIL_ARCHIVE_EXECUTOR_ID
+} from "@/services/executors";
 import { collectCandidates, readFounderName, MAX_DRAFTS_PER_BATCH } from "@/services/drafting/candidates";
+import { collectArchiveCandidates } from "@/services/drafting/archiveCandidates";
 import { draftReply } from "@/services/drafting/draftReply";
 import { findConflictPairs } from "@/services/briefing/detectors";
 import { fetchOperatorRead } from "@/services/briefing/operatorRead";
@@ -155,7 +161,28 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
   }
 
   const calendarActionPrepared = !!conflict && synced.google.calendarWriteGranted;
-  const actionsPrepared = draftsGenerated + (calendarActionPrepared ? 1 : 0);
+
+  // Stage · Silently archive obvious inbox noise — no approval needed.
+  // Only ever prepared once the founder has granted the separate
+  // gmail.modify scope; never prepare an action guaranteed to fail,
+  // same rule as Calendar write above.
+  let archivedPrepared = 0;
+  if (synced.google.gmailModifyGranted) {
+    for (const candidate of collectArchiveCandidates(snapshot)) {
+      const id = `${GMAIL_ARCHIVE_EXECUTOR_ID}:${candidate.messageId}`;
+      detect({
+        id,
+        executor: GMAIL_ARCHIVE_EXECUTOR_ID,
+        title: `Archive: ${candidate.subject || "(no subject)"}`,
+        description: candidate.fromName
+      });
+      prepare({ id, executor: GMAIL_ARCHIVE_EXECUTOR_ID, params: candidate });
+      touchedExecutors.add(GMAIL_ARCHIVE_EXECUTOR_ID);
+      archivedPrepared++;
+    }
+  }
+
+  const actionsPrepared = draftsGenerated + (calendarActionPrepared ? 1 : 0) + archivedPrepared;
 
   // Stage · Produce Operator Read — the completed-run summary, in the
   // founder's voice, using only real counts and honest verbs.

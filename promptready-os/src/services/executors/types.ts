@@ -82,6 +82,15 @@ export interface Executor<P = unknown> {
   /** How many automatic retries on a failed execute() before giving
    *  up. Default 0 (no silent retries) when omitted. */
   maxRetries?: number;
+  /** The autonomy ladder, collapsed to what's actually load-bearing
+   *  today: true (default) means a founder decision is required —
+   *  every executor built so far. false means this executor is
+   *  trusted to run without ever asking, because what it does is
+   *  non-destructive and reversible by design (e.g. archiving —
+   *  never sending, deleting, moving money, or touching customer
+   *  data). The founder never loses visibility either way: silent
+   *  actions still appear in Timeline and still support undo. */
+  requiresApproval?: boolean;
   /** Render the approval card / receipt text from params. Pure. */
   describe(params: P): ActionDescription;
   /** Perform the verb. Only this touches the network / automation. */

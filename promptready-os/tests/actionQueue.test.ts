@@ -357,6 +357,66 @@ describe("post-execute undo strategy — a real compensating call", () => {
   });
 });
 
+const SILENT_EXECUTOR_ID = "test.silent";
+
+function makeSilentExecutor(overrides: Partial<Executor> = {}): Executor & { calls: unknown[] } {
+  const calls: unknown[] = [];
+  return {
+    id: SILENT_EXECUTOR_ID,
+    label: "Test verb (silent)",
+    mode: "native",
+    undoStrategy: "post-execute",
+    undoWindowMs: 30_000,
+    requiresApproval: false,
+    describe: () => ({ title: "silent verb" }),
+    execute: async (p) => {
+      calls.push(p);
+      return { ok: true as const, receipt: "done silently" };
+    },
+    calls,
+    ...overrides
+  };
+}
+
+describe("silent executors — requiresApproval: false skips the founder decision", () => {
+  it("prepare() auto-approves and runs immediately, tagging metadata.silent", async () => {
+    vi.useFakeTimers();
+    const ex = makeSilentExecutor();
+    registerExecutor(ex);
+    useActionQueue.getState().prepare({ id: "a1", executor: SILENT_EXECUTOR_ID, params: {} });
+    await vi.advanceTimersByTimeAsync(10);
+    const item = useActionQueue.getState().items["a1"];
+    expect(item.status).toBe("completed");
+    expect(item.metadata?.silent).toBe(true);
+    expect(item.approvedAt).toBeGreaterThan(0);
+    expect(ex.calls).toHaveLength(1);
+  });
+
+  it("still supports a real undo within the post-execute grace window", async () => {
+    vi.useFakeTimers();
+    const undoCalls: unknown[] = [];
+    const ex = makeSilentExecutor({
+      undo: async (p) => {
+        undoCalls.push(p);
+      }
+    });
+    registerExecutor(ex);
+    useActionQueue.getState().prepare({ id: "a1", executor: SILENT_EXECUTOR_ID, params: { x: 1 } });
+    await vi.advanceTimersByTimeAsync(10);
+    useActionQueue.getState().undo("a1");
+    await vi.advanceTimersByTimeAsync(10);
+    expect(undoCalls).toHaveLength(1);
+    expect(useActionQueue.getState().items["a1"].status).toBe("undone");
+  });
+
+  it("a non-silent executor's prepare() never auto-approves", () => {
+    registerExecutor(makePreExecutor());
+    useActionQueue.getState().prepare({ id: "a1", executor: PRE_EXECUTOR_ID, params: {} });
+    expect(useActionQueue.getState().items["a1"].status).toBe("prepared");
+    expect(useActionQueue.getState().items["a1"].metadata?.silent).toBeUndefined();
+  });
+});
+
 describe("detect() → prepare() and reject()", () => {
   it("detect() registers a raw opportunity with no params yet", () => {
     useActionQueue.getState().detect({ id: "a1", executor: PRE_EXECUTOR_ID, title: "spotted something" });

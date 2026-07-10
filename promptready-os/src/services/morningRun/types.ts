@@ -14,7 +14,7 @@ export interface MorningRunSummary {
   draftsGenerated: number;
   /** Actions newly registered as "prepared" in the action queue. */
   actionsPrepared: number;
-  /** Distinct executor ids touched this run (0, 1, or 2 today). */
+  /** Distinct executor ids touched this run. */
   executorCount: number;
   /** Total input+output tokens across every AI call this run. */
   aiTokens: number;

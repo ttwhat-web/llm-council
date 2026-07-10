@@ -20,6 +20,7 @@ import {
   clearTokens,
   disconnect as oauthDisconnect,
   hasCalendarWriteScope,
+  hasGmailModifyScope,
   readCredentials,
   readTokens,
   writeCredentials
@@ -50,6 +51,9 @@ export interface SourcesState {
     /** True only when Google's token grant actually includes the
      *  Calendar write scope — read live from tokens, never assumed. */
     calendarWriteGranted: boolean;
+    /** Same rule, for the Gmail modify scope — powers the silent
+     *  archive executor. */
+    gmailModifyGranted: boolean;
   };
   snapshot: WorkspaceSnapshot | null;
   briefing: BriefingItem[];
@@ -71,12 +75,22 @@ function evalGoogleState(): {
   state: GoogleConnectionState;
   email: string | null;
   calendarWriteGranted: boolean;
+  gmailModifyGranted: boolean;
 } {
   const creds = readCredentials();
   const tokens = readTokens();
-  if (!creds) return { state: "disconnected", email: null, calendarWriteGranted: false };
-  if (!tokens) return { state: "needs-auth", email: null, calendarWriteGranted: false };
-  return { state: "connected", email: tokens.email ?? null, calendarWriteGranted: hasCalendarWriteScope() };
+  if (!creds) {
+    return { state: "disconnected", email: null, calendarWriteGranted: false, gmailModifyGranted: false };
+  }
+  if (!tokens) {
+    return { state: "needs-auth", email: null, calendarWriteGranted: false, gmailModifyGranted: false };
+  }
+  return {
+    state: "connected",
+    email: tokens.email ?? null,
+    calendarWriteGranted: hasCalendarWriteScope(),
+    gmailModifyGranted: hasGmailModifyScope()
+  };
 }
 
 export const useSourcesStore = create<SourcesState>((set, get) => {
@@ -92,7 +106,8 @@ export const useSourcesStore = create<SourcesState>((set, get) => {
       selfEmail: initialEval.email ?? initialSnapshot?.selfEmail ?? null,
       lastSyncMs: initialSnapshot?.syncedAt ?? null,
       lastErrors: [],
-      calendarWriteGranted: initialEval.calendarWriteGranted
+      calendarWriteGranted: initialEval.calendarWriteGranted,
+      gmailModifyGranted: initialEval.gmailModifyGranted
     },
     snapshot: initialSnapshot,
     briefing: initialBriefing,
@@ -114,7 +129,8 @@ export const useSourcesStore = create<SourcesState>((set, get) => {
           selfEmail: null,
           lastSyncMs: null,
           lastErrors: [],
-          calendarWriteGranted: false
+          calendarWriteGranted: false,
+          gmailModifyGranted: false
         },
         snapshot: null,
         briefing: [],
@@ -129,7 +145,8 @@ export const useSourcesStore = create<SourcesState>((set, get) => {
           ...s.google,
           state: e.state,
           selfEmail: e.email ?? s.google.selfEmail,
-          calendarWriteGranted: e.calendarWriteGranted
+          calendarWriteGranted: e.calendarWriteGranted,
+          gmailModifyGranted: e.gmailModifyGranted
         }
       }));
     },
@@ -146,7 +163,8 @@ export const useSourcesStore = create<SourcesState>((set, get) => {
             selfEmail: result.snapshot.selfEmail || null,
             lastSyncMs: result.snapshot.syncedAt,
             lastErrors: result.errors,
-            calendarWriteGranted: hasCalendarWriteScope()
+            calendarWriteGranted: hasCalendarWriteScope(),
+            gmailModifyGranted: hasGmailModifyScope()
           },
           snapshot: result.snapshot,
           briefing,

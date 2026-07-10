@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildAuthorizationUrl,
   CALENDAR_WRITE_SCOPE,
+  GMAIL_MODIFY_SCOPE,
   hasCalendarWriteScope,
+  hasGmailModifyScope,
   validateClientId
 } from "@/services/google/oauthClient";
 
@@ -47,5 +49,26 @@ describe("buildAuthorizationUrl · Calendar write is never bundled by default", 
 describe("hasCalendarWriteScope", () => {
   it("defaults to false with no stored tokens", () => {
     expect(hasCalendarWriteScope()).toBe(false);
+  });
+});
+
+describe("buildAuthorizationUrl · Gmail modify is never bundled by default", () => {
+  it("requests only the base scopes when no extraScopes are given", () => {
+    const url = new URL(buildAuthorizationUrl(VALID_CLIENT_ID));
+    const scope = url.searchParams.get("scope") ?? "";
+    expect(scope).not.toContain(GMAIL_MODIFY_SCOPE);
+  });
+
+  it("adds the Gmail modify scope only when explicitly requested", () => {
+    const url = new URL(buildAuthorizationUrl(VALID_CLIENT_ID, [GMAIL_MODIFY_SCOPE]));
+    const scope = url.searchParams.get("scope") ?? "";
+    expect(scope).toContain(GMAIL_MODIFY_SCOPE);
+    expect(scope).toContain("gmail.readonly");
+  });
+});
+
+describe("hasGmailModifyScope", () => {
+  it("defaults to false with no stored tokens", () => {
+    expect(hasGmailModifyScope()).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ import {
   validateClientId,
   REDIRECT_URI
 } from "@/services/google/oauthClient";
-import { CalendarWriteConsent } from "@/components/settings/CalendarWriteConsent";
+import { CalendarWriteConsent, GmailArchiveConsent } from "@/components/settings/GoogleScopeConsent";
 
 /**
  * Google Workspace · Sources card.
@@ -172,6 +172,7 @@ export function GoogleSourceCard() {
           errors={google.lastErrors}
           busy={busy === "sync"}
           calendarWriteGranted={google.calendarWriteGranted}
+          gmailModifyGranted={google.gmailModifyGranted}
           onSync={onSync}
           onDisconnect={onDisconnect}
         />
@@ -379,6 +380,7 @@ function ConnectedView(props: {
   errors: string[];
   busy: boolean;
   calendarWriteGranted: boolean;
+  gmailModifyGranted: boolean;
   onSync: () => void;
   onDisconnect: () => void;
 }) {
@@ -422,6 +424,7 @@ function ConnectedView(props: {
       )}
 
       <CalendarWriteConsent granted={props.calendarWriteGranted} />
+      <GmailArchiveConsent granted={props.gmailModifyGranted} />
     </div>
   );
 }

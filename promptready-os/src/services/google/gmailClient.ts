@@ -4,9 +4,10 @@
  * API documentation.
  *
  * Scopes used: gmail.readonly (sync) + gmail.send (the approve→send
- * loop). No modify, no delete — ever. Every send is explicitly
- * approved by the founder, shown, and undoable for 30 seconds before
- * it leaves the queue.
+ * loop) + gmail.modify (archive only, granted separately — see
+ * GMAIL_MODIFY_SCOPE). Never delete. Sends are always founder-approved
+ * with a 30-second undo; archiving is the one silent action Operator
+ * takes, and even that has a real undo (re-adding the INBOX label).
  */
 
 import { ensureAccessToken } from "./oauthClient";
@@ -267,6 +268,37 @@ function base64Utf8(s: string): string {
   // The unescape(encodeURIComponent()) dance handles multibyte safely.
   const bytes = unescape(encodeURIComponent(s));
   return btoa(bytes);
+}
+
+// ---------------------------------------------------------------------------
+// Archive · gmail.modify scope, requested separately (see
+// GMAIL_MODIFY_SCOPE / hasGmailModifyScope in oauthClient.ts). Never
+// deletes — removes the INBOX label only, exactly what Gmail's own
+// "Archive" button does. Reversible by re-adding the label.
+// ---------------------------------------------------------------------------
+
+async function modifyLabels(messageId: string, addLabelIds: string[], removeLabelIds: string[]): Promise<void> {
+  const token = await ensureAccessToken();
+  const res = await fetch(`${API}/messages/${messageId}/modify`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ addLabelIds, removeLabelIds })
+  });
+  if (!res.ok) {
+    throw new Error(`Gmail modify failed (${res.status}): ${await res.text().catch(() => "")}`);
+  }
+}
+
+export async function archiveMessage(messageId: string): Promise<void> {
+  await modifyLabels(messageId, [], ["INBOX"]);
+}
+
+/** The real compensating action for undo — re-adds the INBOX label. */
+export async function unarchiveMessage(messageId: string): Promise<void> {
+  await modifyLabels(messageId, ["INBOX"], []);
 }
 
 export async function sendMessage(input: SendMessageInput): Promise<SendMessageResult> {

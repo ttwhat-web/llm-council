@@ -1,9 +1,11 @@
 "use client";
 
 /**
- * Calendar write · explicit, separate consent — never bundled into the
- * base read-only "Connect Google" flow. Split out of GoogleSourceCard
- * to keep that file under the repo's size limit.
+ * Google scope consent · explicit, separate per-scope consent — never
+ * bundled into the base read-only "Connect Google" flow. One shared
+ * shell (ScopeConsent) so Calendar write and Gmail modify don't drift
+ * into two slightly-different OAuth dances; each caller only supplies
+ * the scope and the founder-facing copy.
  */
 
 import { useCallback, useState } from "react";
@@ -15,10 +17,19 @@ import {
   parseAuthorizationCode,
   readCredentials,
   CALENDAR_WRITE_SCOPE,
+  GMAIL_MODIFY_SCOPE,
   REDIRECT_URI
 } from "@/services/google/oauthClient";
 
-export function CalendarWriteConsent({ granted }: { granted: boolean }) {
+interface ScopeConsentProps {
+  scope: string;
+  granted: boolean;
+  grantedText: string;
+  pendingText: string;
+  buttonText: string;
+}
+
+function ScopeConsent({ scope, granted, grantedText, pendingText, buttonText }: ScopeConsentProps) {
   const refreshState = useSourcesStore((s) => s.refreshGoogleState);
   const [awaitingPaste, setAwaitingPaste] = useState(false);
   const [paste, setPaste] = useState("");
@@ -34,7 +45,7 @@ export function CalendarWriteConsent({ granted }: { granted: boolean }) {
     setError(null);
     let url: string;
     try {
-      url = buildAuthorizationUrl(stored.clientId, [CALENDAR_WRITE_SCOPE]);
+      url = buildAuthorizationUrl(stored.clientId, [scope]);
     } catch (e) {
       setError(`Could not build the Google authorization URL: ${(e as Error).message}`);
       return;
@@ -44,7 +55,7 @@ export function CalendarWriteConsent({ granted }: { granted: boolean }) {
     if (!opened) {
       setError("Browser blocked the popup. Copy the URL manually: " + url);
     }
-  }, []);
+  }, [scope]);
 
   const onExchange = useCallback(async () => {
     const creds = readCredentials();
@@ -74,25 +85,21 @@ export function CalendarWriteConsent({ granted }: { granted: boolean }) {
   if (granted) {
     return (
       <p className="rounded-lg bg-emerald-500/[0.06] px-3 py-2 text-[12px] leading-relaxed text-emerald-200/85">
-        Calendar write enabled — Operator can move an event once you approve it.
+        {grantedText}
       </p>
     );
   }
 
   return (
     <div className="flex flex-col gap-2 rounded-lg bg-amber-500/[0.05] px-3 py-2.5">
-      <p className="text-[12px] leading-relaxed text-amber-200/85">
-        Calendar write isn&apos;t enabled. Operator can detect conflicts but
-        can&apos;t move events for you until you grant this — a separate,
-        explicit consent from the read-only connection above.
-      </p>
+      <p className="text-[12px] leading-relaxed text-amber-200/85">{pendingText}</p>
       {!awaitingPaste ? (
         <button
           type="button"
           onClick={onOpenConsent}
           className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/[0.08] px-3 py-1.5 text-[11.5px] font-medium text-white transition hover:bg-white/[0.12]"
         >
-          <ExternalLink className="h-3.5 w-3.5" /> Grant Calendar write access
+          <ExternalLink className="h-3.5 w-3.5" /> {buttonText}
         </button>
       ) : (
         <div className="flex items-center gap-1.5">
@@ -116,5 +123,33 @@ export function CalendarWriteConsent({ granted }: { granted: boolean }) {
       )}
       {error && <p className="text-[11px] text-rose-200">{error}</p>}
     </div>
+  );
+}
+
+export function CalendarWriteConsent({ granted }: { granted: boolean }) {
+  return (
+    <ScopeConsent
+      scope={CALENDAR_WRITE_SCOPE}
+      granted={granted}
+      grantedText="Calendar write enabled — Operator can move an event once you approve it."
+      pendingText={
+        "Calendar write isn't enabled. Operator can detect conflicts but can't move events for you until you grant this — a separate, explicit consent from the read-only connection above."
+      }
+      buttonText="Grant Calendar write access"
+    />
+  );
+}
+
+export function GmailArchiveConsent({ granted }: { granted: boolean }) {
+  return (
+    <ScopeConsent
+      scope={GMAIL_MODIFY_SCOPE}
+      granted={granted}
+      grantedText="Silent archiving enabled — Operator quietly archives obvious newsletters and automated mail, no approval needed. Every archive is undoable and logged to the Timeline."
+      pendingText={
+        "Operator can silently archive obvious inbox noise (newsletters, automated senders) so you never have to decide on it — but that needs a separate, explicit consent from the read-only connection above. It never touches customer mail."
+      }
+      buttonText="Grant silent archiving"
+    />
   );
 }

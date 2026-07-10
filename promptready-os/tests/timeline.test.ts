@@ -53,4 +53,23 @@ describe("buildTimeline", () => {
   it("never fabricates an event — an empty log produces an empty timeline", () => {
     expect(buildTimeline([], {})).toEqual([]);
   });
+
+  it("marks a silent action's completed/approved events with '· auto'", () => {
+    const items = {
+      a1: action({ id: "a1", status: "completed", receipt: "Archived it.", metadata: { silent: true } })
+    };
+    const log = [
+      entry({ at: 1, actionId: "a1", event: "approved" }),
+      entry({ at: 2, actionId: "a1", event: "completed" })
+    ];
+    const out = buildTimeline(log, items);
+    expect(out[0].label).toBe("Completed: Reply to Hans Müller · auto");
+    expect(out[1].label).toBe("Approved: Reply to Hans Müller · auto");
+  });
+
+  it("never adds '· auto' to a founder-approved action", () => {
+    const items = { a1: action({ id: "a1", status: "completed", receipt: "Sent." }) };
+    const out = buildTimeline([entry({ at: 1, actionId: "a1", event: "completed" })], items);
+    expect(out[0].label).toBe("Completed: Reply to Hans Müller");
+  });
 });
