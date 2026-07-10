@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { GoogleSourceCard } from "@/components/settings/GoogleSourceCard";
 import { MemoryCard } from "@/components/settings/MemoryCard";
 import { MetricsCard } from "@/components/settings/MetricsCard";
+import { TimelineCard } from "@/components/settings/TimelineCard";
 import { BillingCard } from "@/components/settings/BillingCard";
 import { useAiProviderStore } from "@/store/aiProvider";
 import {
@@ -194,6 +195,8 @@ export default function SettingsPage() {
       <GoogleSourceCard />
 
       <MetricsCard />
+
+      <TimelineCard />
 
       <MemoryCard />
 

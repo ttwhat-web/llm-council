@@ -29,4 +29,6 @@ export { GMAIL_SEND_EXECUTOR_ID } from "./gmailSendExecutor";
 export { CALENDAR_MOVE_EXECUTOR_ID, type CalendarMoveParams } from "./calendarMoveExecutor";
 export { useActionQueue, undoSecondsLeft } from "./actionQueue";
 export type { ApproveInput } from "./actionQueue";
+export { computeQueueMetrics, computeActionTiming } from "./actionMetrics";
+export { buildTimeline, type TimelineEntry } from "./timeline";
 export * from "./types";
