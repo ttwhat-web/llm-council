@@ -51,8 +51,19 @@ export function ActionApproval({ action, onApprove, onReject, onUndo, onRetry, c
     (action.status === "waiting_approval" && action.approvedAt == null);
 
   if (pendingDecision) {
+    // Keyboard-first: Enter approves, Shift+Enter declines — but never
+    // while the founder is actually typing (a textarea/input target),
+    // so editing a draft's text never gets accidentally intercepted.
+    const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "TEXTAREA" || target.tagName === "INPUT") return;
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (e.shiftKey) onReject?.();
+      else onApprove();
+    };
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 rounded-xl focus:outline-none focus-visible:ring-1 focus-visible:ring-white/25" tabIndex={0} onKeyDown={onKeyDown}>
         {action?.status === "cancelled" && <ReceiptLine tone="muted">Not done — approve to try again.</ReceiptLine>}
         {children}
         <div className="flex flex-wrap items-center gap-2">
@@ -72,6 +83,9 @@ export function ActionApproval({ action, onApprove, onReject, onUndo, onRetry, c
               Not now
             </button>
           )}
+          <span className="text-[10.5px] text-white/30">
+            ↵ approve{onReject ? " · ⇧↵ not now" : ""}
+          </span>
         </div>
       </div>
     );

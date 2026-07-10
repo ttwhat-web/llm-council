@@ -89,6 +89,22 @@ export function DraftReplies() {
     }
   }, [approve, drafts, pendingApproval]);
 
+  // Keyboard-first: Cmd/Ctrl+A approves everything pending — but never
+  // while typing (never hijacks the browser's real "select all" inside
+  // a text field).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "a") return;
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === "TEXTAREA" || target?.tagName === "INPUT") return;
+      if (pendingApproval.length < 2) return;
+      e.preventDefault();
+      approveAll();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [approveAll, pendingApproval.length]);
+
   // Draft (or re-draft) a specific set of candidates, then register
   // each success as a "prepared" queue entry — the same call Morning
   // Run makes, so the queue stays the one source of truth regardless
@@ -207,7 +223,7 @@ export function DraftReplies() {
               type="button"
               onClick={approveAll}
               className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1 text-[12px] font-semibold text-black transition hover:bg-white/90"
-              title="Approve and send every reply below (30-second undo on each)"
+              title="Approve and send every reply below (30-second undo on each) · ⌘A"
             >
               <Check className="h-3.5 w-3.5" /> Approve all ({pendingApproval.length})
             </button>
@@ -330,6 +346,7 @@ function DraftBody({
   const queueId = useMemo(() => `${GMAIL_SEND_EXECUTOR_ID}:${draft.customerEmail}`, [draft.customerEmail]);
   const action = useActionQueue((s) => s.items[queueId]);
   const approve = useActionQueue((s) => s.approve);
+  const reject = useActionQueue((s) => s.reject);
   const undo = useActionQueue((s) => s.undo);
   const retry = useActionQueue((s) => s.retry);
   const updateParams = useActionQueue((s) => s.updateParams);
@@ -426,7 +443,13 @@ function DraftBody({
 
   return (
     <div className="flex flex-col gap-2">
-      <ActionApproval action={action} onApprove={onApprove} onUndo={() => undo(queueId)} onRetry={onRetry}>
+      <ActionApproval
+        action={action}
+        onApprove={onApprove}
+        onReject={() => reject(queueId)}
+        onUndo={() => undo(queueId)}
+        onRetry={onRetry}
+      >
         {editableContent}
       </ActionApproval>
       {action?.status === "completed" && (

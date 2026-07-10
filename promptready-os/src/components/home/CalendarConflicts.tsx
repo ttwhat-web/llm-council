@@ -34,6 +34,7 @@ export function CalendarConflicts() {
   const calendarWriteGranted = useSourcesStore((s) => s.google.calendarWriteGranted);
   const prepare = useActionQueue((s) => s.prepare);
   const approve = useActionQueue((s) => s.approve);
+  const reject = useActionQueue((s) => s.reject);
   const undo = useActionQueue((s) => s.undo);
   const retry = useActionQueue((s) => s.retry);
   const queueItems = useActionQueue((s) => s.items);
@@ -101,6 +102,7 @@ export function CalendarConflicts() {
         <ActionApproval
           action={item}
           onApprove={() => approve(queueId)}
+          onReject={() => reject(queueId)}
           onUndo={() => undo(queueId)}
           onRetry={() => retry(queueId)}
         >
