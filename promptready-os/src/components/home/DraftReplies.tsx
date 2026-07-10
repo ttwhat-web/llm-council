@@ -79,18 +79,6 @@ export function DraftReplies() {
       q.status === "failed"
     );
   });
-  // "Morning complete" when every drafted reply reached a resolution
-  // the founder actually chose (sent, or explicitly declined/undone)
-  // — a failure still needs attention, so it doesn't count as settled.
-  const settled = drafted.filter((c) => {
-    const q = queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`];
-    return q?.status === "completed" || q?.status === "cancelled";
-  });
-  const sentCount = drafted.filter(
-    (c) => queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`]?.status === "completed"
-  ).length;
-  const morningComplete = drafted.length > 0 && settled.length === drafted.length;
-
   const approveAll = useCallback(() => {
     for (const c of pendingApproval) {
       const state = drafts[c.customerEmail];
@@ -236,19 +224,6 @@ export function DraftReplies() {
           </button>
         </div>
       </header>
-
-      {morningComplete && (
-        <div className="rounded-xl bg-emerald-500/[0.06] px-4 py-3">
-          <p className="text-[14px] font-medium text-emerald-200">
-            Morning complete.
-          </p>
-          <p className="text-[12.5px] text-emerald-200/70">
-            {sentCount === 0
-              ? "Nothing sent — you skipped them all."
-              : `${sentCount} repl${sentCount === 1 ? "y" : "ies"} sent. Close the laptop.`}
-          </p>
-        </div>
-      )}
 
       {!anthropicKey && (
         <div className="rounded-lg bg-amber-500/[0.06] px-3 py-2 text-[12.5px] text-amber-200/85">

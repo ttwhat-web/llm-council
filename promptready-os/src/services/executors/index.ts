@@ -31,4 +31,5 @@ export { useActionQueue, undoSecondsLeft } from "./actionQueue";
 export type { ApproveInput } from "./actionQueue";
 export { computeQueueMetrics, computeActionTiming } from "./actionMetrics";
 export { buildTimeline, type TimelineEntry } from "./timeline";
+export { computeMorningComplete, type MorningCompleteSummary } from "./morningComplete";
 export * from "./types";

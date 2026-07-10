@@ -13,9 +13,11 @@ import {
 import { useSourcesStore } from "@/store/sources";
 import { useBillingStore, computeTrialStatus } from "@/store/billing";
 import { useMorningRunStore } from "@/store/morningRun";
+import { useActionQueue, computeMorningComplete } from "@/services/executors";
 import { DraftReplies } from "@/components/home/DraftReplies";
 import { CalendarConflicts } from "@/components/home/CalendarConflicts";
 import { MemoryCandidatePrompt } from "@/components/home/MemoryCandidatePrompt";
+import { MorningCompleteCard } from "@/components/home/MorningCompleteCard";
 import type { BriefingItem as RealBriefingItem } from "@/services/briefing/types";
 import type { PanelData as RealPanelData } from "@/services/briefing/engine";
 
@@ -309,6 +311,12 @@ export default function HomePage() {
   const realPanelsRaw = useSourcesStore((s) => s.panels);
   const sourcesConnected = googleState === "connected" || googleState === "syncing" || googleState === "error";
 
+  // Morning Complete · the whole action queue, cross-executor. Null
+  // (and the prepared-work components render as usual) until every
+  // action that ever required a founder decision has resolved.
+  const actionQueueItems = useActionQueue((s) => s.items);
+  const morningCompleteSummary = useMemo(() => computeMorningComplete(actionQueueItems), [actionQueueItems]);
+
   // Morning Run · the whole pipeline (sync → detect → draft → prepare
   // → Operator's Read), run once per staleness window by whoever opens
   // Home. "Sync now" below re-fires the exact same orchestrator — a
@@ -436,9 +444,18 @@ export default function HomePage() {
           )}
 
           {/* THE WORK · prepared actions, on the front page. No panel,
-           *  no focus column — the value is here the moment you land. */}
-          {!isDemo && sourcesConnected && <DraftReplies />}
-          {!isDemo && sourcesConnected && <CalendarConflicts />}
+           *  no focus column — the value is here the moment you land.
+           *  Once every action that ever needed a decision has
+           *  resolved, this becomes relief instead of a work list. */}
+          {!isDemo && sourcesConnected && morningCompleteSummary && (
+            <MorningCompleteCard summary={morningCompleteSummary} />
+          )}
+          {!isDemo && sourcesConnected && !morningCompleteSummary && (
+            <>
+              <DraftReplies />
+              <CalendarConflicts />
+            </>
+          )}
           {!isDemo && sourcesConnected && <MemoryCandidatePrompt />}
 
           {/* Briefing · the context behind the prepared work. */}
