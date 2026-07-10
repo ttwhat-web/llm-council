@@ -9,6 +9,14 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/services/google/gmailClient", async () => {
+  const actual = await vi.importActual<typeof import("@/services/google/gmailClient")>(
+    "@/services/google/gmailClient"
+  );
+  return { ...actual, archiveMessage: vi.fn(async () => {}), unarchiveMessage: vi.fn(async () => {}) };
+});
+
 import { runMorningRun } from "@/services/morningRun/orchestrator";
 import { useSourcesStore } from "@/store/sources";
 import { useAiProviderStore } from "@/store/aiProvider";
@@ -17,7 +25,8 @@ import {
   useActionQueue,
   bootExecutors,
   GMAIL_SEND_EXECUTOR_ID,
-  CALENDAR_MOVE_EXECUTOR_ID
+  CALENDAR_MOVE_EXECUTOR_ID,
+  GMAIL_ARCHIVE_EXECUTOR_ID
 } from "@/services/executors";
 import type { GmailMessage, GmailThread, CalendarEvent, WorkspaceSnapshot } from "@/services/google/types";
 import type { BriefingItem } from "@/services/briefing/types";
@@ -132,7 +141,14 @@ beforeEach(() => {
   bootExecutors();
   useActionQueue.setState({ items: {}, order: [], log: [] });
   useSourcesStore.setState({
-    google: { state: "disconnected", selfEmail: null, lastSyncMs: null, lastErrors: [], calendarWriteGranted: false },
+    google: {
+      state: "disconnected",
+      selfEmail: null,
+      lastSyncMs: null,
+      lastErrors: [],
+      calendarWriteGranted: false,
+      gmailModifyGranted: false
+    },
     snapshot: null,
     briefing: [],
     panels: null
@@ -222,6 +238,63 @@ describe("runMorningRun · Calendar write not granted", () => {
     // "detected" is honest (a conflict really was found); "prepared"
     // never happens, since approving it would be guaranteed to fail.
     expect(useActionQueue.getState().items[`${CALENDAR_MOVE_EXECUTOR_ID}:e2`]?.status).toBe("detected");
+  });
+});
+
+describe("runMorningRun · Silent archive — confidence gates silent vs approval-required", () => {
+  it("only silently completes the high-confidence noise message; the low-confidence one still needs approval", async () => {
+    const snapshot = fakeSnapshot();
+    const highConfidence = msg({
+      id: "noise-high",
+      threadId: "t-noise-high",
+      date: NOW - DAY,
+      fromAddress: "noreply@github.com",
+      fromName: "GitHub",
+      subject: "[repo] New issue opened"
+    });
+    const lowConfidence = msg({
+      id: "noise-low",
+      threadId: "t-noise-low",
+      date: NOW - DAY,
+      fromAddress: "notifications@some-random-startup.com",
+      fromName: "Some Startup",
+      subject: "Product update"
+    });
+    snapshot.messages = [...snapshot.messages, highConfidence, lowConfidence];
+    stubSyncGoogle(snapshot, fakeBriefing());
+    useSourcesStore.setState((s) => ({ google: { ...s.google, gmailModifyGranted: true } }));
+
+    await runMorningRun();
+    // prepare()'s auto-approve fires execute() without the orchestrator
+    // awaiting it (same as every other silent action) — flush the
+    // microtask queue so the real (mocked) archiveMessage() call
+    // resolves before asserting the terminal status.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const highItem = useActionQueue.getState().items[`${GMAIL_ARCHIVE_EXECUTOR_ID}:noise-high`];
+    expect(highItem.status).toBe("completed");
+    expect(highItem.metadata?.silent).toBe(true);
+
+    const lowItem = useActionQueue.getState().items[`${GMAIL_ARCHIVE_EXECUTOR_ID}:noise-low`];
+    expect(lowItem.status).toBe("prepared");
+    expect(lowItem.metadata?.silent).toBeUndefined();
+  });
+
+  it("never prepares an archive action before the gmail.modify scope is granted", async () => {
+    const snapshot = fakeSnapshot();
+    const noise = msg({
+      id: "noise-high",
+      threadId: "t-noise-high",
+      date: NOW - DAY,
+      fromAddress: "noreply@github.com",
+      subject: "[repo] New issue opened"
+    });
+    snapshot.messages = [...snapshot.messages, noise];
+    stubSyncGoogle(snapshot, fakeBriefing());
+    // gmailModifyGranted stays false (default).
+
+    await runMorningRun();
+    expect(useActionQueue.getState().items[`${GMAIL_ARCHIVE_EXECUTOR_ID}:noise-high`]).toBeUndefined();
   });
 });
 

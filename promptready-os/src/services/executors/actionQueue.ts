@@ -52,6 +52,13 @@ export interface PrepareInput<P = unknown> {
   confidence?: number;
   priority?: "high" | "medium" | "low";
   metadata?: Record<string, unknown>;
+  /** Override this one action's executor.requiresApproval: false. Used
+   *  when a silent executor's own confidence signal for this specific
+   *  instance falls short of the bar for running unattended — the
+   *  founder still gets a normal decision, same as any other action.
+   *  Never the reverse: an executor that normally requires approval
+   *  can't be forced silent per-action. */
+  forceApproval?: boolean;
 }
 
 /** Kept for callers that only ever prepare (never call detect() first). */
@@ -298,7 +305,7 @@ export const useActionQueue = create<ActionQueueState>((set, get) => {
       if (!executor) return; // no phantom entries for a capability that isn't registered
       const desc = executor.describe(input.params);
       const now = Date.now();
-      const silent = executor.requiresApproval === false;
+      const silent = executor.requiresApproval === false && !input.forceApproval;
       const action: Action = {
         id: input.id,
         executor: input.executor,

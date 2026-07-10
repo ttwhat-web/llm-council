@@ -16,6 +16,7 @@ import { useMorningRunStore } from "@/store/morningRun";
 import { useActionQueue, computeMorningComplete } from "@/services/executors";
 import { DraftReplies } from "@/components/home/DraftReplies";
 import { CalendarConflicts } from "@/components/home/CalendarConflicts";
+import { ArchiveSuggestions } from "@/components/home/ArchiveSuggestions";
 import { MemoryCandidatePrompt } from "@/components/home/MemoryCandidatePrompt";
 import { MorningCompleteCard } from "@/components/home/MorningCompleteCard";
 import type { BriefingItem as RealBriefingItem } from "@/services/briefing/types";
@@ -454,6 +455,7 @@ export default function HomePage() {
             <>
               <DraftReplies />
               <CalendarConflicts />
+              <ArchiveSuggestions />
             </>
           )}
           {!isDemo && sourcesConnected && <MemoryCandidatePrompt />}

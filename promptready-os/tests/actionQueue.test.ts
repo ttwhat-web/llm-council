@@ -415,6 +415,27 @@ describe("silent executors — requiresApproval: false skips the founder decisio
     expect(useActionQueue.getState().items["a1"].status).toBe("prepared");
     expect(useActionQueue.getState().items["a1"].metadata?.silent).toBeUndefined();
   });
+
+  it("forceApproval overrides a silent executor for this one action — a founder decision is still required", () => {
+    const ex = makeSilentExecutor();
+    registerExecutor(ex);
+    useActionQueue.getState().prepare({ id: "a1", executor: SILENT_EXECUTOR_ID, params: {}, forceApproval: true });
+    const item = useActionQueue.getState().items["a1"];
+    expect(item.status).toBe("prepared");
+    expect(item.metadata?.silent).toBeUndefined();
+    expect(ex.calls).toHaveLength(0);
+  });
+
+  it("forceApproval doesn't leak into metadata or block a later manual approve", async () => {
+    vi.useFakeTimers();
+    const ex = makeSilentExecutor();
+    registerExecutor(ex);
+    useActionQueue.getState().prepare({ id: "a1", executor: SILENT_EXECUTOR_ID, params: {}, forceApproval: true });
+    useActionQueue.getState().approve("a1");
+    await vi.advanceTimersByTimeAsync(10);
+    expect(useActionQueue.getState().items["a1"].status).toBe("completed");
+    expect(ex.calls).toHaveLength(1);
+  });
 });
 
 describe("detect() → prepare() and reject()", () => {

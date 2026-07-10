@@ -27,7 +27,10 @@ import {
   GMAIL_ARCHIVE_EXECUTOR_ID
 } from "@/services/executors";
 import { collectCandidates, readFounderName, MAX_DRAFTS_PER_BATCH } from "@/services/drafting/candidates";
-import { collectArchiveCandidates } from "@/services/drafting/archiveCandidates";
+import {
+  collectArchiveCandidates,
+  SILENT_ARCHIVE_CONFIDENCE_THRESHOLD
+} from "@/services/drafting/archiveCandidates";
 import { draftReply } from "@/services/drafting/draftReply";
 import { findConflictPairs } from "@/services/briefing/detectors";
 import { fetchOperatorRead } from "@/services/briefing/operatorRead";
@@ -162,10 +165,12 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
 
   const calendarActionPrepared = !!conflict && synced.google.calendarWriteGranted;
 
-  // Stage · Silently archive obvious inbox noise — no approval needed.
-  // Only ever prepared once the founder has granted the separate
-  // gmail.modify scope; never prepare an action guaranteed to fail,
-  // same rule as Calendar write above.
+  // Stage · Archive obvious inbox noise. Only ever prepared once the
+  // founder has granted the separate gmail.modify scope; never prepare
+  // an action guaranteed to fail, same rule as Calendar write above.
+  // Only candidates with multiple independent signals confirming
+  // they're safe (>=95 confidence) run silently — anything less still
+  // requires the founder's approval, same as any other action.
   let archivedPrepared = 0;
   if (synced.google.gmailModifyGranted) {
     for (const candidate of collectArchiveCandidates(snapshot)) {
@@ -174,9 +179,16 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
         id,
         executor: GMAIL_ARCHIVE_EXECUTOR_ID,
         title: `Archive: ${candidate.subject || "(no subject)"}`,
-        description: candidate.fromName
+        description: candidate.reason,
+        confidence: candidate.confidence
       });
-      prepare({ id, executor: GMAIL_ARCHIVE_EXECUTOR_ID, params: candidate });
+      prepare({
+        id,
+        executor: GMAIL_ARCHIVE_EXECUTOR_ID,
+        params: candidate,
+        confidence: candidate.confidence,
+        forceApproval: candidate.confidence < SILENT_ARCHIVE_CONFIDENCE_THRESHOLD
+      });
       touchedExecutors.add(GMAIL_ARCHIVE_EXECUTOR_ID);
       archivedPrepared++;
     }

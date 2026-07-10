@@ -1,15 +1,18 @@
 /**
  * Silent executor · archive obvious inbox noise (F23).
  *
- * The one executor that runs without ever asking — because what it
- * does is genuinely safe: it only removes the INBOX label from a
- * message Operator is highly confident is noise (a no-reply sender,
- * a known automated domain — the exact heuristic already used to
- * keep noise out of drafted replies, see services/drafting/candidates.ts).
- * Never sends, never deletes, never touches customer data. Real undo:
- * undoStrategy "post-execute" means the archive already happened by
- * the time it's shown, but undo() genuinely re-adds the INBOX label —
- * never a fake reversal.
+ * The executor declares itself trusted to run without asking, but
+ * whether any given action actually does is decided per-instance by
+ * the caller (see services/drafting/archiveCandidates.ts): hard denies
+ * (invoices, payments, proposals, reservations, legal, calendar
+ * invites, any thread the founder has personally replied in) are never
+ * candidates at all; among what's left, only when multiple independent
+ * signals agree (>=95 confidence) does the caller let this run silent —
+ * otherwise it's prepared with forceApproval, same as any other action.
+ * Never sends, never deletes, never touches a real conversation. Real
+ * undo: undoStrategy "post-execute" means the archive already happened
+ * by the time it's shown, but undo() genuinely re-adds the INBOX label
+ * — never a fake reversal.
  *
  * Requires the gmail.modify scope, granted separately from the base
  * connect flow (see GMAIL_MODIFY_SCOPE in oauthClient.ts) — the queue
@@ -27,6 +30,10 @@ export interface GmailArchiveParams {
   messageId: string;
   subject: string;
   fromName: string;
+  /** Why this was judged safe to archive — the founder-facing evidence,
+   *  never a placeholder. Carried through to the receipt so Timeline
+   *  shows exactly why, not just that it happened. */
+  reason: string;
 }
 
 export const gmailArchiveExecutor: Executor<GmailArchiveParams> = {
@@ -37,12 +44,19 @@ export const gmailArchiveExecutor: Executor<GmailArchiveParams> = {
   undoWindowMs: UNDO_WINDOW_MS,
   requiresApproval: false,
   describe(params) {
-    return { title: `Archive: ${params.subject || "(no subject)"}`, description: params.fromName };
+    return {
+      title: `Archive: ${params.subject || "(no subject)"}`,
+      description: `${params.fromName} · ${params.reason}`
+    };
   },
   async execute(params) {
     try {
       await archiveMessage(params.messageId);
-      return { ok: true, receipt: `Archived "${params.subject || "(no subject)"}".`, ref: { messageId: params.messageId } };
+      return {
+        ok: true,
+        receipt: `Archived "${params.subject || "(no subject)"}" — ${params.reason}`,
+        ref: { messageId: params.messageId }
+      };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }

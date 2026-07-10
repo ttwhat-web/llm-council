@@ -28,16 +28,28 @@ const NOISE_DOMAINS = new Set([
   "github.com"
 ]);
 
+/** Sender local-part looks automated (e.g. "noreply@"). Exported
+ *  separately from isNoise() so the archive-candidate detector can
+ *  reason about which specific signal(s) actually matched — real
+ *  evidence for its confidence score, not a single opaque boolean. */
+export function matchesNoisePrefix(addr: string): boolean {
+  const local = addr.trim().toLowerCase().split("@")[0] ?? "";
+  return NOISE_PREFIXES.some((p) => local.startsWith(p));
+}
+
+/** Sender domain is a known bulk/automated domain. */
+export function matchesNoiseDomain(addr: string): boolean {
+  const domain = addr.trim().toLowerCase().split("@")[1] ?? "";
+  return NOISE_DOMAINS.has(domain);
+}
+
 /** Exported so the archive-candidate detector uses the exact same
  *  definition of "noise" as the reply-drafting candidates do — one
  *  heuristic, not two that could quietly drift apart. */
 export function isNoise(addr: string): boolean {
   const a = addr.trim().toLowerCase();
   if (!a) return true;
-  const [local, domain] = a.split("@");
-  if (NOISE_PREFIXES.some((p) => (local ?? "").startsWith(p))) return true;
-  if (NOISE_DOMAINS.has(domain ?? "")) return true;
-  return false;
+  return matchesNoisePrefix(a) || matchesNoiseDomain(a);
 }
 
 export function collectCandidates(snapshot: WorkspaceSnapshot | null): CustomerCandidate[] {
