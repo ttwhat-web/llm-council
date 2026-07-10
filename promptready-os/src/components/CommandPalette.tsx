@@ -3,13 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { Command, CornerDownLeft, RefreshCw, Check, Search } from "lucide-react";
+import { Command, CornerDownLeft, RefreshCw, Check, Search, Sparkles } from "lucide-react";
 import { useSourcesStore } from "@/store/sources";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { useMorningRunStore } from "@/store/morningRun";
 import { useActionQueue } from "@/services/executors";
 import { buildTimeline } from "@/services/executors/timeline";
 import { searchWorkspace, type SearchResult } from "@/services/search/search";
+import { useDelegationStore } from "@/store/delegation";
+import { interpretRequest } from "@/services/delegation/interpret";
 
 /**
  * Command Palette · Cmd/Ctrl+K. One surface for "go somewhere" AND
@@ -83,6 +85,7 @@ export function CommandPalette() {
   const snapshot = useSourcesStore((s) => s.snapshot);
   const memory = useOperatorMemoryStore((s) => s.memory);
   const runMorningRun = useMorningRunStore((s) => s.run);
+  const runDelegation = useDelegationStore((s) => s.run);
   const approveAllPending = useActionQueue((s) => s.approveAllPending);
   const log = useActionQueue((s) => s.log);
   const items = useActionQueue((s) => s.items);
@@ -136,6 +139,24 @@ export function CommandPalette() {
     }
   }, [open]);
 
+  // A supported business-command sentence ("follow up with customers
+  // who are waiting") never matches a nav label/hint — surfaced as one
+  // more quick action instead of a dead "no matching command" state,
+  // using the exact same Delegation Engine the Home composer uses.
+  const delegateAction = useMemo((): PaletteAction | null => {
+    const q = query.trim();
+    if (!q || interpretRequest(q).unsupported) return null;
+    return {
+      id: "delegate",
+      label: `Delegate: "${q}"`,
+      hint: "prepares real actions",
+      run: () => {
+        if (window.location.pathname !== "/") navigate("/");
+        void runDelegation(q);
+      }
+    };
+  }, [query, navigate, runDelegation]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const base = q
@@ -144,8 +165,9 @@ export function CommandPalette() {
           ...recent.map((id) => actions.find((a) => a.id === id)).filter((a): a is PaletteAction => !!a),
           ...actions.filter((a) => !recent.includes(a.id))
         ];
-    return base.slice(0, 9);
-  }, [query, recent, actions]);
+    const withDelegate = delegateAction ? [delegateAction, ...base] : base;
+    return withDelegate.slice(0, 9);
+  }, [query, recent, actions, delegateAction]);
 
   const searchResults = useMemo(
     () => (query.trim() ? searchWorkspace(query, { messages: snapshot?.messages, events: snapshot?.events, timeline, memory }) : []),
@@ -222,6 +244,7 @@ export function CommandPalette() {
                   <span className="flex items-center gap-2 text-[12.5px] text-white">
                     {a.id === "sync-now" && <RefreshCw className="h-3 w-3 text-white/40" />}
                     {a.id === "approve-all-pending" && <Check className="h-3 w-3 text-white/40" />}
+                    {a.id === "delegate" && <Sparkles className="h-3 w-3 text-white/40" />}
                     {a.label}
                   </span>
                   <span className="flex items-center gap-2">

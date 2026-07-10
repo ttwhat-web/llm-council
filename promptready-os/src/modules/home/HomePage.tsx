@@ -19,6 +19,9 @@ import { CalendarConflicts } from "@/components/home/CalendarConflicts";
 import { ArchiveSuggestions } from "@/components/home/ArchiveSuggestions";
 import { MemoryCandidatePrompt } from "@/components/home/MemoryCandidatePrompt";
 import { MorningCompleteCard } from "@/components/home/MorningCompleteCard";
+import { DelegationPreview } from "@/components/home/DelegationPreview";
+import { useDelegationStore } from "@/store/delegation";
+import { interpretRequest } from "@/services/delegation/interpret";
 import type { BriefingItem as RealBriefingItem } from "@/services/briefing/types";
 import type { PanelData as RealPanelData } from "@/services/briefing/engine";
 
@@ -443,6 +446,12 @@ export default function HomePage() {
               {operatorRead}
             </p>
           )}
+
+          {/* Delegation Engine · the direct result of the composer
+           *  below, when the founder just asked for something. Sits
+           *  above the passive prepared-work list since it's the most
+           *  immediately relevant thing on the page while it's open. */}
+          {!isDemo && <DelegationPreview />}
 
           {/* THE WORK · prepared actions, on the front page. No panel,
            *  no focus column — the value is here the moment you land.
@@ -998,8 +1007,12 @@ function Composer() {
   const current = useMissionStore((s) => s.current);
   const dispatch = useMissionStore((s) => s.dispatch);
   const cancel = useMissionStore((s) => s.cancel);
+  const delegationStatus = useDelegationStore((s) => s.status);
+  const runDelegation = useDelegationStore((s) => s.run);
 
-  const inFlight = !!current && current.stage !== "idle" && current.stage !== "deliverable-ready";
+  const missionInFlight = !!current && current.stage !== "idle" && current.stage !== "deliverable-ready";
+  const delegating = delegationStatus === "interpreting";
+  const inFlight = missionInFlight || delegating;
   const justFinished = !!current && current.stage === "deliverable-ready";
 
   useEffect(() => {
@@ -1009,12 +1022,20 @@ function Composer() {
     t.style.height = `${Math.min(t.scrollHeight, 220)}px`;
   }, [brief]);
 
+  // Supported business commands (follow up, resolve conflicts, archive
+  // noise) go straight through the Delegation Engine → real prepared
+  // Action Queue records, previewed above. Anything else still runs
+  // through the deterministic mission runner, unchanged.
   const onDispatch = useCallback(() => {
     const trimmed = brief.trim();
     if (!trimmed || inFlight) return;
-    void dispatch(trimmed, "auto", "fast", null);
     setBrief("");
-  }, [brief, dispatch, inFlight]);
+    if (!interpretRequest(trimmed).unsupported) {
+      void runDelegation(trimmed);
+      return;
+    }
+    void dispatch(trimmed, "auto", "fast", null);
+  }, [brief, dispatch, inFlight, runDelegation]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -1043,10 +1064,10 @@ function Composer() {
         />
         <div className="mt-2 flex items-center gap-2">
           <span className="text-[11.5px] text-white/35">
-            Try · What should I focus on today? · Draft follow-ups · Who is at risk?
+            Try · Follow up with customers who are waiting · Resolve tomorrow&apos;s calendar conflicts · Handle my morning
           </span>
           <span className="ml-auto flex items-center gap-2">
-            {inFlight && (
+            {missionInFlight && (
               <button
                 type="button"
                 onClick={cancel}
@@ -1063,7 +1084,7 @@ function Composer() {
             >
               {inFlight ? (
                 <>
-                  <Loader className="h-3.5 w-3.5 animate-spin" /> Working…
+                  <Loader className="h-3.5 w-3.5 animate-spin" /> {delegating ? "Preparing…" : "Working…"}
                 </>
               ) : (
                 <>
@@ -1078,7 +1099,7 @@ function Composer() {
         </div>
       </div>
 
-      {inFlight && current && <InlineTrace stage={current.stage} />}
+      {missionInFlight && current && <InlineTrace stage={current.stage} />}
 
       {justFinished && current && (
         <div className="flex items-center gap-3 pt-1">
