@@ -18,7 +18,7 @@
  */
 
 import { useSourcesStore } from "@/store/sources";
-import { useOperatorMemoryStore } from "@/store/operatorMemory";
+import { getActiveMemoryView } from "@/services/memory/distillation";
 import { useAiProviderStore } from "@/store/aiProvider";
 import {
   useActionQueue,
@@ -62,8 +62,11 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
     return { ...emptyMorningRunSummary(startedAt, "No workspace snapshot yet."), errors };
   }
 
-  // Stage · Load Memory.
-  const memory = useOperatorMemoryStore.getState().memory;
+  // Stage · Load Memory. Drafts and the Operator's Read only ever see
+  // the distilled, active view — a forgotten or archived fact never
+  // reaches a prompt again, even though it stays visible (and
+  // recoverable) in the raw ledger Settings shows.
+  const memory = getActiveMemoryView();
   const anthropicKey = useAiProviderStore.getState().anthropicKey;
 
   // Stage · Detect opportunities (already run by syncGoogle → buildBriefing)

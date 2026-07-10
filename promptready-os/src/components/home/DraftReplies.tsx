@@ -20,6 +20,7 @@ import { Check, Loader, RefreshCw } from "lucide-react";
 import { useSourcesStore } from "@/store/sources";
 import { useAiProviderStore } from "@/store/aiProvider";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
+import { getActiveMemoryView } from "@/services/memory/distillation";
 import { draftReply } from "@/services/drafting/draftReply";
 import {
   collectCandidates,
@@ -118,10 +119,13 @@ export function DraftReplies() {
         for (const c of list) next[c.customerEmail] = { kind: "drafting" };
         return next;
       });
-      // Run serially to stay polite to the API on first run.
+      // Run serially to stay polite to the API on first run. Reads the
+      // distilled, active-only memory view fresh for this batch — a
+      // forgotten or archived fact never reaches the draft prompt.
+      const activeMemory = getActiveMemoryView();
       for (const c of list) {
         const result = await draftReply(
-          { context: c, founderFirstName, intent: "follow-up", memory },
+          { context: c, founderFirstName, intent: "follow-up", memory: activeMemory },
           anthropicKey
         );
         if (result.ok) {
@@ -149,7 +153,7 @@ export function DraftReplies() {
       }
       setBusy(false);
     },
-    [anthropicKey, founderFirstName, memory, prepare]
+    [anthropicKey, founderFirstName, prepare]
   );
 
   const draftAll = useCallback(() => draftSpecific(batch), [draftSpecific, batch]);
