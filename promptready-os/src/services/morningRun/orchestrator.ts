@@ -61,14 +61,32 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
   // + Prioritize (buildBriefing already sorts high-priority-first).
   const detectorsFired = Array.from(new Set(briefing.map((b) => b.detector)));
 
-  // Stage · Generate drafts (replies, overdue threads, waiting customers).
+  // Stage · Detect opportunities → Generate drafts (replies, overdue
+  // threads, waiting customers). Every candidate is detected first
+  // (a real, logged "detected" state) so the funnel is honest even
+  // when drafting fails or there's no AI key to draft with.
   const candidates = collectCandidates(snapshot).slice(0, MAX_DRAFTS_PER_BATCH);
   const founderFirstName = memory.firstName?.trim() || readFounderName();
   let draftsGenerated = 0;
   let aiTokens = 0;
   let aiLatencyMs = 0;
+  const detect = useActionQueue.getState().detect;
   const prepare = useActionQueue.getState().prepare;
   const touchedExecutors = new Set<string>();
+  const replyDetectorMatch = briefing.find(
+    (b) => b.detector === "stale-customer-thread" || b.detector === "unanswered-email"
+  );
+
+  for (const candidate of candidates) {
+    detect({
+      id: `${GMAIL_SEND_EXECUTOR_ID}:${candidate.customerEmail}`,
+      executor: GMAIL_SEND_EXECUTOR_ID,
+      title: `Reply to ${candidate.customerName}`,
+      description: `Waiting ${candidate.daysSinceLastInbound}d`,
+      confidence: replyDetectorMatch?.confidence,
+      priority: replyDetectorMatch?.priority
+    });
+  }
 
   if (anthropicKey) {
     for (const candidate of candidates) {
@@ -89,7 +107,7 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
       // waiting for approval, before the founder ever looks at Home.
       prepare({
         id: `${GMAIL_SEND_EXECUTOR_ID}:${candidate.customerEmail}`,
-        executorId: GMAIL_SEND_EXECUTOR_ID,
+        executor: GMAIL_SEND_EXECUTOR_ID,
         params: {
           to: result.draft.to,
           subject: result.draft.subject,
@@ -107,6 +125,16 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
   // when Operator can actually write it — never prepare an action
   // that's guaranteed to fail on approval.
   const conflict = findConflictPairs(snapshot.events, snapshot.syncedAt)[0] ?? null;
+  if (conflict) {
+    const calendarConflictMatch = briefing.find((b) => b.detector === "calendar-conflict");
+    detect({
+      id: `${CALENDAR_MOVE_EXECUTOR_ID}:${conflict.b.id}`,
+      executor: CALENDAR_MOVE_EXECUTOR_ID,
+      title: `Resolve conflict: "${conflict.a.summary}" / "${conflict.b.summary}"`,
+      confidence: calendarConflictMatch?.confidence,
+      priority: calendarConflictMatch?.priority
+    });
+  }
   if (conflict && synced.google.calendarWriteGranted) {
     const staying = conflict.a;
     const moving = conflict.b;
@@ -114,7 +142,7 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
     const newEndMs = newStartMs + (moving.endMs - moving.startMs);
     prepare({
       id: `${CALENDAR_MOVE_EXECUTOR_ID}:${moving.id}`,
-      executorId: CALENDAR_MOVE_EXECUTOR_ID,
+      executor: CALENDAR_MOVE_EXECUTOR_ID,
       params: {
         eventId: moving.id,
         calendarId: moving.calendarId,

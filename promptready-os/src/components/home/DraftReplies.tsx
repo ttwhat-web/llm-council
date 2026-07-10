@@ -1,20 +1,17 @@
 "use client";
 
 /**
- * Draft Replies · the approve→send loop.
- *
- * Rendered inside the Customer focus column. "Draft N replies" runs
- * the drafting service once per stale thread (max 4). Each draft can
- * be edited, then Approved. Approve queues the send with a 30-second
- * undo window (see services/drafting/sendQueue.ts); after the window
- * the reply is sent through the founder's Gmail (gmail.send) and a
- * receipt is shown. One keystroke closes a thread the founder had
- * been avoiding — this is the ✓.
+ * Draft Replies · the approve→send loop, through the generic Action
+ * Queue. "Draft N replies" runs the drafting service once per stale
+ * thread (max 4). Each draft can be edited, then Approved — approval
+ * chrome is <ActionApproval/>, the same generic component Calendar
+ * uses. This file only supplies the Gmail-specific content: the
+ * editable subject/body, Copy.
  *
  * Honest fallbacks:
  *  * No Anthropic key → CTA pointing at Settings → AI Keys.
  *  * Per-draft errors render inline; other drafts still succeed.
- *  * Send errors render with the message + an Approve & retry.
+ *  * Send failures render with the message + a generic Retry.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,11 +27,11 @@ import {
   MAX_DRAFTS_PER_BATCH,
   type CustomerCandidate
 } from "@/services/drafting/candidates";
-import { useActionQueue, undoSecondsLeft, GMAIL_SEND_EXECUTOR_ID } from "@/services/executors";
+import { useActionQueue, GMAIL_SEND_EXECUTOR_ID } from "@/services/executors";
 import { recordMetric } from "@/store/metrics";
 import { useBillingStore, computeTrialStatus } from "@/store/billing";
 import { FeedbackPrompt } from "@/components/home/FeedbackPrompt";
-import { DraftEditor, ApproveRow, ReceiptLine } from "@/components/home/DraftControls";
+import { ActionApproval } from "@/components/executors/ActionApproval";
 import type { DraftResponse } from "@/services/drafting/types";
 
 type DraftState =
@@ -69,20 +66,28 @@ export function DraftReplies() {
 
   const batch = useMemo(() => candidates.slice(0, MAX_DRAFTS_PER_BATCH), [candidates]);
 
-  // Which drafted replies are ready to approve but not yet queued/done.
+  // Which drafted replies still need a founder decision — not yet
+  // approved, and not already resolved.
   const drafted = batch.filter((c) => drafts[c.customerEmail]?.kind === "drafted");
   const pendingApproval = drafted.filter((c) => {
     const q = queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`];
-    return !q || q.status === "prepared" || q.status === "undone" || q.status === "error";
+    return (
+      !q ||
+      q.status === "prepared" ||
+      (q.status === "waiting_approval" && q.approvedAt == null) ||
+      q.status === "cancelled" ||
+      q.status === "failed"
+    );
   });
-  // "Morning complete" when every drafted reply reached a terminal
-  // state (sent or intentionally skipped) and nothing is left to do.
+  // "Morning complete" when every drafted reply reached a resolution
+  // the founder actually chose (sent, or explicitly declined/undone)
+  // — a failure still needs attention, so it doesn't count as settled.
   const settled = drafted.filter((c) => {
     const q = queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`];
-    return q?.status === "done" || q?.status === "undone";
+    return q?.status === "completed" || q?.status === "cancelled";
   });
   const sentCount = drafted.filter(
-    (c) => queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`]?.status === "done"
+    (c) => queueItems[`${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`]?.status === "completed"
   ).length;
   const morningComplete = drafted.length > 0 && settled.length === drafted.length;
 
@@ -92,18 +97,7 @@ export function DraftReplies() {
       if (state?.kind !== "drafted") continue;
       const actionId = `${GMAIL_SEND_EXECUTOR_ID}:${c.customerEmail}`;
       recordMetric(actionId, "approved");
-      approve({
-        id: actionId,
-        executorId: GMAIL_SEND_EXECUTOR_ID,
-        params: {
-          to: state.draft.to,
-          subject: state.draft.subject,
-          body: state.draft.body,
-          threadId: c.threadMessages[0]?.threadId,
-          promptVersion: state.draft.promptVersion,
-          model: state.draft.model
-        }
-      });
+      approve(actionId);
     }
   }, [approve, drafts, pendingApproval]);
 
@@ -131,7 +125,7 @@ export function DraftReplies() {
           recordMetric(actionId, "generated");
           prepare({
             id: actionId,
-            executorId: GMAIL_SEND_EXECUTOR_ID,
+            executor: GMAIL_SEND_EXECUTOR_ID,
             params: {
               to: result.draft.to,
               subject: result.draft.subject,
@@ -359,29 +353,26 @@ function DraftBody({
   const [editing, setEditing] = useState(false);
 
   const queueId = useMemo(() => `${GMAIL_SEND_EXECUTOR_ID}:${draft.customerEmail}`, [draft.customerEmail]);
-  const sent = useActionQueue((s) => s.items[queueId]);
+  const action = useActionQueue((s) => s.items[queueId]);
   const approve = useActionQueue((s) => s.approve);
   const undo = useActionQueue((s) => s.undo);
+  const retry = useActionQueue((s) => s.retry);
+  const updateParams = useActionQueue((s) => s.updateParams);
+  const markWaitingApproval = useActionQueue((s) => s.markWaitingApproval);
 
-  // Metric · this draft was shown to the founder (once).
+  // Metric · this draft was shown to the founder (once) — and the
+  // queue's own honest "a founder actually saw this" transition.
   useEffect(() => {
     recordMetric(queueId, "shown");
-  }, [queueId]);
+    markWaitingApproval(queueId);
+  }, [queueId, markWaitingApproval]);
 
   // Metric · reflect the executor's terminal outcome (once each).
   useEffect(() => {
-    if (sent?.status === "done") recordMetric(queueId, "sent");
-    else if (sent?.status === "error") recordMetric(queueId, "failed");
-    else if (sent?.status === "undone") recordMetric(queueId, "undone");
-  }, [sent?.status, queueId]);
-
-  // Re-render every second while in the undo window for the countdown.
-  const [, force] = useState(0);
-  useEffect(() => {
-    if (sent?.status !== "queued") return;
-    const t = window.setInterval(() => force((n) => n + 1), 1000);
-    return () => window.clearInterval(t);
-  }, [sent?.status]);
+    if (action?.status === "completed") recordMetric(queueId, "sent");
+    else if (action?.status === "failed") recordMetric(queueId, "failed");
+    else if (action?.status === "cancelled") recordMetric(queueId, "undone");
+  }, [action?.status, queueId]);
 
   const copy = async () => {
     try {
@@ -400,47 +391,70 @@ function DraftBody({
     setBody(v);
   };
 
+  const syncedParams = () => ({
+    to: draft.to,
+    subject: draft.subject,
+    body,
+    threadId,
+    promptVersion: draft.promptVersion,
+    model: draft.model
+  });
+
   const onApprove = () => {
     recordMetric(queueId, "approved");
-    approve({
-      id: queueId,
-      executorId: GMAIL_SEND_EXECUTOR_ID,
-      params: {
-        to: draft.to,
-        subject: draft.subject,
-        body,
-        threadId,
-        promptVersion: draft.promptVersion,
-        model: draft.model
-      }
-    });
+    // Sync any local edits into the queue's own record before it
+    // becomes the thing that actually executes.
+    updateParams(queueId, syncedParams());
+    approve(queueId);
   };
 
-  // Terminal / in-flight states replace the action row.
-  if (sent?.status === "queued") {
-    const left = undoSecondsLeft(sent);
-    return (
-      <div className="flex flex-col gap-2">
-        <ReceiptLine tone="amber">
-          Sending to {draft.to} in {left}s…
-          <button
-            type="button"
-            onClick={() => undo(queueId)}
-            className="ml-2 underline-offset-2 hover:underline"
-          >
-            Undo
-          </button>
-        </ReceiptLine>
+  const onRetry = () => {
+    updateParams(queueId, syncedParams());
+    retry(queueId);
+  };
+
+  const editableContent = (
+    <>
+      <span className="text-[11.5px] text-white/45">Subject · {draft.subject}</span>
+      {editing ? (
+        <textarea
+          value={body}
+          onChange={(e) => onEditBody(e.target.value)}
+          rows={5}
+          className="min-h-[120px] w-full resize-y rounded-lg bg-black/30 p-3 text-[13px] leading-relaxed text-white focus:outline-none"
+        />
+      ) : (
+        <pre className="whitespace-pre-wrap rounded-lg bg-black/30 p-3 font-sans text-[13px] leading-relaxed text-white/90">
+          {body}
+        </pre>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setEditing((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-3 py-1 text-[11.5px] text-white/80 transition hover:bg-white/[0.08]"
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          onClick={copy}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11.5px] transition ${
+            copied ? "bg-emerald-500/[0.12] text-emerald-200" : "bg-white/[0.05] text-white/80 hover:bg-white/[0.08]"
+          }`}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
       </div>
-    );
-  }
-  if (sent?.status === "executing") {
-    return <ReceiptLine tone="amber">Sending to {draft.to}…</ReceiptLine>;
-  }
-  if (sent?.status === "done") {
-    return (
-      <div className="flex flex-col gap-1.5">
-        <ReceiptLine tone="emerald">✓ {sent.receipt ?? `Sent to ${draft.to}.`}</ReceiptLine>
+    </>
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <ActionApproval action={action} onApprove={onApprove} onUndo={() => undo(queueId)} onRetry={onRetry}>
+        {editableContent}
+      </ActionApproval>
+      {action?.status === "completed" && (
         <FeedbackPrompt
           actionId={queueId}
           promptVersion={draft.promptVersion}
@@ -450,32 +464,7 @@ function DraftBody({
           subjectLabel={customerName}
           subjectKey={draft.customerEmail}
         />
-      </div>
-    );
-  }
-  if (sent?.status === "undone") {
-    return (
-      <div className="flex flex-col gap-2">
-        <ReceiptLine tone="muted">Not sent. The draft is below if you want to try again.</ReceiptLine>
-        <DraftEditor body={body} editing={editing} onEdit={onEditBody} subject={draft.subject} />
-        <ApproveRow onApprove={onApprove} onCopy={copy} copied={copied} onEditToggle={() => setEditing((v) => !v)} />
-      </div>
-    );
-  }
-  if (sent?.status === "error") {
-    return (
-      <div className="flex flex-col gap-2">
-        <ReceiptLine tone="rose">Send failed · {sent.error}</ReceiptLine>
-        <ApproveRow onApprove={onApprove} onCopy={copy} copied={copied} onEditToggle={() => setEditing((v) => !v)} retry />
-      </div>
-    );
-  }
-
-  // Default · drafted, not yet approved.
-  return (
-    <div className="flex flex-col gap-2">
-      <DraftEditor body={body} editing={editing} onEdit={onEditBody} subject={draft.subject} />
-      <ApproveRow onApprove={onApprove} onCopy={copy} copied={copied} onEditToggle={() => setEditing((v) => !v)} />
+      )}
     </div>
   );
 }

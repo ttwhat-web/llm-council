@@ -17,11 +17,15 @@ export const gmailSendExecutor: Executor<SendMessageInput> = {
   id: GMAIL_SEND_EXECUTOR_ID,
   label: "Send email",
   mode: "native",
+  // Nothing sends until the grace window elapses — the same trick as
+  // Gmail's own "undo send". Undo during the window means execute()
+  // never runs; 100% honest, no unsend required.
+  undoStrategy: "pre-execute",
   undoWindowMs: UNDO_WINDOW_MS,
   describe(params) {
     return {
       title: `Reply to ${params.to}`,
-      detail: params.subject
+      description: params.subject
     };
   },
   async execute(params) {

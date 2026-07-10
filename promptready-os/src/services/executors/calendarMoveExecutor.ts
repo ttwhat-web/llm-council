@@ -21,6 +21,11 @@ export const calendarMoveExecutor: Executor<CalendarMoveParams> = {
   id: CALENDAR_MOVE_EXECUTOR_ID,
   label: "Move calendar event",
   mode: "native",
+  // Same pre-execute grace window as Gmail: the move is delayed, not
+  // reversed. (A post-execute "move it back" strategy is a real future
+  // option, but pre-execute is simpler and equally honest — no reason
+  // to prefer a compensating call when a delay works just as well.)
+  undoStrategy: "pre-execute",
   undoWindowMs: UNDO_WINDOW_MS,
 
   describe(params) {
@@ -30,7 +35,7 @@ export const calendarMoveExecutor: Executor<CalendarMoveParams> = {
     });
     return {
       title: `Move "${params.summary}" to ${time}`,
-      detail: new Date(params.newStartMs).toLocaleDateString()
+      description: new Date(params.newStartMs).toLocaleDateString()
     };
   },
 

@@ -130,7 +130,7 @@ function anthropicResponse(text: string) {
 
 beforeEach(() => {
   bootExecutors();
-  useActionQueue.setState({ items: {}, order: [] });
+  useActionQueue.setState({ items: {}, order: [], log: [] });
   useSourcesStore.setState({
     google: { state: "disconnected", selfEmail: null, lastSyncMs: null, lastErrors: [], calendarWriteGranted: false },
     snapshot: null,
@@ -214,12 +214,14 @@ describe("runMorningRun · without an AI key", () => {
 });
 
 describe("runMorningRun · Calendar write not granted", () => {
-  it("never prepares a calendar move it already knows will fail on approval", async () => {
+  it("detects the conflict but never prepares a move it already knows will fail on approval", async () => {
     stubSyncGoogle(fakeSnapshot(), fakeBriefing());
     // calendarWriteGranted stays false (default from beforeEach).
     const summary = await runMorningRun();
     expect(summary.actionsPrepared).toBe(0);
-    expect(useActionQueue.getState().items[`${CALENDAR_MOVE_EXECUTOR_ID}:e2`]).toBeUndefined();
+    // "detected" is honest (a conflict really was found); "prepared"
+    // never happens, since approving it would be guaranteed to fail.
+    expect(useActionQueue.getState().items[`${CALENDAR_MOVE_EXECUTOR_ID}:e2`]?.status).toBe("detected");
   });
 });
 
@@ -233,15 +235,13 @@ describe("runMorningRun · re-runs never clobber a founder's decision", () => {
     expect(useActionQueue.getState().items[id].status).toBe("prepared");
 
     // Founder approves between runs.
-    useActionQueue.getState().approve({
-      id,
-      executorId: CALENDAR_MOVE_EXECUTOR_ID,
-      params: useActionQueue.getState().items[id].params
-    });
-    expect(useActionQueue.getState().items[id].status).toBe("queued");
+    useActionQueue.getState().approve(id);
+    expect(useActionQueue.getState().items[id].status).toBe("waiting_approval");
+    expect(useActionQueue.getState().items[id].approvedAt).toBeGreaterThan(0);
 
     // Morning Run fires again (e.g. manual refresh) — must not reset it.
     await runMorningRun();
-    expect(useActionQueue.getState().items[id].status).toBe("queued");
+    expect(useActionQueue.getState().items[id].status).toBe("waiting_approval");
+    expect(useActionQueue.getState().items[id].approvedAt).toBeGreaterThan(0);
   });
 });

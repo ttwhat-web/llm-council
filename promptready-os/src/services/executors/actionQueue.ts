@@ -1,198 +1,477 @@
 "use client";
 
 /**
- * Action queue · the one approval + undo + execute + receipt loop for
- * EVERY executor. Generalizes the email send queue: approve stages an
- * action in an undo window; if the window elapses untouched, the queue
- * resolves the executor from the registry and runs it; the result
- * becomes a receipt. Undo cancels before anything happens.
+ * Action queue · the single execution primitive for the entire product.
  *
- * This is the founder's single gesture — the ✓ — no matter which verb
- * (email, calendar, WhatsApp, payment, computer-use) it drives.
+ * Every action Operator ever takes — send an email, move a meeting,
+ * message on WhatsApp, charge a card, drive a browser — flows through
+ * this one state machine. The queue never imports a concrete executor
+ * module; it only knows the Executor interface (types.ts) and resolves
+ * verbs by id through the registry. Adding a capability is exactly one
+ * `registerExecutor()` call — nothing here changes.
  *
- * Deterministic + unit-tested with a fake clock and fake executors.
- * Only the executor's execute() touches the network / automation.
+ * Lifecycle (see types.ts for exactly what each status means):
+ *
+ *   detected → prepared → waiting_approval → executing → completed
+ *                                                       ↘ failed
+ *   waiting_approval → cancelled            (declined, or pre-execute undo)
+ *   completed → undone                      (post-execute undo only)
+ *
+ * Persisted to localStorage so receipts, metrics, and in-flight state
+ * survive a reload — a crash mid-"executing" is recovered honestly
+ * (marked failed, never silently re-run and never assumed to have
+ * succeeded) rather than losing the record entirely.
  */
 
 import { create } from "zustand";
 import { getExecutor } from "./registry";
-import type { Action } from "./types";
+import { computeQueueMetrics } from "./actionMetrics";
+import type { Action, ActionLogEntry, ActionStatus, QueueMetrics } from "./types";
 
-export interface ApproveInput {
-  /** Stable queue id, e.g. `gmail.send:hans@acme.de`. */
+const STORAGE_KEY = "operator.actionQueue.v1";
+const MAX_ITEMS = 500;
+const MAX_LOG = 2000;
+
+export interface DetectInput {
   id: string;
-  executorId: string;
-  params: unknown;
+  executor: string;
+  title: string;
+  description?: string;
+  confidence?: number;
+  priority?: "high" | "medium" | "low";
+  metadata?: Record<string, unknown>;
+}
+
+export interface PrepareInput<P = unknown> {
+  id: string;
+  executor: string;
+  params: P;
+  /** Optional overrides — omit to use the executor's own describe(params). */
+  title?: string;
+  description?: string;
+  confidence?: number;
+  priority?: "high" | "medium" | "low";
+  metadata?: Record<string, unknown>;
+}
+
+/** Kept for callers that only ever prepare (never call detect() first). */
+export type ApproveInput<P = unknown> = PrepareInput<P>;
+
+export interface Persisted {
+  items: Record<string, Action>;
+  order: string[];
+  log: ActionLogEntry[];
+}
+
+function readPersisted(): Persisted {
+  if (typeof window === "undefined") return { items: {}, order: [], log: [] };
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { items: {}, order: [], log: [] };
+    const parsed = JSON.parse(raw) as Partial<Persisted>;
+    return {
+      items: parsed.items && typeof parsed.items === "object" ? parsed.items : {},
+      order: Array.isArray(parsed.order) ? parsed.order : [],
+      log: Array.isArray(parsed.log) ? parsed.log : []
+    };
+  } catch {
+    return { items: {}, order: [], log: [] };
+  }
+}
+
+function writePersisted(p: Persisted): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        items: p.items,
+        order: p.order.slice(0, MAX_ITEMS),
+        log: p.log.slice(-MAX_LOG)
+      })
+    );
+  } catch {
+    /* quota */
+  }
+}
+
+/**
+ * Failure recovery · anything still "executing" when this module last
+ * unloaded means the app closed (or crashed) mid-network-call. We
+ * genuinely don't know if it succeeded — honesty means never assuming
+ * either way. Mark it failed with a clear reason instead of silently
+ * losing it or silently re-running it (which could double-send).
+ * Exported (pure, no I/O) so this is directly testable — persistence
+ * is a no-op under Node/no-window, so this can't be exercised any
+ * other way.
+ */
+export function recoverOrphans(p: Persisted): Persisted {
+  const now = Date.now();
+  const items = { ...p.items };
+  const log = [...p.log];
+  let changed = false;
+  for (const id of Object.keys(items)) {
+    const item = items[id];
+    if (item.status !== "executing") continue;
+    changed = true;
+    items[id] = {
+      ...item,
+      status: "failed",
+      error: "Interrupted before completion — verify manually before retrying.",
+      completedAt: now
+    };
+    log.push({ at: now, actionId: id, executor: item.executor, event: "recovered" });
+  }
+  return changed ? { ...p, items, log } : p;
 }
 
 interface ActionQueueState {
   items: Record<string, Action>;
   order: string[];
-  /** Pipeline-side: register work that's ready for approval, without
-   *  starting the undo window. A no-op if this id already progressed
-   *  past "prepared" (queued/executing/done/undone/error) — a
-   *  pipeline re-run never clobbers a founder's decision. */
-  prepare(input: ApproveInput): void;
-  approve(input: ApproveInput): void;
+  log: ActionLogEntry[];
+
+  /** Register a raw opportunity before concrete params exist. */
+  detect(input: DetectInput): void;
+  /** Register (or refresh) work ready for approval. No-op if this id
+   *  already progressed past "prepared"/"detected" — a pipeline re-run
+   *  never clobbers a founder's decision. */
+  prepare<P>(input: PrepareInput<P>): void;
+  /** Mark a prepared item as actually shown to the founder — the
+   *  moment it stops being background prep and starts being a real,
+   *  reversible decision in front of them. */
+  markWaitingApproval(id: string): void;
+  /** Refresh a not-yet-approved item's params in place (e.g. the
+   *  founder edited a draft's body before sending). No-op once the
+   *  item has an approvedAt — never mutates something already
+   *  committed to executing. */
+  updateParams<P>(id: string, params: P): void;
+  /** Approve a waiting_approval item. Branches on the executor's
+   *  undoStrategy: pre-execute starts a grace timer before ever
+   *  calling execute(); post-execute calls execute() immediately and
+   *  opens a post-completion grace window instead. */
+  approve(id: string): void;
+  /** Decline before anything ran. */
+  reject(id: string): void;
+  /** Undo — pre-execute: cancels before execute() ever runs (→
+   *  cancelled). Post-execute: calls the executor's real undo() (→
+   *  undone). No-op outside the grace window. */
   undo(id: string): void;
+  /** Re-attempt a failed action's execute() from scratch. */
+  retry(id: string): void;
   get(id: string): Action | undefined;
-  /** Count of actions that ended in "done" (for "Morning complete"). */
+  /** Count of actions that reached "completed" (for "Morning complete"). */
   doneCount(): number;
+  metrics(): QueueMetrics;
+  reset(): void;
 }
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
-export const useActionQueue = create<ActionQueueState>((set, get) => ({
-  items: {},
-  order: [],
+function clearTimer(id: string): void {
+  const t = timers.get(id);
+  if (t) {
+    clearTimeout(t);
+    timers.delete(id);
+  }
+}
 
-  prepare(input) {
-    const existing = get().items[input.id];
-    if (existing && existing.status !== "prepared") return; // don't clobber a real decision
+export const useActionQueue = create<ActionQueueState>((set, get) => {
+  const initial = recoverOrphans(readPersisted());
+  writePersisted(initial);
 
-    const executor = getExecutor(input.executorId);
-    if (!executor) return; // silently skip — approve() will surface the honest error if clicked
+  function commit(items: Record<string, Action>, log: ActionLogEntry[], order?: string[]) {
+    const next = { items, order: order ?? get().order, log };
+    writePersisted(next);
+    set(next);
+  }
 
-    const desc = executor.describe(input.params);
-    const action: Action = {
-      id: input.id,
-      executorId: input.executorId,
-      params: input.params,
-      title: desc.title,
-      detail: desc.detail,
-      status: "prepared"
-    };
-    set((s) => ({
-      items: { ...s.items, [input.id]: action },
-      order: s.order.includes(input.id) ? s.order : [input.id, ...s.order]
-    }));
-  },
+  function appendLog(base: ActionLogEntry[], entry: ActionLogEntry): ActionLogEntry[] {
+    return [...base, entry].slice(-MAX_LOG);
+  }
 
-  approve(input) {
-    const executor = getExecutor(input.executorId);
+  /** Guarded entry point: only ever called from a grace timer, a
+   *  direct approve() (post-execute/no-window), or retry() — each of
+   *  which lands the item on "waiting_approval"/"prepared" first, so a
+   *  stray call after some other status change is safely ignored. */
+  async function runExecute(id: string): Promise<void> {
+    const item = get().items[id];
+    if (!item || (item.status !== "waiting_approval" && item.status !== "prepared")) return;
+    const executor = getExecutor(item.executor);
     if (!executor) {
-      // Unknown executor → surface an honest error rather than silently
-      // dropping the founder's approval.
-      const failed: Action = {
-        id: input.id,
-        executorId: input.executorId,
-        params: input.params,
-        title: input.executorId,
-        status: "error",
-        error: `No executor registered for "${input.executorId}".`,
-        settledAt: Date.now()
-      };
-      set((s) => ({
-        items: { ...s.items, [input.id]: failed },
-        order: [input.id, ...s.order.filter((x) => x !== input.id)]
-      }));
+      const now = Date.now();
+      commit(
+        { ...get().items, [id]: { ...item, status: "failed", error: `No executor registered for "${item.executor}".`, completedAt: now } },
+        appendLog(get().log, { at: now, actionId: id, executor: item.executor, event: "failed", detail: "unregistered executor" })
+      );
+      return;
+    }
+    const startedAt = Date.now();
+    commit(
+      { ...get().items, [id]: { ...item, status: "executing", executedAt: startedAt, undoUntil: undefined } },
+      appendLog(get().log, { at: startedAt, actionId: id, executor: item.executor, event: "executing" })
+    );
+    await attemptExecute(id, executor);
+  }
+
+  /** The actual execute() attempt + result handling, including
+   *  automatic retries. Assumes the item is already "executing" —
+   *  called both by runExecute's first attempt and by itself on retry,
+   *  so it never re-checks the pre-execution status. */
+  async function attemptExecute(id: string, executor: NonNullable<ReturnType<typeof getExecutor>>): Promise<void> {
+    const before = get().items[id];
+    if (!before || before.status !== "executing") return; // recovered/reset meanwhile
+
+    let result;
+    try {
+      result = await executor.execute(before.params);
+    } catch (e) {
+      result = { ok: false as const, error: (e as Error).message };
+    }
+
+    const current = get().items[id];
+    if (!current || current.status !== "executing") return; // recovered/reset meanwhile
+    const now = Date.now();
+
+    if (result.ok) {
+      const undoUntil = executor.undoStrategy === "post-execute" ? now + executor.undoWindowMs : undefined;
+      commit(
+        { ...get().items, [id]: { ...current, status: "completed", receipt: result.receipt, ref: result.ref, completedAt: now, undoUntil } },
+        appendLog(get().log, { at: now, actionId: id, executor: current.executor, event: "completed" })
+      );
       return;
     }
 
-    const desc = executor.describe(input.params);
-    const now = Date.now();
-    const action: Action = {
-      id: input.id,
-      executorId: input.executorId,
-      params: input.params,
-      title: desc.title,
-      detail: desc.detail,
-      status: "queued",
-      undoUntil: now + executor.undoWindowMs
-    };
-    set((s) => ({
-      items: { ...s.items, [input.id]: action },
-      order: [input.id, ...s.order.filter((x) => x !== input.id)]
-    }));
-
-    const t = setTimeout(() => {
-      timers.delete(input.id);
-      void settle(input.id, set, get);
-    }, executor.undoWindowMs);
-    timers.set(input.id, t);
-  },
-
-  undo(id) {
-    const item = get().items[id];
-    if (!item || item.status !== "queued") return;
-    const t = timers.get(id);
-    if (t) {
-      clearTimeout(t);
-      timers.delete(id);
+    const retryCount = current.retryCount ?? 0;
+    const maxRetries = executor.maxRetries ?? 0;
+    if (retryCount < maxRetries) {
+      commit(
+        { ...get().items, [id]: { ...current, retryCount: retryCount + 1 } },
+        appendLog(get().log, { at: now, actionId: id, executor: current.executor, event: "retried", detail: `attempt ${retryCount + 2}` })
+      );
+      await attemptExecute(id, executor);
+      return;
     }
-    set((s) => ({
-      items: {
-        ...s.items,
-        [id]: { ...item, status: "undone", undoUntil: undefined, settledAt: Date.now() }
-      }
-    }));
-  },
 
-  get(id) {
-    return get().items[id];
-  },
-
-  doneCount() {
-    return Object.values(get().items).filter((a) => a.status === "done").length;
-  }
-}));
-
-async function settle(
-  id: string,
-  set: (fn: (s: ActionQueueState) => Partial<ActionQueueState>) => void,
-  get: () => ActionQueueState
-): Promise<void> {
-  const item = get().items[id];
-  if (!item || item.status !== "queued") return; // undone meanwhile
-  const executor = getExecutor(item.executorId);
-  if (!executor) {
-    set((s) => ({
-      items: {
-        ...s.items,
-        [id]: { ...s.items[id], status: "error", undoUntil: undefined, error: "Executor vanished.", settledAt: Date.now() }
-      }
-    }));
-    return;
+    commit(
+      { ...get().items, [id]: { ...current, status: "failed", error: result.error, completedAt: now } },
+      appendLog(get().log, { at: now, actionId: id, executor: current.executor, event: "failed", detail: result.error })
+    );
   }
 
-  set((s) => ({
-    items: { ...s.items, [id]: { ...s.items[id], status: "executing", undoUntil: undefined } }
-  }));
+  return {
+    items: initial.items,
+    order: initial.order,
+    log: initial.log,
 
-  try {
-    const result = await executor.execute(item.params);
-    set((s) => ({
-      items: {
-        ...s.items,
-        [id]:
-          result.ok
-            ? {
-                ...s.items[id],
-                status: "done",
-                receipt: result.receipt,
-                ref: result.ref,
-                settledAt: Date.now()
-              }
-            : {
-                ...s.items[id],
-                status: "error",
-                error: result.error,
-                settledAt: Date.now()
-              }
-      }
-    }));
-  } catch (e) {
-    set((s) => ({
-      items: {
-        ...s.items,
-        [id]: { ...s.items[id], status: "error", error: (e as Error).message, settledAt: Date.now() }
-      }
-    }));
-  }
-}
+    detect(input) {
+      const existing = get().items[input.id];
+      if (existing) return; // detection never overwrites anything further along
+      const now = Date.now();
+      const action: Action = {
+        id: input.id,
+        executor: input.executor,
+        params: undefined,
+        title: input.title,
+        description: input.description,
+        confidence: input.confidence,
+        priority: input.priority,
+        status: "detected",
+        createdAt: now,
+        metadata: input.metadata
+      };
+      commit(
+        { ...get().items, [input.id]: action },
+        appendLog(get().log, { at: now, actionId: input.id, executor: input.executor, event: "detected" }),
+        get().order.includes(input.id) ? get().order : [input.id, ...get().order]
+      );
+    },
 
-/** Whole seconds left in the undo window; 0 when not queued. */
-export function undoSecondsLeft(item: Action, now: number = Date.now()): number {
-  if (item.status !== "queued" || item.undoUntil == null) return 0;
-  return Math.max(0, Math.ceil((item.undoUntil - now) / 1000));
-}
+    prepare(input) {
+      const existing = get().items[input.id];
+      if (existing && existing.status !== "detected" && existing.status !== "prepared") return;
+
+      const executor = getExecutor(input.executor);
+      if (!executor) return; // no phantom entries for a capability that isn't registered
+      const desc = executor.describe(input.params);
+      const now = Date.now();
+      const action: Action = {
+        id: input.id,
+        executor: input.executor,
+        params: input.params,
+        title: input.title ?? desc?.title ?? input.executor,
+        description: input.description ?? desc?.description,
+        confidence: input.confidence ?? desc?.confidence,
+        priority: input.priority ?? desc?.priority,
+        status: "prepared",
+        createdAt: existing?.createdAt ?? now,
+        metadata: input.metadata ?? existing?.metadata
+      };
+      commit(
+        { ...get().items, [input.id]: action },
+        appendLog(get().log, { at: now, actionId: input.id, executor: input.executor, event: "prepared" }),
+        get().order.includes(input.id) ? get().order : [input.id, ...get().order]
+      );
+    },
+
+    markWaitingApproval(id) {
+      const item = get().items[id];
+      if (!item || item.status !== "prepared") return;
+      const now = Date.now();
+      commit(
+        { ...get().items, [id]: { ...item, status: "waiting_approval" } },
+        appendLog(get().log, { at: now, actionId: id, executor: item.executor, event: "waiting_approval" })
+      );
+    },
+
+    updateParams(id, params) {
+      const item = get().items[id];
+      if (!item || item.approvedAt != null) return;
+      // Editable up until a founder decision has committed it to run:
+      // still-pending, previously declined, or previously failed — a
+      // fresh edit before re-approving/retrying is normal, not a reset.
+      const editable: ActionStatus[] = ["prepared", "waiting_approval", "cancelled", "failed"];
+      if (!editable.includes(item.status)) return;
+      const executor = getExecutor(item.executor);
+      const desc = executor?.describe(params);
+      commit(
+        {
+          ...get().items,
+          [id]: {
+            ...item,
+            params,
+            title: desc?.title ?? item.title,
+            description: desc?.description ?? item.description
+          }
+        },
+        get().log
+      );
+    },
+
+    approve(id) {
+      const item = get().items[id];
+      // waiting_approval with approvedAt already set means it's mid
+      // grace-window — a stray second approve() call is a no-op, never
+      // a duplicate timer.
+      const alreadyApproving = item?.status === "waiting_approval" && item.approvedAt != null;
+      const approvable: ActionStatus[] = ["prepared", "waiting_approval", "cancelled"];
+      if (!item || alreadyApproving || !approvable.includes(item.status)) return;
+      const executor = getExecutor(item.executor);
+      if (!executor) {
+        const now = Date.now();
+        commit(
+          { ...get().items, [id]: { ...item, status: "failed", error: `No executor registered for "${item.executor}".`, completedAt: now } },
+          appendLog(get().log, { at: now, actionId: id, executor: item.executor, event: "failed", detail: "unregistered executor" })
+        );
+        return;
+      }
+
+      const now = Date.now();
+      // Re-approving after a cancel/failure clears the stale terminal
+      // fields — this is a fresh attempt, not a resumed one.
+      const freshItem = { ...item, error: undefined, completedAt: undefined, retryCount: 0 };
+      if (executor.undoStrategy === "pre-execute" && executor.undoWindowMs > 0) {
+        commit(
+          { ...get().items, [id]: { ...freshItem, status: "waiting_approval", approvedAt: now, undoUntil: now + executor.undoWindowMs } },
+          appendLog(get().log, { at: now, actionId: id, executor: item.executor, event: "approved" })
+        );
+        const t = setTimeout(() => {
+          timers.delete(id);
+          void runExecute(id);
+        }, executor.undoWindowMs);
+        timers.set(id, t);
+        return;
+      }
+
+      commit(
+        { ...get().items, [id]: { ...freshItem, status: "waiting_approval", approvedAt: now, undoUntil: undefined } },
+        appendLog(get().log, { at: now, actionId: id, executor: item.executor, event: "approved" })
+      );
+      void runExecute(id);
+    },
+
+    reject(id) {
+      const item = get().items[id];
+      if (!item || item.status !== "prepared" && item.status !== "waiting_approval") return;
+      clearTimer(id);
+      const now = Date.now();
+      commit(
+        { ...get().items, [id]: { ...item, status: "cancelled", completedAt: now, undoUntil: undefined } },
+        appendLog(get().log, { at: now, actionId: id, executor: item.executor, event: "cancelled" })
+      );
+    },
+
+    undo(id) {
+      const item = get().items[id];
+      if (!item) return;
+      const now = Date.now();
+
+      // Pre-execute grace window: cancel before execute() ever runs.
+      if (item.status === "waiting_approval" && item.undoUntil != null && now < item.undoUntil) {
+        clearTimer(id);
+        commit(
+          { ...get().items, [id]: { ...item, status: "cancelled", completedAt: now, undoUntil: undefined } },
+          appendLog(get().log, { at: now, actionId: id, executor: item.executor, event: "cancelled", detail: "undone pre-execute" })
+        );
+        return;
+      }
+
+      // Post-execute grace window: a real compensating call.
+      if (item.status === "completed" && item.undoUntil != null && now < item.undoUntil) {
+        const executor = getExecutor(item.executor);
+        if (!executor?.undo) return; // honesty: no compensating action exists, no-op
+        void executor.undo(item.params, item.ref).then(
+          () => {
+            const cur = get().items[id];
+            if (!cur) return;
+            commit(
+              { ...get().items, [id]: { ...cur, status: "undone", completedAt: Date.now(), undoUntil: undefined } },
+              appendLog(get().log, { at: Date.now(), actionId: id, executor: item.executor, event: "undone" })
+            );
+          },
+          (e) => {
+            const cur = get().items[id];
+            if (!cur) return;
+            commit(
+              { ...get().items, [id]: { ...cur, error: `Undo failed: ${(e as Error).message}` } },
+              appendLog(get().log, { at: Date.now(), actionId: id, executor: item.executor, event: "failed", detail: "undo failed" })
+            );
+          }
+        );
+      }
+    },
+
+    retry(id) {
+      const item = get().items[id];
+      if (!item || item.status !== "failed") return;
+      const now = Date.now();
+      // Land on "waiting_approval" (no grace window) so runExecute's
+      // entry guard accepts it, then immediately hand off to execute —
+      // a manual retry means the founder already asked for it now.
+      commit(
+        { ...get().items, [id]: { ...item, status: "waiting_approval", retryCount: (item.retryCount ?? 0) + 1, error: undefined, undoUntil: undefined } },
+        appendLog(get().log, { at: now, actionId: id, executor: item.executor, event: "retried", detail: "manual retry" })
+      );
+      void runExecute(id);
+    },
+
+    get(id) {
+      return get().items[id];
+    },
+
+    doneCount() {
+      return Object.values(get().items).filter((a) => a.status === "completed").length;
+    },
+
+    metrics() {
+      return computeQueueMetrics(Object.values(get().items));
+    },
+
+    reset() {
+      for (const id of Object.keys(get().items)) clearTimer(id);
+      writePersisted({ items: {}, order: [], log: [] });
+      set({ items: {}, order: [], log: [] });
+    }
+  };
+});
+
+export { undoSecondsLeft, computeActionTiming, computeQueueMetrics } from "./actionMetrics";
