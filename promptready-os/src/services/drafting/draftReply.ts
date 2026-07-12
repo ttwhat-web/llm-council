@@ -32,7 +32,7 @@ interface RawAnthropicResponse {
 }
 
 export function buildDraftPrompt(req: DraftRequest): string {
-  const { context, founderFirstName, memory } = req;
+  const { context, founderFirstName, memory, companyBrainSummary } = req;
   const signature = founderFirstName ? `— ${founderFirstName}` : "—";
   const transcript = context.threadMessages
     .slice(-5)
@@ -43,10 +43,14 @@ export function buildDraftPrompt(req: DraftRequest): string {
 
   // The system prompt (Operator voice) carries identity, tone, and
   // response rules. This user message carries the task, the data,
-  // and — when present — the founder profile block from memory.
+  // and — when present — the founder profile block from memory plus
+  // grounded context about this specific customer.
   const parts: string[] = [];
   if (memoryBlock) {
     parts.push(memoryBlock, "");
+  }
+  if (companyBrainSummary) {
+    parts.push(companyBrainSummary, "");
   }
   parts.push(
     `Task: draft a follow-up email body for the customer below.`,

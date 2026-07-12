@@ -285,4 +285,19 @@ describe("draft prompt + memory", () => {
     const out = buildDraftPrompt({ ...baseReq, memory: null });
     expect(out).toContain("Do not invent customer-specific facts");
   });
+
+  it("includes the Company Brain summary when provided", () => {
+    const out = buildDraftPrompt({
+      ...baseReq,
+      memory: null,
+      companyBrainSummary: "What you know about Hans Müller:\n  Prefers German."
+    });
+    expect(out).toContain("What you know about Hans Müller");
+    expect(out).toContain("Prefers German.");
+  });
+
+  it("omits the Company Brain block entirely when there's nothing grounded to say", () => {
+    const out = buildDraftPrompt({ ...baseReq, memory: null, companyBrainSummary: undefined });
+    expect(out).not.toContain("What you know about");
+  });
 });

@@ -32,6 +32,12 @@ import {
   SILENT_ARCHIVE_CONFIDENCE_THRESHOLD
 } from "@/services/drafting/archiveCandidates";
 import { draftReply } from "@/services/drafting/draftReply";
+import {
+  getActiveCompanyBrainContext,
+  getCompanyBrainResult,
+  isResolvedBrainResult,
+  renderCompanyBrainForPrompt
+} from "@/services/companyBrain/retrieve";
 import { findConflictPairs } from "@/services/briefing/detectors";
 import { fetchOperatorRead } from "@/services/briefing/operatorRead";
 import { emptyMorningRunSummary, type MorningRunSummary } from "./types";
@@ -101,10 +107,13 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
   }
 
   if (anthropicKey) {
+    const brainCtx = getActiveCompanyBrainContext();
     for (const candidate of candidates) {
+      const brainResult = getCompanyBrainResult(candidate.customerEmail, brainCtx);
+      const companyBrainSummary = isResolvedBrainResult(brainResult) ? renderCompanyBrainForPrompt(brainResult) : undefined;
       const before = Date.now();
       const result = await draftReply(
-        { context: candidate, founderFirstName, intent: "follow-up", memory },
+        { context: candidate, founderFirstName, intent: "follow-up", memory, companyBrainSummary },
         anthropicKey
       );
       aiLatencyMs += Date.now() - before;

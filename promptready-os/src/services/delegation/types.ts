@@ -57,4 +57,9 @@ export interface DelegationContext {
   anthropicKey: string | null;
   calendarWriteGranted: boolean;
   gmailModifyGranted: boolean;
+  /** Optional — when present, planned replies are grounded with real
+   *  context about the specific customer (recent contact, remembered
+   *  preferences, pending work) via services/companyBrain. Omitted in
+   *  tests that don't need it; the planner behaves identically either way. */
+  companyBrainContext?: import("@/services/companyBrain/types").CompanyBrainContext;
 }

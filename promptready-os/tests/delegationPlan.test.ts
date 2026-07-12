@@ -262,6 +262,56 @@ describe("delegate() · partial success", () => {
   });
 });
 
+describe("delegate() · Company Brain evidence injection", () => {
+  it("grounds the planned reply's evidence and the draft prompt with what Operator remembers", async () => {
+    mockDraftReply.mockResolvedValue(fakeDraft("hans@acme.de"));
+    const message = msg({ id: "m1", date: NOW - 3 * DAY, fromName: "Hans Müller", fromAddress: "hans@acme.de" });
+    const staleThread = thread("t1", [message]);
+
+    const plan = await delegate(
+      "Reply to Hans.",
+      ctx({
+        snapshot: snap({ threads: [staleThread] }),
+        companyBrainContext: {
+          snapshot: snap({ messages: [message], threads: [staleThread] }),
+          actionItems: {},
+          actionLog: [],
+          memory: { ...EMPTY_MEMORY, rememberThese: "Hans Müller prefers German." },
+          candidates: {
+            k1: {
+              key: "k1",
+              kind: "language",
+              subjectLabel: "Hans Müller",
+              text: "Hans Müller prefers German.",
+              status: "saved",
+              evidenceCount: 2,
+              firstSeenAt: NOW - 10 * DAY,
+              updatedAt: NOW - 10 * DAY
+            }
+          },
+          noteOverrides: {},
+          feedbackEvents: [],
+          now: NOW
+        }
+      })
+    );
+
+    const reply = plan.actions.find((a) => a.kind === "reply");
+    expect(reply?.why).toContain("Hans Müller prefers German.");
+    expect(mockDraftReply).toHaveBeenCalledWith(
+      expect.objectContaining({ companyBrainSummary: expect.stringContaining("Hans Müller prefers German.") }),
+      "fake-key"
+    );
+  });
+
+  it("never grounds anything when no Company Brain context is supplied — fully backward compatible", async () => {
+    mockDraftReply.mockResolvedValue(fakeDraft("hans@acme.de"));
+    const staleThread = thread("t1", [msg({ id: "m1", date: NOW - 3 * DAY, fromName: "Hans Müller", fromAddress: "hans@acme.de" })]);
+    await delegate("Reply to Hans.", ctx({ snapshot: snap({ threads: [staleThread] }) }));
+    expect(mockDraftReply).toHaveBeenCalledWith(expect.objectContaining({ companyBrainSummary: undefined }), "fake-key");
+  });
+});
+
 describe("delegate() · receipts and Timeline creation", () => {
   it("a silently-archived action leaves a real receipt and a real Timeline entry", async () => {
     vi.useFakeTimers({ now: NOW });

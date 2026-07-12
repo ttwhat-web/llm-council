@@ -21,6 +21,13 @@ import { useSourcesStore } from "@/store/sources";
 import { useAiProviderStore } from "@/store/aiProvider";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { getActiveMemoryView } from "@/services/memory/distillation";
+import {
+  getActiveCompanyBrainContext,
+  getCompanyBrainResult,
+  isResolvedBrainResult,
+  renderCompanyBrainForPrompt
+} from "@/services/companyBrain/retrieve";
+import { useCompanyBrainPanelStore } from "@/store/companyBrainPanel";
 import { draftReply } from "@/services/drafting/draftReply";
 import {
   collectCandidates,
@@ -123,9 +130,12 @@ export function DraftReplies() {
       // distilled, active-only memory view fresh for this batch — a
       // forgotten or archived fact never reaches the draft prompt.
       const activeMemory = getActiveMemoryView();
+      const brainCtx = getActiveCompanyBrainContext();
       for (const c of list) {
+        const brainResult = getCompanyBrainResult(c.customerEmail, brainCtx);
+        const companyBrainSummary = isResolvedBrainResult(brainResult) ? renderCompanyBrainForPrompt(brainResult) : undefined;
         const result = await draftReply(
-          { context: c, founderFirstName, intent: "follow-up", memory: activeMemory },
+          { context: c, founderFirstName, intent: "follow-up", memory: activeMemory, companyBrainSummary },
           anthropicKey
         );
         if (result.ok) {
@@ -300,6 +310,13 @@ function DraftCard({
   candidate: CustomerCandidate;
   state: DraftState;
 }) {
+  const openCompanyBrain = useCompanyBrainPanelStore((s) => s.open);
+  const groundedNote = useMemo(() => {
+    const result = getCompanyBrainResult(candidate.customerEmail, getActiveCompanyBrainContext());
+    if (!isResolvedBrainResult(result)) return null;
+    return result.memory[0]?.text ?? null;
+  }, [candidate.customerEmail]);
+
   return (
     <li className="flex flex-col gap-2 rounded-xl bg-white/[0.018] p-3">
       <header className="flex min-w-0 items-baseline justify-between gap-3">
@@ -309,7 +326,15 @@ function DraftCard({
             {candidate.customerEmail} · {candidate.daysSinceLastInbound}d
           </span>
         </span>
+        <button
+          type="button"
+          onClick={() => openCompanyBrain(candidate.customerEmail)}
+          className="shrink-0 text-[11px] text-white/40 underline-offset-2 transition hover:text-white/80 hover:underline"
+        >
+          Everything about them
+        </button>
       </header>
+      {groundedNote && <p className="text-[12px] leading-relaxed text-white/50">{groundedNote}</p>}
       {state.kind === "idle" && (
         <p className="text-[12px] text-white/40">Press &quot;Draft N replies&quot; to generate.</p>
       )}

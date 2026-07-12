@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { Command, CornerDownLeft, RefreshCw, Check, Search, Sparkles } from "lucide-react";
+import { Command, CornerDownLeft, RefreshCw, Check, Search, Sparkles, User } from "lucide-react";
 import { useSourcesStore } from "@/store/sources";
 import { useOperatorMemoryStore } from "@/store/operatorMemory";
 import { useMorningRunStore } from "@/store/morningRun";
@@ -12,6 +12,8 @@ import { buildTimeline } from "@/services/executors/timeline";
 import { searchWorkspace, type SearchResult } from "@/services/search/search";
 import { useDelegationStore } from "@/store/delegation";
 import { interpretRequest } from "@/services/delegation/interpret";
+import { useCompanyBrainPanelStore } from "@/store/companyBrainPanel";
+import { resolveSubject } from "@/services/companyBrain/resolveSubject";
 
 /**
  * Command Palette · Cmd/Ctrl+K. One surface for "go somewhere" AND
@@ -86,6 +88,7 @@ export function CommandPalette() {
   const memory = useOperatorMemoryStore((s) => s.memory);
   const runMorningRun = useMorningRunStore((s) => s.run);
   const runDelegation = useDelegationStore((s) => s.run);
+  const openCompanyBrain = useCompanyBrainPanelStore((s) => s.open);
   const approveAllPending = useActionQueue((s) => s.approveAllPending);
   const log = useActionQueue((s) => s.log);
   const items = useActionQueue((s) => s.items);
@@ -99,7 +102,7 @@ export function CommandPalette() {
       {
         id: "approve-all-pending",
         label: "Approve everything pending",
-        hint: "every executor, one gesture",
+        hint: "every action, one gesture",
         run: () => {
           approveAllPending();
         }
@@ -139,6 +142,23 @@ export function CommandPalette() {
     }
   }, [open]);
 
+  // A name-shaped query ("Hans", "Bridge") resolves to a real person or
+  // company before anything else is considered — the founder sees what
+  // Operator knows about them ahead of any route/nav match (rule: Cmd+K
+  // shows Company Brain results before route navigation).
+  const brainAction = useMemo((): PaletteAction | null => {
+    const q = query.trim();
+    if (!q) return null;
+    const resolution = resolveSubject(q, snapshot);
+    if (resolution.kind === "not-found") return null;
+    return {
+      id: "company-brain",
+      label: resolution.kind === "resolved" ? resolution.displayName : `"${q}" — more than one match`,
+      hint: "everything about them",
+      run: () => openCompanyBrain(q)
+    };
+  }, [query, snapshot, openCompanyBrain]);
+
   // A supported business-command sentence ("follow up with customers
   // who are waiting") never matches a nav label/hint — surfaced as one
   // more quick action instead of a dead "no matching command" state,
@@ -166,8 +186,9 @@ export function CommandPalette() {
           ...actions.filter((a) => !recent.includes(a.id))
         ];
     const withDelegate = delegateAction ? [delegateAction, ...base] : base;
-    return withDelegate.slice(0, 9);
-  }, [query, recent, actions, delegateAction]);
+    const withBrain = brainAction ? [brainAction, ...withDelegate] : withDelegate;
+    return withBrain.slice(0, 9);
+  }, [query, recent, actions, delegateAction, brainAction]);
 
   const searchResults = useMemo(
     () => (query.trim() ? searchWorkspace(query, { messages: snapshot?.messages, events: snapshot?.events, timeline, memory }) : []),
@@ -245,6 +266,7 @@ export function CommandPalette() {
                     {a.id === "sync-now" && <RefreshCw className="h-3 w-3 text-white/40" />}
                     {a.id === "approve-all-pending" && <Check className="h-3 w-3 text-white/40" />}
                     {a.id === "delegate" && <Sparkles className="h-3 w-3 text-white/40" />}
+                    {a.id === "company-brain" && <User className="h-3 w-3 text-white/40" />}
                     {a.label}
                   </span>
                   <span className="flex items-center gap-2">

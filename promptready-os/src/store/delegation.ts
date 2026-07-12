@@ -16,6 +16,7 @@ import { useActionQueue } from "@/services/executors";
 import { useSourcesStore } from "@/store/sources";
 import { useAiProviderStore } from "@/store/aiProvider";
 import { getActiveMemoryView } from "@/services/memory/distillation";
+import { getActiveCompanyBrainContext } from "@/services/companyBrain/retrieve";
 import { delegate } from "@/services/delegation/buildPlan";
 import type { DelegationPlan } from "@/services/delegation/types";
 
@@ -50,7 +51,8 @@ export const useDelegationStore = create<DelegationState>((set, get) => ({
         memory: getActiveMemoryView(),
         anthropicKey: useAiProviderStore.getState().anthropicKey,
         calendarWriteGranted: sources.google.calendarWriteGranted,
-        gmailModifyGranted: sources.google.gmailModifyGranted
+        gmailModifyGranted: sources.google.gmailModifyGranted,
+        companyBrainContext: getActiveCompanyBrainContext()
       });
       set({ status: "ready", plan });
     } catch (e) {

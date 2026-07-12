@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CommandPalette } from "@/components/CommandPalette";
+import { CompanyBrainPanel } from "@/components/companyBrain/CompanyBrainPanel";
 import { useUiModeStore } from "@/store/uiMode";
 
 /**
@@ -108,6 +109,7 @@ export function ShellLayout() {
       </main>
 
       <CommandPalette />
+      <CompanyBrainPanel />
       <VoiceSheet open={voiceOpen} onClose={() => setVoiceOpen(false)} />
     </div>
   );

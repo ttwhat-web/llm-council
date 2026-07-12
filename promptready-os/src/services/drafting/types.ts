@@ -32,6 +32,11 @@ export interface DraftRequest {
    *  preferred-language context. When null, no profile block is
    *  added and Operator stays generic. */
   memory?: FounderMemory | null;
+  /** Optional grounded context about this specific customer — recent
+   *  contact, anything already pending, remembered preferences, past
+   *  decisions — from services/companyBrain. Absent when there's
+   *  nothing real to say; never invented. */
+  companyBrainSummary?: string;
 }
 
 export interface DraftResponse {

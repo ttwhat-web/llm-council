@@ -19,6 +19,7 @@ import { useActionQueue, GMAIL_SEND_EXECUTOR_ID, CALENDAR_MOVE_EXECUTOR_ID, GMAI
 import { collectCandidates, MAX_DRAFTS_PER_BATCH, type CustomerCandidate } from "@/services/drafting/candidates";
 import { collectArchiveCandidates, SILENT_ARCHIVE_CONFIDENCE_THRESHOLD } from "@/services/drafting/archiveCandidates";
 import { draftReply } from "@/services/drafting/draftReply";
+import { getCompanyBrainResult, isResolvedBrainResult, renderCompanyBrainForPrompt } from "@/services/companyBrain/retrieve";
 import { findConflictPairs, type ConflictPair } from "@/services/briefing/detectors";
 import { interpretRequest, type DelegationClause } from "./interpret";
 import type { DelegationContext, DelegationIssue, DelegationPlan, PlannedAction } from "./types";
@@ -145,7 +146,14 @@ async function planFollowUps(
       description: `Waiting ${candidate.daysSinceLastInbound}d`
     });
 
-    const result = await draftReply({ context: candidate, founderFirstName, intent: "follow-up", memory: ctx.memory }, ctx.anthropicKey);
+    const brainResult = ctx.companyBrainContext ? getCompanyBrainResult(candidate.customerEmail, ctx.companyBrainContext) : null;
+    const grounded = brainResult && isResolvedBrainResult(brainResult) ? brainResult : null;
+    const companyBrainSummary = grounded ? renderCompanyBrainForPrompt(grounded) : undefined;
+
+    const result = await draftReply(
+      { context: candidate, founderFirstName, intent: "follow-up", memory: ctx.memory, companyBrainSummary },
+      ctx.anthropicKey
+    );
     if (!result.ok) {
       issues.push({ kind: "executor-failure", message: `Couldn't draft a reply to ${candidate.customerName}: ${result.error}` });
       continue;
@@ -170,12 +178,18 @@ async function planFollowUps(
     }
 
     const days = candidate.daysSinceLastInbound;
+    // Ground the "why" in what Operator actually remembers about this
+    // person when there's something real to add — never a repeat of
+    // the fact line above, and never present when there's nothing.
+    const memoryFact = grounded?.memory[0]?.text;
+    const why = memoryFact ? `No response has been sent since their last message · Remembers: ${memoryFact}` : "No response has been sent since their last message";
+
     actions.push({
       queueId,
       kind: "reply",
       summary: `Reply to ${candidate.customerName}`,
       fact: `Waiting ${days} day${days === 1 ? "" : "s"} for a reply`,
-      why: "No response has been sent since their last message"
+      why
     });
   }
 }
