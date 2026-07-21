@@ -36,24 +36,20 @@ interface PaletteAction {
   run?: () => void;
 }
 
+// Only the surfaces that are actually part of Operator today. This
+// list used to carry 11 more legacy routes (Markets, Console, Library,
+// Launchpad, Atlas, Brain, Memory, Workflows, Marketplace, Voice,
+// Terminal, Agents) left over from before the product became Operator
+// — none of them fit "one continuous experience," so Cmd+K, the
+// founder's main way of finding anything, no longer offers them. The
+// underlying pages still exist and still work by direct URL; nothing
+// was deleted, only stopped being offered as if it were part of the
+// product. Removing those pages outright is a real decision — worth
+// asking about, not assuming.
 const NAV_ACTIONS: PaletteAction[] = [
-  // Primary surfaces
   { id: "home", label: "Open Home", hint: "today", to: "/" },
-  { id: "markets", label: "Open Markets", hint: "chart workspace", to: "/markets" },
-  { id: "console", label: "Open Console", hint: "dispatch missions", to: "/console" },
-  { id: "library", label: "Open Library", hint: "notes · saved", to: "/library" },
-  { id: "launchpad", label: "Open Launchpad", hint: "external apps", to: "/launchpad" },
-  { id: "settings", label: "Open Settings", hint: "providers · workspace", to: "/settings" },
-  // Power-user routes
-  { id: "atlas", label: "Open Atlas", hint: "blueprint canvas", to: "/atlas" },
-  { id: "brain", label: "Open Brain", hint: "identity · memory", to: "/brain" },
-  { id: "memory", label: "Open Memory", hint: "notes", to: "/memory" },
-  { id: "workflows", label: "Open Workflows", hint: "automations", to: "/workflows" },
-  { id: "marketplace", label: "Open Marketplace", hint: "packs", to: "/marketplace" },
-  { id: "voice", label: "Open Voice console", hint: "transcripts", to: "/voice" },
-  { id: "terminal", label: "Open Intelligence Terminal", hint: "feeds", to: "/terminal" },
-  { id: "agents", label: "Open Agents", hint: "agent registry", to: "/agents" },
-  { id: "server", label: "Open Server", hint: "ssh bridge", to: "/server" }
+  { id: "settings", label: "Open Settings", hint: "sources · memory · keys", to: "/settings" },
+  { id: "server", label: "Open Server", hint: "restart a service", to: "/server" }
 ];
 
 const SOURCE_LABEL: Record<SearchResult["source"], string> = {
