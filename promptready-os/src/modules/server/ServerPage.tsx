@@ -1,13 +1,17 @@
 "use client";
 
 /**
- * Server Command Center · honest scaffold.
+ * Server Command Center.
  *
- * The full SSH bridge ("server agent") is planned, not wired. The page
- * is structurally complete · profile management is real and local;
- * status / services / logs render adapter-ready cells until the agent
- * ships. Restart confirms but explicitly never executes; deploy is
- * permanently disabled with the "planned" pill.
+ * The SSH bridge (services/serverAgentBridge.ts → the Rust server.rs
+ * command) is real and wired — status / services / logs are live data
+ * when running in the desktop app. Restart flows through the same
+ * Action Queue every other executor uses (services/executors/
+ * computerUseExecutor.ts, capability "terminal") so it gets a real
+ * receipt and a real Timeline entry, not just a local toast; the
+ * confirm modal below is the founder decision the queue's approval
+ * step formalizes. Deploy is permanently disabled with the "planned"
+ * pill — no button exists that isn't actually wired to something real.
  *
  * Security posture:
  *   - no password storage anywhere in the code
@@ -65,7 +69,6 @@ import {
   bridgeListPm2,
   bridgeListSystemd,
   bridgeProbeStatus,
-  bridgeRestart,
   isBridgeAvailable,
   type ServiceKind,
   type ServiceOut as BridgeServiceOut
@@ -76,6 +79,7 @@ import {
   listAudit,
   type AuditEntry
 } from "@/services/serverAudit";
+import { useActionQueue, COMPUTER_USE_EXECUTOR_ID, type ComputerUseParams } from "@/services/executors";
 
 // Local alias so the existing rendering code keeps a single ServerService type.
 type ServerService = BridgeServiceOut;
@@ -98,6 +102,10 @@ export default function ServerPage() {
   const [confirmRestart, setConfirmRestart] = useState<ServerService | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>(() => listAudit());
   const [lastRestart, setLastRestart] = useState<Record<string, RestartHint>>({});
+  // Tracks the one restart currently flowing through the Action Queue,
+  // so its real outcome (not a local toast) drives lastRestart below.
+  const [inFlightRestart, setInFlightRestart] = useState<{ queueId: string; serviceId: string } | null>(null);
+  const inFlightItem = useActionQueue((s) => (inFlightRestart ? s.items[inFlightRestart.queueId] : undefined));
 
   // Live data slots (all stay null until the agent ships).
   const [status, setStatus] = useState<ServerStatus | null>(null);
@@ -299,7 +307,14 @@ export default function ServerPage() {
     setConfirmRestart(svc);
   };
 
-  const onRestartConfirmed = async () => {
+  // Restart flows through the real Action Queue (computerUseExecutor,
+  // capability "terminal") instead of calling the SSH bridge directly —
+  // same underlying call, but now it earns a receipt and a Timeline
+  // entry like every other action in the product. The confirm modal
+  // below is still the one moment the founder actually decides;
+  // approve() here formalizes a decision already given, it doesn't
+  // skip one.
+  const onRestartConfirmed = () => {
     if (!confirmRestart || !activeProfile) return;
     const svc = confirmRestart;
     setConfirmRestart(null);
@@ -319,16 +334,47 @@ export default function ServerPage() {
       return;
     }
     setLastRestart((prev) => ({ ...prev, [rid]: { state: "running", at: Date.now() } }));
-    const r = await bridgeRestart(activeProfile, svc.kind, svc.name);
-    setAudit(listAudit());
+    recordAudit({
+      action: "restart-confirm",
+      profileId: activeProfile.id,
+      profileName: activeProfile.name,
+      detail: `service=${svc.name}`,
+      result: "ok"
+    });
+
+    const queueId = `${COMPUTER_USE_EXECUTOR_ID}:${activeProfile.id}:${svc.kind}:${svc.name}`;
+    const params: ComputerUseParams = {
+      capability: "terminal",
+      summary: `Restart ${svc.name}`,
+      target: `${activeProfile.host} · ${svc.kind}:${svc.name}`,
+      terminal: { profile: activeProfile, kind: svc.kind, serviceName: svc.name }
+    };
+    const { detect, prepare, approve } = useActionQueue.getState();
+    detect({ id: queueId, executor: COMPUTER_USE_EXECUTOR_ID, title: params.summary, description: params.target });
+    prepare({ id: queueId, executor: COMPUTER_USE_EXECUTOR_ID, params });
+    setInFlightRestart({ queueId, serviceId: rid });
+    approve(queueId);
+  };
+
+  // Reflects the queue's real, settled outcome into the existing
+  // lastRestart UI feed — never a second call to the bridge, just
+  // reading back what the executor already did for real.
+  useEffect(() => {
+    if (!inFlightRestart || !inFlightItem) return;
+    if (inFlightItem.status !== "completed" && inFlightItem.status !== "failed") return;
+    const rid = inFlightRestart.serviceId;
     setLastRestart((prev) => ({
       ...prev,
-      [rid]: r.ok
-        ? { state: "ok", at: Date.now(), detail: `restarted · ${r.data?.stdout?.split("\n")[0] ?? "no output"}` }
-        : { state: "error", at: Date.now(), detail: r.error ?? "unknown error" }
+      [rid]:
+        inFlightItem.status === "completed"
+          ? { state: "ok", at: Date.now(), detail: inFlightItem.receipt ?? "restarted" }
+          : { state: "error", at: Date.now(), detail: inFlightItem.error ?? "unknown error" }
     }));
-    void refreshServices();
-  };
+    setAudit(listAudit());
+    setInFlightRestart(null);
+    if (inFlightItem.status === "completed") void refreshServices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inFlightRestart, inFlightItem?.status]);
 
   const onRestartCancel = () => {
     if (!confirmRestart || !activeProfile) {
