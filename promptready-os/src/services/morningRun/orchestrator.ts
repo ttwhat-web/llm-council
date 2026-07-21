@@ -42,7 +42,13 @@ import { findConflictPairs } from "@/services/briefing/detectors";
 import { fetchOperatorRead } from "@/services/briefing/operatorRead";
 import { emptyMorningRunSummary, type MorningRunSummary } from "./types";
 
-export async function runMorningRun(): Promise<MorningRunSummary> {
+/**
+ * @param onStage Called with a short, present-tense label at each real
+ * stage transition below — never decorative, never called for work
+ * that didn't happen. Optional: the pipeline behaves identically
+ * without a listener (manual "Sync now", future cron, etc.).
+ */
+export async function runMorningRun(onStage?: (label: string) => void): Promise<MorningRunSummary> {
   const startedAt = Date.now();
 
   // Stage · Load connectors.
@@ -54,6 +60,7 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
 
   // Stage · Sync Gmail + Sync Calendar (one call covers both, and
   // rebuilds the detector-based briefing + panels internally).
+  onStage?.("Reading your inbox and calendar…");
   const errors: string[] = [];
   try {
     await sources.syncGoogle();
@@ -83,6 +90,7 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
   // threads, waiting customers). Every candidate is detected first
   // (a real, logged "detected" state) so the funnel is honest even
   // when drafting fails or there's no AI key to draft with.
+  onStage?.("Checking messages that need a reply…");
   const candidates = collectCandidates(snapshot).slice(0, MAX_DRAFTS_PER_BATCH);
   const founderFirstName = memory.firstName?.trim() || readFounderName();
   let draftsGenerated = 0;
@@ -145,6 +153,7 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
   // Stage · Prepare a calendar move for the soonest conflict, only
   // when Operator can actually write it — never prepare an action
   // that's guaranteed to fail on approval.
+  onStage?.("Looking for calendar conflicts…");
   const conflict = findConflictPairs(snapshot.events, snapshot.syncedAt)[0] ?? null;
   if (conflict) {
     const calendarConflictMatch = briefing.find((b) => b.detector === "calendar-conflict");
@@ -185,6 +194,7 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
   // requires the founder's approval, same as any other action.
   let archivedPrepared = 0;
   if (synced.google.gmailModifyGranted) {
+    onStage?.("Clearing obvious noise…");
     for (const candidate of collectArchiveCandidates(snapshot)) {
       const id = `${GMAIL_ARCHIVE_EXECUTOR_ID}:${candidate.messageId}`;
       detect({
@@ -212,6 +222,7 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
   // founder's voice, using only real counts and honest verbs.
   let operatorRead: string | null = null;
   if (anthropicKey && briefing.length > 0) {
+    onStage?.("Preparing your morning summary…");
     const overdueThreads = Math.max(0, collectCandidates(snapshot).length - draftsGenerated);
     const before = Date.now();
     const readResult = await fetchOperatorRead(briefing, memory, anthropicKey, {
@@ -229,12 +240,15 @@ export async function runMorningRun(): Promise<MorningRunSummary> {
   }
 
   // Stage · Ready.
+  onStage?.("Ready.");
   return {
     startedAt,
     durationMs: Date.now() - startedAt,
     detectorsFired,
     draftsGenerated,
     actionsPrepared,
+    archivedPrepared,
+    calendarConflictPrepared: calendarActionPrepared,
     executorCount: touchedExecutors.size,
     aiTokens,
     aiLatencyMs,

@@ -14,6 +14,14 @@ export interface MorningRunSummary {
   draftsGenerated: number;
   /** Actions newly registered as "prepared" in the action queue. */
   actionsPrepared: number;
+  /** Of `actionsPrepared`, how many were low-risk inbox noise archived
+   *  automatically (only ever set when the founder already granted
+   *  gmail.modify). Broken out so the ritual summary can say a real
+   *  number instead of reverse-engineering it from the total. */
+  archivedPrepared: number;
+  /** Whether a calendar conflict was found and (if write access was
+   *  granted) a real move was prepared for founder approval. */
+  calendarConflictPrepared: boolean;
   /** Distinct executor ids touched this run. */
   executorCount: number;
   /** Total input+output tokens across every AI call this run. */
@@ -35,6 +43,8 @@ export function emptyMorningRunSummary(startedAt: number, skipped?: string): Mor
     detectorsFired: [],
     draftsGenerated: 0,
     actionsPrepared: 0,
+    archivedPrepared: 0,
+    calendarConflictPrepared: false,
     executorCount: 0,
     aiTokens: 0,
     aiLatencyMs: 0,

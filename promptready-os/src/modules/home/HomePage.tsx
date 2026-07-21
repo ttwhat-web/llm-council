@@ -19,6 +19,7 @@ import { CalendarConflicts } from "@/components/home/CalendarConflicts";
 import { ArchiveSuggestions } from "@/components/home/ArchiveSuggestions";
 import { MemoryCandidatePrompt } from "@/components/home/MemoryCandidatePrompt";
 import { MorningCompleteCard } from "@/components/home/MorningCompleteCard";
+import { MorningRitual } from "@/components/home/MorningRitual";
 import { DelegationPreview } from "@/components/home/DelegationPreview";
 import { useDelegationStore } from "@/store/delegation";
 import { interpretRequest } from "@/services/delegation/interpret";
@@ -388,6 +389,7 @@ export default function HomePage() {
 
   return (
     <div className="flex h-full min-h-0">
+      {!isDemo && <MorningRitual />}
       <main
         className={clsx(
           "flex min-h-0 flex-1 flex-col overflow-y-auto transition-opacity duration-200",

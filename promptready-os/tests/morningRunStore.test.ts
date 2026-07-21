@@ -14,7 +14,7 @@ import { runMorningRun } from "@/services/morningRun/orchestrator";
 const mockRunMorningRun = vi.mocked(runMorningRun);
 
 beforeEach(() => {
-  useMorningRunStore.setState({ status: "idle", lastRun: null });
+  useMorningRunStore.setState({ status: "idle", stage: null, lastRun: null });
   mockRunMorningRun.mockReset();
 });
 
@@ -26,6 +26,8 @@ describe("useMorningRunStore", () => {
       detectorsFired: ["stale-customer-thread"],
       draftsGenerated: 2,
       actionsPrepared: 2,
+      archivedPrepared: 0,
+      calendarConflictPrepared: false,
       executorCount: 1,
       aiTokens: 500,
       aiLatencyMs: 300,
@@ -48,6 +50,8 @@ describe("useMorningRunStore", () => {
       detectorsFired: [],
       draftsGenerated: 1,
       actionsPrepared: 1,
+      archivedPrepared: 0,
+      calendarConflictPrepared: false,
       executorCount: 1,
       aiTokens: 10,
       aiLatencyMs: 5,
@@ -83,6 +87,8 @@ describe("useMorningRunStore", () => {
       detectorsFired: [],
       draftsGenerated: 0,
       actionsPrepared: 0,
+      archivedPrepared: 0,
+      calendarConflictPrepared: false,
       executorCount: 0,
       aiTokens: 0,
       aiLatencyMs: 0,
