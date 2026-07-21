@@ -86,6 +86,22 @@ exactly the context needed to decide in seconds.
 Operator earns the right to do more by first proving, relentlessly, that
 it never does something it shouldn't.
 
+## The permanent rule
+
+Every principle below is downstream of one rule, and it doesn't change:
+
+> Operator is not a collection of features. Operator is a collection of
+> experiences. Every new capability must disappear into one continuous
+> experience. If the founder notices system boundaries, the design is
+> incomplete. Gmail should not feel like Gmail. Calendar should not feel
+> like Calendar. Memory should not feel like Memory. Approvals should not
+> feel like Approvals. Everything should simply feel like Operator.
+
+This is the test for every future sprint, before any other: not "does the
+new capability work," but "did it disappear into the one experience, or
+is it now visible as its own system." A feature that works but announces
+its own boundary has failed this test even if every other one passes.
+
 ## Design principles
 
 - **One continuous experience, not a collection of screens.** Home is the

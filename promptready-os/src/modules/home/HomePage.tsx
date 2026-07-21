@@ -464,9 +464,19 @@ export default function HomePage() {
           )}
           {!isDemo && sourcesConnected && !morningCompleteSummary && (
             <>
-              <DraftReplies />
-              <CalendarConflicts />
-              <ArchiveSuggestions />
+              {/* ids are the Morning Ritual's shared-element landing
+               *  spots — the ceremony's "N replies ready" line flies
+               *  to this exact box on dismiss, so Home reads as the
+               *  ritual's continuation, not a cut to a new screen. */}
+              <div id="ritual-target-replies">
+                <DraftReplies />
+              </div>
+              <div id="ritual-target-calendar">
+                <CalendarConflicts />
+              </div>
+              <div id="ritual-target-archive">
+                <ArchiveSuggestions />
+              </div>
             </>
           )}
           {!isDemo && sourcesConnected && <MemoryCandidatePrompt />}
