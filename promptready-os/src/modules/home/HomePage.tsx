@@ -552,19 +552,19 @@ function EmptyBriefing() {
     <article className="flex flex-col gap-3">
       <BriefingBlock
         label="Fact"
-        body="Hiçbir kaynağa bağlı değilim."
+        body="I'm not connected to anything yet."
       />
       <BriefingBlock
         label="Why it matters"
-        body="Yorum yapabilmem için önce sinyal görmem gerek. En küçük başlangıç gelen kutun."
+        body="I need to see real signal before I can say anything useful. Your inbox is the smallest place to start."
       />
       <BriefingBlock
         label="Recommendation"
-        body="Gmail'i bağla — yarın bu satırda gerçek bir özet olur."
+        body="Connect Gmail — tomorrow this line has a real summary."
         emphasis
       />
       <Link to="/settings" className="self-start pt-1 text-[13px] text-white/65 transition hover:text-white">
-        ▸ Connect Gmail · ~30 saniye
+        ▸ Connect Gmail · one-time setup
       </Link>
     </article>
   );
@@ -673,35 +673,35 @@ function greetingSubtitle(args: {
     return "Bu sabah üç şeye dikkat etmen gerek. Aşağıdaki paneller dayanak veriyi gösteriyor.";
   }
   if (!sourcesConnected) {
-    return "Henüz bir kaynağa bağlı değilim, o yüzden bu sabah sana güvenebileceğin bir özet veremem. Bir kaynak bağlayalım — yarın gerçek bir özetle başlarız.";
+    return "Nothing is connected yet, so I can't give you a summary you can trust this morning. Let's connect a source — tomorrow starts with a real one.";
   }
   if (googleState === "syncing" && !snapshot) {
-    return "Operator senin için ilk taramayı yapıyor. Birkaç saniye…";
+    return "Running your first scan…";
   }
   if (googleState === "error" && lastErrors.length > 0) {
-    return "Son senkronizasyon başarısız oldu. Aşağıda detayı, kaynaktan yeniden denemek için \"Sync now\" düğmesi var.";
+    return "The last sync failed. The detail is below, with a \"Sync now\" button to try again.";
   }
   if (!snapshot) {
-    return "Bağlandık, ama henüz veri taşımadım. Birkaç saniye içinde sabah özeti çıkacak.";
+    return "Connected, but nothing's synced yet. Your morning summary will be ready in a few seconds.";
   }
   const msgs = snapshot.messages.length;
   const evs = snapshot.events.length;
   const con = snapshot.contacts.length;
   if (briefingCount > 0) {
-    return `Bu sabah ${briefingCount === 1 ? "bir konu" : `${briefingCount} konu`} dikkatini hak ediyor. Paneller aşağıda dayanak veriyi gösteriyor.`;
+    return `${briefingCount === 1 ? "One thing" : `${briefingCount} things`} deserve your attention this morning. The panels below show what's behind it.`;
   }
   // Connected with snapshot but no briefing items → say what we
   // actually scanned and why it's quiet.
   if (msgs === 0 && evs === 0) {
-    return `Son 14 günde gelen kutunda ve önümüzdeki 14 günde takviminde hiçbir şey yok. ${con} kişi rehberinde. Bir başka hesabı bağlamak ister misin?`;
+    return `Nothing in your inbox in the last 14 days, and nothing on your calendar in the next 14. ${con} contact${con === 1 ? "" : "s"} in your address book. Want to connect another account?`;
   }
   if (msgs === 0) {
-    return `Son 14 günde gelen kutun boş. ${evs} takvim olayı var ama henüz dikkat isteyen bir şey yok.`;
+    return `Your inbox is empty for the last 14 days. ${evs} calendar event${evs === 1 ? "" : "s"}, nothing needing attention yet.`;
   }
   if (evs === 0) {
-    return `${msgs} mesaj taradım, dikkat isteyen bir şey yok. Önümüzdeki 14 günde takvim olayı da yok.`;
+    return `Scanned ${msgs} message${msgs === 1 ? "" : "s"} — nothing needs attention. No calendar events in the next 14 days either.`;
   }
-  return `${msgs} mesaj ve ${evs} takvim olayı taradım — bugün için seni meşgul edecek bir şey görmüyorum. Paneller aşağıda neyi gördüğümü gösteriyor.`;
+  return `Scanned ${msgs} message${msgs === 1 ? "" : "s"} and ${evs} calendar event${evs === 1 ? "" : "s"} — nothing needs you today. The panels below show what I saw.`;
 }
 
 /**
