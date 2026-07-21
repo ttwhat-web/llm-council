@@ -1,0 +1,18 @@
+node_modules
+.next
+out
+dist
+.env
+.env.local
+.DS_Store
+*.log
+desktop/src-tauri/target
+desktop/src-tauri/Cargo.lock
+*.tsbuildinfo
+.eslintcache
+
+# Mission Alerts — local user→chat link storage
+.data/
+
+# Phase-5 file-backed billing store (dev only — never commit)
+.promptfixer/

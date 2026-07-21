@@ -1,0 +1,328 @@
+@import "../design/tokens.css";
+@import "./atlas-cinema.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  /* Premium dark · #06070B base, soft cool glow from the top, a hint
+   * of warm depth from the bottom-right. Calm enough that a reader's
+   * eye lands on text first; rich enough that the screen never feels
+   * like a blank web page. */
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -5%, rgba(124, 155, 255, 0.10), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(255, 180, 120, 0.035), transparent 70%),
+    #06070B;
+  color: rgba(255, 255, 255, 0.92);
+  font-feature-settings: "ss01", "ss02", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Very subtle film grain · under 3% opacity. Sits above the body
+ * background but below #root, so the noise never interferes with
+ * interactive surfaces and never reads as texture. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-repeat: repeat;
+  background-size: 240px 240px;
+  mix-blend-mode: overlay;
+}
+
+canvas,
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
+canvas {
+  display: block;
+}
+
+/* ---------- Background system · Intelligence Expansion 01 ---------------- *
+ * Pure-visual ambient backdrops selected in Settings → Personalization.
+ * A single fixed overlay layers on top of the base body gradient. No
+ * runtime behaviour changes · the layer is pointer-events:none.         */
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+#root {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+/* static · plain (default) — overlay stays hidden */
+body[data-bg="static"]::before { opacity: 0; }
+
+/* grid · blueprint lines */
+body[data-bg="grid"]::before {
+  opacity: 1;
+  background-image:
+    linear-gradient(var(--pr-color-accent-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pr-color-accent-soft) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* blueprint · denser grid + corner vignette */
+body[data-bg="blueprint"]::before {
+  opacity: 1;
+  background-image:
+    linear-gradient(var(--pr-color-accent-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pr-color-accent-soft) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 0%, var(--pr-color-accent-soft), transparent 55%);
+  background-size: 22px 22px, 22px 22px, 100% 100%;
+}
+
+/* market · faint vertical price columns */
+body[data-bg="market"]::before {
+  opacity: 0.6;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--pr-color-accent-soft) 0px,
+    var(--pr-color-accent-soft) 2px,
+    transparent 2px,
+    transparent 14px
+  );
+}
+
+/* glass · soft radial glows */
+body[data-bg="glass"]::before {
+  opacity: 1;
+  background-image:
+    radial-gradient(circle at 20% 20%, var(--pr-color-accent-soft), transparent 35%),
+    radial-gradient(circle at 80% 70%, var(--pr-color-accent-soft), transparent 40%);
+}
+
+/* holo · slow shifting hue sheen */
+body[data-bg="holo"]::before {
+  opacity: 0.5;
+  background-image: conic-gradient(
+    from 0deg,
+    var(--pr-color-accent-soft),
+    transparent 25%,
+    var(--pr-color-accent-soft) 50%,
+    transparent 75%,
+    var(--pr-color-accent-soft)
+  );
+  animation: holoSpin 36s linear infinite;
+}
+@keyframes holoSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* graph · dot grid */
+body[data-bg="graph"]::before {
+  opacity: 1;
+  background-image: radial-gradient(var(--pr-color-accent-soft) 1.4px, transparent 1.4px);
+  background-size: 26px 26px;
+}
+
+/* ---- Calmer presets · Sprint M · easier on the eyes ------------------- */
+
+/* soft-grid · faint wide grid, low opacity (new default) */
+body[data-bg="soft-grid"]::before {
+  opacity: 0.4;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* calm-graph · sparse, large, dim dot grid */
+body[data-bg="calm-graph"]::before {
+  opacity: 0.5;
+  background-image: radial-gradient(rgba(255,255,255,0.05) 1.2px, transparent 1.2px);
+  background-size: 40px 40px;
+}
+
+/* midnight-glass · two very soft cool glows, no pattern */
+body[data-bg="midnight-glass"]::before {
+  opacity: 0.7;
+  background-image:
+    radial-gradient(circle at 25% 15%, rgba(124,155,255,0.06), transparent 40%),
+    radial-gradient(circle at 80% 85%, rgba(124,155,255,0.05), transparent 45%);
+}
+
+/* warm-focus · gentle warm vignette toward the center */
+body[data-bg="warm-focus"]::before {
+  opacity: 0.6;
+  background-image:
+    radial-gradient(ellipse at 50% 40%, rgba(245,196,120,0.05), transparent 55%),
+    radial-gradient(ellipse at 50% 120%, rgba(0,0,0,0.35), transparent 60%);
+}
+
+/* low-contrast · almost flat, a whisper of grid */
+body[data-bg="low-contrast"]::before {
+  opacity: 0.25;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ---- Theme 2.0 · animated backgrounds · UX-X (premium · calm) -------- */
+
+/* animated-grid · grid that drifts very slowly */
+body[data-bg="animated-grid"]::before {
+  opacity: 0.5;
+  background-image:
+    linear-gradient(var(--pr-color-accent-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pr-color-accent-soft) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: bgGridDrift 60s linear infinite;
+}
+@keyframes bgGridDrift { to { background-position: 40px 40px; } }
+
+/* market-dots · dot field with a slow vertical drift */
+body[data-bg="market-dots"]::before {
+  opacity: 0.45;
+  background-image: radial-gradient(var(--pr-color-accent-soft) 1.4px, transparent 1.4px);
+  background-size: 30px 30px;
+  animation: bgDotsDrift 50s linear infinite;
+}
+@keyframes bgDotsDrift { to { background-position: 0 30px; } }
+
+/* slow-graph · two soft diagonal sweeps, very slow */
+body[data-bg="slow-graph"]::before {
+  opacity: 0.4;
+  background-image:
+    repeating-linear-gradient(60deg, var(--pr-color-accent-soft) 0 1px, transparent 1px 90px);
+  animation: bgGraphPan 90s linear infinite;
+}
+@keyframes bgGraphPan { to { background-position: 200px 0; } }
+
+/* signal-field · faint pulsing radial glows */
+body[data-bg="signal-field"]::before {
+  opacity: 0.6;
+  background-image:
+    radial-gradient(circle at 20% 30%, var(--pr-color-accent-soft), transparent 35%),
+    radial-gradient(circle at 75% 70%, var(--pr-color-accent-soft), transparent 40%);
+  animation: bgSignalPulse 12s ease-in-out infinite;
+}
+@keyframes bgSignalPulse { 0%,100% { opacity: 0.45; } 50% { opacity: 0.7; } }
+
+/* soft-stars · sparse static star dots with a gentle twinkle */
+body[data-bg="soft-stars"]::before {
+  opacity: 0.5;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.35), transparent);
+  background-size: 220px 220px;
+  animation: bgStarTwinkle 9s ease-in-out infinite;
+}
+@keyframes bgStarTwinkle { 0%,100% { opacity: 0.35; } 50% { opacity: 0.6; } }
+
+/* ---- Motion system · UX-X · opt-in premium micro-motion --------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .op-breathe-border {
+    animation: opBreatheBorder 5s ease-in-out infinite;
+  }
+  @keyframes opBreatheBorder {
+    0%,100% { box-shadow: 0 0 0 1px rgba(124,155,255,0.10), 0 0 18px -8px rgba(124,155,255,0.25); }
+    50%     { box-shadow: 0 0 0 1px rgba(124,155,255,0.24), 0 0 26px -6px rgba(124,155,255,0.45); }
+  }
+  .op-rise {
+    animation: opRise 0.5s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  @keyframes opRise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
+/* hover depth · glass reflection · safe regardless of motion pref */
+.op-hover-depth {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.op-hover-depth:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px -12px rgba(0,0,0,0.55);
+}
+.op-glass-reflect {
+  position: relative;
+  overflow: hidden;
+}
+.op-glass-reflect::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, rgba(255,255,255,0.06) 0%, transparent 35%);
+  pointer-events: none;
+}
+
+/* ---------- Glass utilities --------------------------------------------- */
+
+.glass {
+  background: linear-gradient(180deg, var(--pr-surface-2), var(--pr-surface-1));
+  border: 1px solid var(--pr-border-1);
+  backdrop-filter: blur(var(--pr-blur-md)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--pr-blur-md)) saturate(140%);
+  box-shadow: var(--pr-shadow-glass);
+}
+
+.glass-strong {
+  background: linear-gradient(
+    180deg,
+    rgba(20, 23, 32, 0.85),
+    rgba(11, 13, 18, 0.85)
+  );
+  border: 1px solid var(--pr-border-2);
+  backdrop-filter: blur(var(--pr-blur-lg)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--pr-blur-lg)) saturate(160%);
+  box-shadow: var(--pr-shadow-glass);
+}
+
+/* ---------- Scrollbar --------------------------------------------------- */
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* ---------- Tauri drag regions ----------------------------------------- */
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}

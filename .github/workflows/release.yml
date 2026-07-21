@@ -1,0 +1,233 @@
+name: Release · PromptReady OS
+
+# Triggered by tag push (v*). Builds the Tauri desktop binaries for
+# macOS Apple Silicon, macOS Intel, Windows MSI, Linux AppImage and
+# Linux .deb, then publishes them as a GitHub Release with a
+# checksums.txt next to the artifacts.
+#
+# Honest: a missing signing key on the runner will skip notarization
+# rather than ship an unsigned-but-mislabelled binary. The CI logs
+# show every step that ran.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v0.1.0)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  APP_DIR: promptready-os
+  NODE_VERSION: "20"
+  RUST_TOOLCHAIN: stable
+
+jobs:
+  # --------------------------------------------------------------------
+  # 1. Build matrix · one job per platform target
+  # --------------------------------------------------------------------
+  build:
+    name: build · ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macos-apple-silicon
+            os: macos-14
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+          - label: macos-intel
+            os: macos-13
+            target: x86_64-apple-darwin
+            bundles: app,dmg
+          - label: windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: msi
+          - label: linux
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.APP_DIR }}/src-tauri/target
+          key: cargo-${{ matrix.label }}-${{ hashFiles(format('{0}/src-tauri/Cargo.lock', env.APP_DIR)) }}
+          restore-keys: |
+            cargo-${{ matrix.label }}-
+
+      - name: Linux build deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci
+
+      - name: Build web bundle
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run build
+
+      - name: Build Tauri bundle
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          # Optional signing keys. If absent, the job still produces an
+          # unsigned binary — the release-notes step labels it honestly.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+
+      - name: Collect artifacts
+        id: collect
+        shell: bash
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          mkdir -p ../release-staging
+          shopt -s nullglob
+          for pattern in \
+            "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg" \
+            "src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi" \
+            "src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage" \
+            "src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb"; do
+            for f in $pattern; do
+              if [ -f "$f" ]; then
+                cp "$f" ../release-staging/
+                echo "collected $f"
+              fi
+            done
+          done
+          ls -lah ../release-staging || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: promptready-os-${{ matrix.label }}
+          path: release-staging/
+          if-no-files-found: warn
+
+  # --------------------------------------------------------------------
+  # 2. Publish · single job that assembles checksums and creates a
+  #    GitHub Release. Only attaches files that actually exist.
+  # --------------------------------------------------------------------
+  publish:
+    name: publish · GitHub Release
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Flatten and checksum
+        shell: bash
+        run: |
+          mkdir -p release-final
+          shopt -s nullglob
+          for f in release-artifacts/*/*; do
+            if [ -f "$f" ]; then
+              cp "$f" release-final/
+            fi
+          done
+          cd release-final
+          if compgen -G "*" > /dev/null; then
+            sha256sum * | sort > checksums.txt
+            echo "----- checksums.txt -----"
+            cat checksums.txt
+          else
+            echo "no binaries collected · publish step will skip release"
+            echo "SKIP_RELEASE=1" >> $GITHUB_ENV
+          fi
+
+      - name: Resolve tag name
+        id: tag
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release
+        if: env.SKIP_RELEASE != '1'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: PromptReady OS ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          draft: true
+          files: |
+            release-final/*
+          body: |
+            ## PromptReady OS · ${{ steps.tag.outputs.tag }}
+
+            Local-first AI operator console. Source build · the
+            deterministic engine runs offline forever.
+
+            ### Install (one of)
+
+            - **macOS**: download the matching `.dmg` for Apple Silicon
+              or Intel. Unsigned builds may require a Gatekeeper
+              override on first launch (see Settings → Packaging).
+            - **Windows**: run the `.msi` installer.
+            - **Linux**: AppImage (universal) or `.deb` (Debian /
+              Ubuntu).
+            - **Source**: `git clone … && cd promptready-os &&
+              npm install && npm run tauri:build`.
+
+            ### Verify
+
+            `sha256sum -c checksums.txt`
+
+            ### Honest notes
+
+            - Signing & notarization land when the cert lives in CI
+              secrets. Until then binaries are unsigned.
+            - The deterministic engine ships in the box. Ollama is
+              opt-in. Cloud is opt-in (BYOK).
