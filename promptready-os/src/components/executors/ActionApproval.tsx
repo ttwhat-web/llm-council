@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Check, RefreshCw } from "lucide-react";
+import { Check, Loader2, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { undoSecondsLeft } from "@/services/executors/actionQueue";
 import type { Action } from "@/services/executors/types";
@@ -105,7 +105,13 @@ export function ActionApproval({ action, onApprove, onReject, onUndo, onRetry, c
   }
 
   if (action!.status === "executing") {
-    return <ReceiptLine tone="amber">{action!.title}…</ReceiptLine>;
+    return (
+      <ReceiptLine tone="amber">
+        <span className="inline-flex items-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin" /> {action!.title}
+        </span>
+      </ReceiptLine>
+    );
   }
 
   if (action!.status === "completed") {

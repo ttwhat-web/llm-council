@@ -33,10 +33,20 @@ export function DelegationPreview() {
   const undo = useActionQueue((s) => s.undo);
   const retry = useActionQueue((s) => s.retry);
 
-  const pendingCount = useMemo(() => {
-    if (!plan) return 0;
-    return plan.actions.filter((a) => isPending(items[a.queueId])).length;
+  // Split so a founder can tell "needs a decision" from "already
+  // handled" at a glance — the header count and the button count used
+  // to disagree (4 actions, "Approve all (3)") with nothing explaining
+  // why. Now the grouping itself is the explanation.
+  const { pendingActions, doneActions } = useMemo(() => {
+    if (!plan) return { pendingActions: [] as PlannedAction[], doneActions: [] as PlannedAction[] };
+    const pendingActions: PlannedAction[] = [];
+    const doneActions: PlannedAction[] = [];
+    for (const a of plan.actions) {
+      (isPending(items[a.queueId]) ? pendingActions : doneActions).push(a);
+    }
+    return { pendingActions, doneActions };
   }, [plan, items]);
+  const pendingCount = pendingActions.length;
 
   // Esc closes the preview; Cmd/Ctrl+A approves everything still
   // pending in THIS plan — never every pending action on Home, and
@@ -65,7 +75,7 @@ export function DelegationPreview() {
   return (
     <section className="flex flex-col gap-3 rounded-2xl bg-white/[0.025] p-5" aria-label="Delegated request">
       <header className="flex items-start justify-between gap-3">
-        <span className="min-w-0 text-[15px] font-medium text-white">{headline(status, plan, error)}</span>
+        <span className="min-w-0 text-[15px] font-medium text-white">{headline(status, plan, error, pendingCount)}</span>
         <button
           type="button"
           onClick={dismiss}
@@ -78,7 +88,7 @@ export function DelegationPreview() {
 
       {status === "interpreting" && <p className="text-[13px] text-white/55">Preparing…</p>}
 
-      {plan && plan.actions.length > 0 && (
+      {pendingActions.length > 0 && (
         <>
           {pendingCount > 1 && (
             <button
@@ -91,7 +101,7 @@ export function DelegationPreview() {
             </button>
           )}
           <ul className="flex flex-col gap-2">
-            {plan.actions.map((a) => (
+            {pendingActions.map((a) => (
               <li key={a.queueId} className="flex flex-col gap-1.5 rounded-lg bg-white/[0.018] p-3">
                 <p className="text-[13px] font-medium text-white">{a.summary}</p>
                 <ActionApproval
@@ -107,6 +117,27 @@ export function DelegationPreview() {
             ))}
           </ul>
         </>
+      )}
+
+      {doneActions.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {pendingActions.length > 0 && (
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.15em] text-white/30">Already done</span>
+          )}
+          <ul className="flex flex-col gap-1">
+            {doneActions.map((a) => (
+              <li key={a.queueId}>
+                <ActionApproval
+                  action={items[a.queueId]}
+                  onApprove={() => approve(a.queueId)}
+                  onReject={() => reject(a.queueId)}
+                  onUndo={() => undo(a.queueId)}
+                  onRetry={() => retry(a.queueId)}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {plan && plan.issues.length > 0 && (
@@ -132,6 +163,7 @@ function isPending(item: Action | undefined): boolean {
     !item ||
     item.status === "prepared" ||
     item.status === "cancelled" ||
+    item.status === "failed" ||
     (item.status === "waiting_approval" && item.approvedAt == null)
   );
 }
@@ -145,12 +177,16 @@ function EvidenceLine({ action }: { action: PlannedAction }) {
   );
 }
 
-function headline(status: string, plan: DelegationPlan | null, error: string | null): string {
+function headline(status: string, plan: DelegationPlan | null, error: string | null, pendingCount: number): string {
   if (error) return "Something went wrong preparing that.";
   if (status === "interpreting") return "Understanding that…";
   if (!plan) return "";
   const n = plan.actions.length;
   if (n === 0 && plan.issues.length > 0) return "I couldn't prepare anything from that.";
   if (n === 0) return "Nothing to do — you're already caught up.";
-  return `I understood this as ${n} action${n === 1 ? "" : "s"}.`;
+  const base = `I understood this as ${n} action${n === 1 ? "" : "s"}.`;
+  if (pendingCount === 0) return `${base} All done already.`;
+  if (pendingCount === n) return base;
+  const doneCount = n - pendingCount;
+  return `${base} ${pendingCount} need${pendingCount === 1 ? "s" : ""} you, ${doneCount} already done.`;
 }
